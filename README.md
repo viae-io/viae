@@ -7,7 +7,7 @@ A bi-directional communication api framework with streaming support.
 [![NPM version][npm-image]][npm-url]
 [![NPM downloads][npm-downloads]][npm-url]
 [![Travis Status][travis-image]][travis-url]
-[Stability][stability-image]
+[![Stability][stability-image]][stability-url]
 
 ## install
 
@@ -16,9 +16,6 @@ A bi-directional communication api framework with streaming support.
 ## Usage
 
 check [Documentation](https://github.com/MeirionHughes/viae/wiki) for more examples; 
-
-
-
 
 ### WebSocket - Client
 
@@ -57,3 +54,4 @@ npm test
 [travis-url]: https://travis-ci.org/MeirionHughes/viae
 [travis-image]: https://img.shields.io/travis/MeirionHughes/viae/master.svg
 [stability-image]: https://img.shields.io/badge/stability-1%20%3A%20unstable-red.svg
+[stability-url]: https://nodejs.org/api/documentation.html#documentation_stability_index
