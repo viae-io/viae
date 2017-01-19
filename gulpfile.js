@@ -124,7 +124,6 @@ gulp.task('compile:source', function (callback) {
       libraryTarget: 'umd'
     },
     resolve: {
-      modules: [path.join(__dirname, 'node_modules')],
       extensions: ['.js', '.jsx', '.ts', 'tsx'],
     },
     module: {
@@ -184,7 +183,7 @@ gulp.task('compile:spec', function () {
 
   return tsResult.js
     .pipe(sourcemap.write('.', { sourceRoot: '.' }))
-    .pipe(replace(/(source\/)/g, '/lib\/'))
+    .pipe(replace(/(src\/)/g, '/lib\/'))
     .pipe(gulp.dest('spec/'));
 });
 
