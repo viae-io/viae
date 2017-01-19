@@ -1,5 +1,5 @@
 import * as pathToRegexp from 'path-to-regexp';
-import { Readable } from 'readable-stream';
+import { Readable } from 'stream';
 import { Rowan, IRowan, Handler } from 'rowan';
 
 import { Events } from './utils/events';

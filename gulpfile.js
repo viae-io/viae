@@ -11,6 +11,7 @@ var replace = require('gulp-replace');
 var tslint = require('gulp-tslint');
 var formatter = require('typescript-formatter');
 var typescript = require('typescript');
+const webpack = require('webpack');
 
 var path = require('path');
 var merge = require('merge2');
@@ -100,10 +101,6 @@ gulp.task('lint:source', function () {
     .pipe(tslint.report());
 });
 
-
-const webpack = require('webpack');
-
-
 /**
  * Compiling
  */
@@ -146,10 +143,8 @@ gulp.task('compile:source', function (callback) {
     ],
     externals: [{
       "rowan": true,
-      "readable-stream": true,
-      "varint": true,
-      "tslib": true,
-    }]
+      "tslib": true
+        }]
   }, function (err, stats) {
     if (err) throw new gutil.PluginError("webpack", err);
     gutil.log("[webpack]", stats.toString({
