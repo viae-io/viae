@@ -1,0 +1,55 @@
+{
+  "name": "viae",
+  "version": "0.1.0",
+  "description": "A bi-directional communication api framework with streaming support.",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "scripts": {
+    "test": "gulp test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RobGeoLtd/viae.js.git"
+  },
+  "keywords": [
+    "api",
+    "rowan",
+    "middleware",
+    "request",
+    "response",
+    "websocket",
+    "ws",
+    "stream"
+  ],
+  "author": "Meirion Hughes <crakinshot@yahoo.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/RobGeoLtd/viae.js/issues"
+  },
+  "homepage": "https://github.com/RobGeoLtd/viae.js#readme",
+  "devDependencies": {
+    "@types/jasmine": "^2.5.38",
+    "@types/node": "^6.0.59",
+    "gulp": "^3.9.1",
+    "gulp-jasmine": "^2.4.2",
+    "gulp-plumber": "^1.1.0",
+    "gulp-replace": "^0.5.4",
+    "gulp-rimraf": "^0.2.1",
+    "gulp-sourcemaps": "^2.2.0",
+    "gulp-tslint": "^7.0.1",
+    "gulp-typescript": "^3.1.3",
+    "gulp-typescript-formatter": "^0.1.3",
+    "merge2": "^1.0.2",
+    "run-sequence": "^1.2.2",
+    "tslint": "^4.0.2",
+    "typescript": "^2.1.4",
+    "typescript-formatter": "^3.1.0",
+    "ws": "^1.1.1"
+  },
+  "dependencies": {
+    "path-to-regexp": "^1.7.0",
+    "readable-stream": "^2.2.2",
+    "rowan": "^0.1.8",
+    "varint": "^5.0.0"
+  }
+}
