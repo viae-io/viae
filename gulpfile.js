@@ -16,7 +16,7 @@ var runsequence = require('run-sequence');
 var through = require('through2');
 
 var paths = {
-  source: "source/",
+  source: "src/",
   output: "lib/",
   spec: "spec/"
 }
@@ -117,8 +117,8 @@ gulp.task('compile:source', ['clean:source'], function () {
     tsResult.js
       .pipe(sourcemap.write('.', {
         sourceRoot: function (file) {
-          var relative = path.relative(file.path, path.join(__dirname, "source"));
-          var relativeSource = path.join(relative, 'source')
+          var relative = path.relative(file.path, path.join(__dirname, "src"));
+          var relativeSource = path.join(relative, 'src')
           return relativeSource;
         }
       }))
@@ -143,7 +143,7 @@ gulp.task('compile:spec', ['compile:source', 'clean:spec'], function () {
         return relativeSource;
       }
     }))
-    .pipe(replace(/(source\/)/g, 'lib/'))
+    .pipe(replace(/(src\/)/g, 'lib/'))
     .pipe(gulp.dest(paths.spec));
 });
 

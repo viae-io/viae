@@ -1,4 +1,4 @@
-import { Method, Message, MessageSerialiser } from '../source/index';
+import { Method, Message, MessageSerialiser } from '../src/index';
 
 describe("Message", () => {
   describe("Serialiser", () => {
