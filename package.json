@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MeirionHughes/viae.js.git"
+    "url": "git+https://github.com/MeirionHughes/viae.git"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
@@ -27,9 +27,9 @@
   "author": "Meirion Hughes <crakinshot@yahoo.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/MeirionHughes/viae.js/issues"
+    "url": "https://github.com/MeirionHughes/viae/issues"
   },
-  "homepage": "https://github.com/MeirionHughes/viae.js#readme",
+  "homepage": "https://github.com/MeirionHughes/viae#readme",
   "devDependencies": {
     "@types/jasmine": "^2.5.38",
     "@types/node": "^6.0.59",
