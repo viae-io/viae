@@ -1,6 +1,7 @@
 'use strict';
 
 var gulp = require('gulp');
+var gutil = require('gutil');
 var ts = require('gulp-typescript');
 var jasmine = require('gulp-jasmine');
 var plumber = require('gulp-plumber');
@@ -9,10 +10,11 @@ var rimraf = require('gulp-rimraf');
 var replace = require('gulp-replace');
 var tslint = require('gulp-tslint');
 var formatter = require('typescript-formatter');
+var typescript = require('typescript');
 
 var path = require('path');
 var merge = require('merge2');
-var runsequence = require('run-sequence');
+var sequence = require('run-sequence');
 var through = require('through2');
 
 var paths = {
@@ -20,6 +22,7 @@ var paths = {
   output: "lib/",
   spec: "spec/"
 }
+var title = "viae";
 
 /**
  * Cleaning
@@ -98,12 +101,69 @@ gulp.task('lint:source', function () {
 });
 
 
+const webpack = require('webpack');
+
+
 /**
  * Compiling
  */
 
+gulp.task('compile', ["clean"], function (done) {
+  sequence("compile:source", "compile:typings", "compile:spec", done);
+});
 
-gulp.task('compile:source', ['clean:source'], function () {
+gulp.task('compile:source', function (callback) {
+  webpack({
+    entry: {
+      index: './src/index'
+    },
+    output: {
+      path: path.join(__dirname, 'lib'),
+      filename: 'index.js',
+      library: title,
+      libraryTarget: 'umd'
+    },
+    resolve: {
+      modules: [
+        path.join(__dirname, 'node_modules')
+      ],
+      extensions: ['.ts', '.js'],
+    },
+    module: {
+      loaders: [
+        {
+          test: /\.ts$/i,
+          loaders: ['awesome-typescript-loader'],
+          exclude: /node_modules/
+        },
+      ]
+    },
+    plugins: [
+      new webpack.optimize.UglifyJsPlugin({ minimize: true, output: { comments: false }, sourceMap: true }),
+      new webpack.SourceMapDevToolPlugin({
+        test: /\.js$/,
+        moduleFilenameTemplate: '[absolute-resource-path]',
+        fallbackModuleFilenameTemplate: '[absolute-resource-path]?[hash]',
+        filename: "[file].map",
+        sourceRoot: '../src'
+      })
+    ],
+    externals: [{
+      "rowan": true,
+      "readable-stream": true,
+      "varint": true
+    }]
+  }, function (err, stats) {
+    if (err) throw new gutil.PluginError("webpack", err);
+    gutil.log("[webpack]", stats.toString({
+      // output options
+    }));
+    callback();
+  });
+});
+
+
+gulp.task('compile:typings', function () {
   var tsProject = ts.createProject('tsconfig.json', {
     typescript: require('typescript')
   });
@@ -112,39 +172,22 @@ gulp.task('compile:source', ['clean:source'], function () {
     .pipe(sourcemap.init())
     .pipe(tsProject());
 
-  return merge([
-    tsResult.dts.pipe(gulp.dest(paths.output)),
-    tsResult.js
-      .pipe(sourcemap.write('.', {
-        sourceRoot: function (file) {
-          var relative = path.relative(file.path, path.join(__dirname, "src"));
-          var relativeSource = path.join(relative, 'src')
-          return relativeSource;
-        }
-      }))
-      .pipe(gulp.dest(paths.output))
-  ]);
+  return tsResult.dts.pipe(gulp.dest(paths.output))
 });
 
-gulp.task('compile:spec', ['compile:source', 'clean:spec'], function () {
+gulp.task('compile:spec', function () {
   var tsProject = ts.createProject('tsconfig.json', {
-    typescript: require('typescript')
+    typescript: typescript
   });
 
-  var tsResult = gulp.src([paths.spec + '**/*spec.ts'])
+  var tsResult = gulp.src([paths.spec + '**/*.spec.ts'])
     .pipe(sourcemap.init())
     .pipe(tsProject());
 
   return tsResult.js
-    .pipe(sourcemap.write('.', {
-      sourceRoot: function (file) {
-        var relative = path.relative(file.path, path.join(__dirname, "spec"));
-        var relativeSource = path.join(relative, 'spec')
-        return relativeSource;
-      }
-    }))
-    .pipe(replace(/(src\/)/g, 'lib/'))
-    .pipe(gulp.dest(paths.spec));
+    .pipe(sourcemap.write('.', { sourceRoot: '.' }))
+    .pipe(replace(/(source\/)/g, '/lib\/'))
+    .pipe(gulp.dest('spec/'));
 });
 
 /**
@@ -158,15 +201,15 @@ gulp.task('test:jasmine', function (done) {
 });
 
 gulp.task('test', function (done) {
-  runsequence('compile:spec', 'lint:source', 'test:jasmine', function (err) {
-    runsequence('clean:spec');
+  sequence('compile:spec', 'lint:source', 'test:jasmine', function (err) {
+    sequence('clean:spec');
     done();
   });
 });
 
 gulp.task('test:nocompile', function (done) {
-  runsequence('test:jasmine', function (err) {
-    runsequence('clean:spec');
+  sequence('test:jasmine', function (err) {
+    sequence('clean:spec');
     done();
   });
 });
