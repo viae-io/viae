@@ -9,7 +9,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/RobGeoLtd/viae.js.git"
+    "url": "git+https://github.com/MeirionHughes/viae.js.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
   },
   "keywords": [
     "api",
@@ -24,9 +27,9 @@
   "author": "Meirion Hughes <crakinshot@yahoo.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/RobGeoLtd/viae.js/issues"
+    "url": "https://github.com/MeirionHughes/viae.js/issues"
   },
-  "homepage": "https://github.com/RobGeoLtd/viae.js#readme",
+  "homepage": "https://github.com/MeirionHughes/viae.js#readme",
   "devDependencies": {
     "@types/jasmine": "^2.5.38",
     "@types/node": "^6.0.59",
