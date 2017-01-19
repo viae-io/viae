@@ -124,17 +124,14 @@ gulp.task('compile:source', function (callback) {
       libraryTarget: 'umd'
     },
     resolve: {
-      modules: [
-        path.join(__dirname, 'node_modules')
-      ],
-      extensions: ['.ts', '.js'],
+      modules: [path.join(__dirname, 'node_modules')],
+      extensions: ['.js', '.jsx', '.ts', 'tsx'],
     },
     module: {
       loaders: [
         {
           test: /\.ts$/i,
           loaders: ['awesome-typescript-loader'],
-          exclude: /node_modules/
         },
       ]
     },
@@ -151,7 +148,8 @@ gulp.task('compile:source', function (callback) {
     externals: [{
       "rowan": true,
       "readable-stream": true,
-      "varint": true
+      "varint": true,
+      "tslib": true,
     }]
   }, function (err, stats) {
     if (err) throw new gutil.PluginError("webpack", err);
@@ -201,7 +199,7 @@ gulp.task('test:jasmine', function (done) {
 });
 
 gulp.task('test', function (done) {
-  sequence('compile:spec', 'lint:source', 'test:jasmine', function (err) {
+  sequence('compile:source', 'compile:spec', 'lint:source', 'test:jasmine', function (err) {
     sequence('clean:spec');
     done();
   });
