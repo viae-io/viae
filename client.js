@@ -10,7 +10,7 @@ let via = new Via(ws);
 
 via.use((ctx) => {
   if (isPipeable(ctx.res.body)) {
-    ctx.res.body.pipe(process.stdout);
+    ctx.res.body.pipe(process.stdout, { end: false });
     return false;
   }
 });
