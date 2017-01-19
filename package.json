@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A bi-directional communication api framework with streaming support.",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
@@ -51,7 +51,7 @@
     "ws": "^1.1.1",
     "path-to-regexp": "^1.7.0"
   },
-  "dependencies": {    
+  "dependencies": {
     "readable-stream": "^2.2.2",
     "rowan": "0.1.x",
     "varint": "^5.0.0"
