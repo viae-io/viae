@@ -193,7 +193,7 @@ gulp.task('test:jasmine', function (done) {
 });
 
 gulp.task('test', function (done) {
-  sequence('compile:source', 'compile:spec', 'lint:source', 'test:jasmine', function (err) {
+  sequence('compile', 'lint:source', 'test:jasmine', function (err) {
     sequence('clean:spec');
     done();
   });
