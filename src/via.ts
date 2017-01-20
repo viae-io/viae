@@ -119,7 +119,8 @@ export class Via implements IRowan<Context> {
     };
   }
 
-  protected send(msg: Message, wire?: Wire) {
+  /* solicited or unsolicited response */
+  send(msg: Message, wire?: Wire) {
     wire = wire || this.wire;
 
     if (wire == undefined)
