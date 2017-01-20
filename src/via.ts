@@ -151,11 +151,15 @@ export class Via implements IRowan<Context> {
     return promise;
   }
 
-  process(err: any, ctx: Context) {
+  process(ctx: Context)
+  process(err: any, ctx: Context)
+  process() {
     if (arguments.length == 2)
-      return this._root.process(err, ctx);
-    return this._root.process(ctx);
+      return this._root.process(arguments[0], arguments[1]);
+
+    return this._root.process(arguments[0]);
   }
+
 
   protected async decodeWireMessage(wire: Wire, binary: Uint8Array) {
     let msg = this._serialiser.decode(binary);
