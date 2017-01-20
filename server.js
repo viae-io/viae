@@ -6,9 +6,9 @@ let wss = new WebSocketServer({ port: 8080, handleProtocols: ["viae"] });
 let server = new Viae(wss);
 
 server.path("/greet", (ctx) => {
-  ctx.begin(); 
+  ctx.begin();
   ctx.send("w");
-  ctx.send("o"); 
+  ctx.send("o");
   ctx.send("r");
   ctx.send("l");
   ctx.send("d");
@@ -31,3 +31,11 @@ server.use((err, ctx) => {
 });
 
 console.log("Server Running on 8080....");
+
+setInterval(() => {
+  server.broadcast({
+    status:200,
+    path:"/welcome",
+    body:"hello"
+  })
+}, 2000);

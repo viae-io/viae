@@ -12,6 +12,8 @@ via.use((ctx) => {
   if (isPipeable(ctx.res.body)) {
     ctx.res.body.pipe(process.stdout, { end: false });
     return false;
+  }else{
+    console.log(ctx.res.body);
   }
 });
 

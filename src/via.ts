@@ -120,15 +120,17 @@ export class Via implements IRowan<Context> {
   }
 
   /* solicited or unsolicited response */
-  send(msg: Message, wire?: Wire) {
-    wire = wire || this.wire;
+  send(msg: Message, ...wires: Wire[]) {
+    wires = wires || [this.wire];
 
-    if (wire == undefined)
+    if (wires == undefined)
       throw Error("wire is undefined");
 
     let bin = this._serialiser.encode(msg).buffer;
 
-    wire.send(bin);
+    for (var wire of wires){
+      wire.send(bin);
+    }
   }
 
   request(msg: Message, ...handlers: ViaHandler[]) {
