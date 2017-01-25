@@ -7,6 +7,7 @@ A bi-directional communication api framework with streaming support.
 [![NPM version][npm-image]][npm-url]
 [![NPM downloads][npm-downloads]][npm-url]
 [![Travis Status][travis-image]][travis-url]
+[![codecov](https://codecov.io/gh/MeirionHughes/viae/branch/master/graph/badge.svg)](https://codecov.io/gh/MeirionHughes/viae)
 [![Stability][stability-image]][stability-url]
 
 ## install
