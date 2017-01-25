@@ -7,7 +7,7 @@ export function unhandled() {
 }
 
 export function unhandledError() {
-  return async (err, ctx: Context) => {
+  return async (ctx: Context, err: any) => {
 
     if (typeof (err) == "number")
       ctx.res.status = err;
@@ -20,7 +20,7 @@ export function unhandledError() {
 }
 
 export function fatalError() {
-  return async (err, _) => {
+  return async (_, err) => {
     if (err.stack != undefined) {
       console.log(err);
     }

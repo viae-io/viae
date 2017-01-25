@@ -1,19 +1,26 @@
 let webpack = require('webpack');
+let path = require('path');
+
 module.exports = {
   entry: './src/index.ts',
   output: {
-    filename: 'viae.js',
+    filename: 'index.js',
     path: './lib',
+    library: 'Viae',
+    libraryTarget: 'umd'    
   },
   module: {
     rules: [
       {
-        test: /\.ts?$/,
+        test: /\.ts?$/,     
+        exclude: [
+          path.resolve(__dirname, "test")
+        ],
         loader: 'awesome-typescript-loader'
       }
     ]
   },
-  externals: [ "rowan", "stream"],
+  externals: ["varint", "stream", "rowan", "tslib"],
   resolve: {
     extensions: [".ts", ".js"]
   },

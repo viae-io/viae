@@ -152,12 +152,8 @@ export class Via implements IRowan<Context> {
   }
 
   process(ctx: Context)
-  process(err: any, ctx: Context)
-  process() {
-    if (arguments.length == 2)
-      return this._root.process(arguments[0], arguments[1]);
-
-    return this._root.process(arguments[0]);
+  process(ctx: Context, err?: any){
+    return this._root.process(ctx, err);
   }
 
 
@@ -167,7 +163,7 @@ export class Via implements IRowan<Context> {
     let ctx = this.createContext(wire, msg);
 
     try {
-      await this.process(undefined, ctx);
+      await this.process(ctx);
     }
     catch (err) {
       console.log("process exception:", err);
@@ -237,7 +233,7 @@ export class Via implements IRowan<Context> {
         return;
       const interceptor = this._interceptors.get((ctx.res.id || ctx.req.id));
       if (interceptor != undefined) {
-        return await Rowan.execute(undefined, ctx, interceptor.handlers);
+        return await Rowan.execute(ctx, undefined, interceptor.handlers);
       }
     };
   }

@@ -12,3 +12,8 @@ tsconfig.json
 tsfmt.json
 tslint.json
 gulpfile.js
+server.js
+client.js
+webpack.config.js
+gulpfile.js
+

@@ -9,7 +9,7 @@
     "test": "nyc node_modules/mocha/bin/_mocha --compilers ts:ts-node/register ./test/*.ts",
     "posttest": "npm run build",
     "cover": "codecov",
-    "build": "webpack",
+    "build": "webpack && gulp typings",
     "prepare-release": "npm test",
     "clean": "rimraf coverage .nyc_output lib",
     "lint": "tslint ./src/*.ts"
@@ -44,20 +44,24 @@
     "awesome-typescript-loader": "^3.0.0-beta.18",
     "chai": "^3.5.0",
     "codecov": "^1.0.1",
-    "minify": "^2.0.13",
+    "gulp": "^3.9.1",
+    "gulp-typescript": "^3.1.4",
     "mocha": "^3.2.0",
     "nyc": "^10.1.2",
+    "path-to-regexp": "^1.7.0",
     "rimraf": "^2.5.4",
     "ts-node": "^2.0.0",
     "tslint": "^4.3.1",
     "typescript": "^2.1.5",
     "varint": "^5.0.0",
-    "webpack": "^2.2.0"
+    "webpack": "^2.2.0",
+    "ws": "^1.1.1"
   },
   "dependencies": {
-    "path-to-regexp": "^1.7.0",
+    "readable-stream": "^2.2.2",
     "rowan": "0.2.x",
-    "tslib": "^1.5.0"
+    "tslib": "^1.5.0",
+    "varint": "^5.0.0"
   },
   "nyc": {
     "include": [

@@ -20,7 +20,7 @@ server.use((ctx) => {
   return 404;
 });
 
-server.use((err, ctx) => {
+server.use((ctx, err) => {
   console.log(err);
   if (typeof (err) == "number") {
     ctx.res.status = err;
