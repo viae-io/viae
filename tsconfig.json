@@ -2,17 +2,16 @@
   "compilerOptions": {
     "target": "es5",
     "module": "commonjs",
-    "moduleResolution": "node",
     "sourceMap": true,
-    "declaration": true,
+    "declaration": true,  
     "importHelpers": true,
+    "removeComments": true,
     "lib": [
       "es2015",
       "dom"
     ],
-    "types": [
-      "node",
-      "jasmine"
+    "typeRoots": [
+      "node_modules/@types"
     ]
   },
   "exclude": [

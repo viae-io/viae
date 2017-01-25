@@ -1,4 +1,6 @@
 import { Method, Message, MessageSerialiser } from '../src/index';
+import { assert, expect } from 'chai';
+
 
 describe("Message", () => {
   describe("Serialiser", () => {
@@ -11,12 +13,14 @@ describe("Message", () => {
 
       let bin = serialiser.encode(msg);
 
-      expect(bin.length).toBe(8);
+      expect(bin.length).equals(8);
 
       let result = serialiser.decode(bin);
 
-      expect(result.id).toBeDefined();
-      expect(result.id.length).toBe(16);
+      expect(result.id).to.not.be.undefined;
+
+      if (result.id)
+        expect(result.id.length).equals(16);
     });
 
     it("should correctly serialise message with id", () => {
@@ -29,11 +33,11 @@ describe("Message", () => {
 
       let bin = serialiser.encode(msg);
 
-      expect(bin.length).toBe(8);
+      expect(bin.length).to.equal(8);
 
       let result = serialiser.decode(bin);
 
-      expect(result.id).toBe("f0e1d2c3b4a59687");
+      expect(result.id).to.equal("f0e1d2c3b4a59687");
 
     });
 
@@ -47,12 +51,12 @@ describe("Message", () => {
       let serialiser = new MessageSerialiser();
       let bytes = serialiser.encode(msg);
 
-      expect(bytes.length).toBe(10);
+      expect(bytes.length).to.equal(10);
 
       let result = serialiser.decode(bytes);
 
-      expect(result.id).toBe("f0e1d2c3b4a59687");
-      expect(result.status).toBe(404);
+      expect(result.id).to.equal("f0e1d2c3b4a59687");
+      expect(result.status).to.equal(404);
     });
 
     it("should correctly serialise message with string body", () => {
@@ -65,12 +69,12 @@ describe("Message", () => {
       let serialiser = new MessageSerialiser();
       let bytes = serialiser.encode(msg);
 
-      expect(bytes.length).toBe(20);
+      expect(bytes.length).to.equal(20);
 
       let result = serialiser.decode(bytes);
 
-      expect(result.id).toBe("f0e1d2c3b4a59687");
-      expect(result.body).toBe("hello world");
+      expect(result.id).to.equal("f0e1d2c3b4a59687");
+      expect(result.body).to.equal("hello world");
     });
 
     it("should correctly serialise message with object body", () => {
@@ -82,7 +86,7 @@ describe("Message", () => {
       let serialiser = new MessageSerialiser();
       let result = serialiser.decode(serialiser.encode(msg));
 
-      expect(result.body).toEqual({ foo: "bar" });
+      expect(result.body).to.deep.equal({ foo: "bar" });
     });
 
     it("should correctly serialise message with Uint8Array body", () => {
@@ -94,7 +98,7 @@ describe("Message", () => {
       let serialiser = new MessageSerialiser();
       let result = serialiser.decode(serialiser.encode(msg));
 
-      expect(result.body).toEqual(new Uint8Array([1, 2, 3, 4]));
+      expect(result.body).to.deep.equal(new Uint8Array([1, 2, 3, 4]));
     });
 
     it("should correctly serialise message with headers", () => {
@@ -108,7 +112,7 @@ describe("Message", () => {
       let serialiser = new MessageSerialiser();
       let result = serialiser.decode(serialiser.encode(msg));
 
-      expect(result.headers).toEqual({
+      expect(result.headers).to.deep.equal({
         foo: "bar",
         ray: "day"
       });
@@ -123,8 +127,8 @@ describe("Message", () => {
       let serialiser = new MessageSerialiser();
       let result = serialiser.decode(serialiser.encode(msg));
 
-      expect(result).not.toBe(msg);
-      expect(result.method).toEqual(msg.method);
+      expect(result).not.to.deep.equal(msg);
+      expect(result.method).to.equal(msg.method);
     });
 
     it("should correctly serialise message with all fields", () => {
@@ -145,8 +149,8 @@ describe("Message", () => {
       let serialiser = new MessageSerialiser();
       let result = serialiser.decode(serialiser.encode(msg));
 
-      expect(result).not.toBe(msg);
-      expect(result).toEqual(msg);
+      expect(result).to.not.equal(msg);
+      expect(result).to.deep.equal(msg);
     });
   });
 });
