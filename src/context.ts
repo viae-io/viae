@@ -2,7 +2,7 @@ import { Request } from './request';
 import { Message } from './message';
 import { Wire } from './wire';
 
-export interface Context {
+export interface ViaContext {
   wire: Wire;
   
   req?: Request;

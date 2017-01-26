@@ -1,4 +1,4 @@
-export class Events {
+export class EventEmitter {
   private _events: { [name: string]: Array<(...args) => void>; } = {};
 
   /** 

@@ -1,13 +1,13 @@
-import { Context } from '../context';
+import { ViaContext } from '../context';
 
 export function unhandled() {
-  return async (ctx: Context) => {
+  return async (ctx: ViaContext) => {
     throw 404;
   };
 }
 
 export function unhandledError() {
-  return async (ctx: Context, err: any) => {
+  return async (ctx: ViaContext, err: any) => {
 
     if (typeof (err) == "number")
       ctx.res.status = err;
