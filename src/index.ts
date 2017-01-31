@@ -1,6 +1,5 @@
 export * from './context';
 export * from './message';
-export * from './message-serialiser';
 export * from './method';
 export * from './status';
 export * from './request';

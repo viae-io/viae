@@ -7,7 +7,6 @@ import { Wire } from './wire';
 import { Method } from './method';
 import { ViaContext } from './context';
 import { Message, MessageFlags } from './message';
-import { MessageSerialiser } from './message-serialiser';
 
 import { ViaPath, ViaHandler, ViaInterceptor } from './via-types';
 export { ViaPath, ViaHandler, ViaInterceptor } from './via-types';
@@ -19,8 +18,6 @@ import { intercept } from './middleware/intercept';
 export class Via implements IRowan<ViaContext> {
   private _root = new Rowan<ViaContext>();
   private _app = new Rowan<ViaContext>();
-
-  protected _serialiser = new MessageSerialiser();
 
   /*@internal*/
   public interceptors = new Map<string, ViaInterceptor>();
@@ -101,7 +98,7 @@ export class Via implements IRowan<ViaContext> {
     if (wires == undefined)
       throw Error("wire is undefined");
 
-    let bin = this._serialiser.encode(msg).buffer;
+    let bin = Message.serialiseBinary(msg).buffer;
 
     for (var wire of wires) {
       wire.send(bin);
@@ -112,7 +109,7 @@ export class Via implements IRowan<ViaContext> {
     if (msg.id == undefined)
       msg.id = Message.genIdString();
 
-    let bin = this._serialiser.encode(msg).buffer;
+    let bin = Message.serialiseBinary(msg).buffer;
 
     var resolve;
     let promise = new Promise<Message>((r) => resolve = r);
@@ -132,7 +129,7 @@ export class Via implements IRowan<ViaContext> {
   }
 
   protected async decodeWireMessage(wire: Wire, binary: Uint8Array) {
-    let msg = this._serialiser.decode(binary);
+    let msg = Message.deserialiseBinary(binary);
 
     let ctx = this.createContext(wire, msg);
 
