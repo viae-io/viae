@@ -1,11 +1,12 @@
 import * as pathToRegexp from 'path-to-regexp';
-import { ViaPath } from '../via-types';
-import { ViaContext } from '../context';
+import { ViaContext } from '../via';
+
+export type ViaPath = string | RegExp | (string | RegExp)[];
 
 export function pathHandler(path: ViaPath) {
   let keys = [];
   var exp = pathToRegexp(path, keys);
-  return async (ctx: ViaContext) => {
+  return (ctx: ViaContext) => {
     let match = (ctx.req.path) ? exp.exec(ctx.req.path) : null;
     if (match == null) {
       return false;

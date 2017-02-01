@@ -1,53 +1,40 @@
 
 import { Readable } from 'stream';
 import { Rowan, IRowan, Handler } from 'rowan';
-
 import { EventEmitter } from './utils/events';
 import { Wire } from './wire';
 import { Method } from './method';
-import { ViaContext } from './context';
-import { Message, MessageFlags } from './message';
-
-import { ViaPath, ViaHandler, ViaInterceptor } from './via-types';
-export { ViaPath, ViaHandler, ViaInterceptor } from './via-types';
-
-import { unhandled, unhandledError, fatalError } from './middleware/unhandled';
-import { pathHandler } from './middleware/path-handler';
-import { intercept } from './middleware/intercept';
+import { Message, MessageStreamFlags } from './message';
+import { Request } from './request';
 
 export class Via implements IRowan<ViaContext> {
+  private _interceptors = new Map<string, ViaInterceptor>();
+
   private _root = new Rowan<ViaContext>();
   private _app = new Rowan<ViaContext>();
 
-  /*@internal*/
-  public interceptors = new Map<string, ViaInterceptor>();
-
   constructor(private wire?: Wire) {
-    //TODO: Move these out;     
-    this._root.use(intercept(this));
-    this._root.use(this.responseStreamer());
+    this._root.use(this.handlerIntercept());
+    this._root.use(this.handlerResponseStream());
 
     this._root.use(this._app);
 
-    // Fallbacks 
-    this._root.use(unhandled());
-    this._root.use(unhandledError());
-    this._root.use(fatalError());
+    this._root.use(this.handlerUnhandled());
+    this._root.use(this.handlerUnhandledError());
 
     if (!!wire) {
-      wire.on("message", (data) => this.decodeWireMessage(wire, new Uint8Array(data)));
+      wire.on("message", x => this.processMessage(x, this.wire));
     }
   }
 
-  private intercept(id: string, handler: ViaHandler, ...handlers: ViaHandler[]): () => void {
-    let dispose = () => this.interceptors.delete(id);
+  protected async processMessage(data: ArrayBuffer, wire: Wire) {
+    let msg = Message.deserialiseBinary(new Uint8Array(data));
+    let ctx = this.createContext(wire, msg);
+    await this.process(ctx);
+  }
 
-    this.interceptors.set(id, {
-      dispose: dispose,
-      handlers: [handler, ...handlers]
-    });
-
-    return dispose;
+  process(ctx: ViaContext, err?: any) {
+    return this._root.process(ctx, err);
   }
 
   use(handler: ViaHandler, ...handlers: ViaHandler[]): this {
@@ -55,40 +42,16 @@ export class Via implements IRowan<ViaContext> {
     return this;
   }
 
-  get(path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
-    return this.method(Method.GET, path, handler, ...handlers);
-  }
+  private intercept(id: string, handler: ViaHandler, ...handlers: ViaHandler[]): () => void {
+    let dispose = () => this._interceptors.delete(id);
 
-  put(path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
-    return this.method(Method.PUT, path, handler, ...handlers);
-  }
+    this._interceptors.set(id, {
+      dispose: dispose,
+      timestamp: Date.now(),
+      handlers: [handler, ...handlers]
+    });
 
-  post(path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
-    return this.method(Method.POST, path, handler, ...handlers);
-  }
-
-  patch(path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
-    return this.method(Method.PATCH, path, handler, ...handlers);
-  }
-
-  delete(path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
-    return this.method(Method.DELETE, path, handler, ...handlers);
-  }
-
-  subscribe(path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
-    return this.method(Method.SUBSCRIBE, path, handler, ...handlers);
-  }
-
-  unsubscribe(path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
-    return this.method(Method.UNSUBSCRIBE, path, handler, ...handlers);
-  }
-
-  method(method: Method, path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
-    return this.use((ctx) => ctx.req.method === method, pathHandler(path), handler, ...handlers);
-  }
-
-  path(path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
-    return this.use(pathHandler(path), handler, ...handlers);
+    return dispose;
   }
 
   /* solicited or unsolicited response */
@@ -123,26 +86,7 @@ export class Via implements IRowan<ViaContext> {
     return promise;
   }
 
-  process(ctx: ViaContext)
-  process(ctx: ViaContext, err?: any) {
-    return this._root.process(ctx, err);
-  }
-
-  protected async decodeWireMessage(wire: Wire, binary: Uint8Array) {
-    let msg = Message.deserialiseBinary(binary);
-
-    let ctx = this.createContext(wire, msg);
-
-    try {
-      await this.process(ctx);
-    }
-    catch (err) {
-      console.log("process exception:", err);
-    }
-  }
-
-  /*internal*/
-  createContext(wire: Wire, msg: Message) {
+  private createContext(wire: Wire, msg: Message) {
     let ctx: ViaContext = {
       wire: wire,
     };
@@ -154,38 +98,37 @@ export class Via implements IRowan<ViaContext> {
 
     ctx.req = msg;
     ctx.res = { id: msg.id };
+
     ctx.begin = () => {
       let sid = Message.genIdString();
       ctx.res.status = 200;
-      ctx.res.flags = MessageFlags.Begin;
+      ctx.res.flags = MessageStreamFlags.Begin;
       ctx.res.body = sid;
 
-      console.log(ctx.res);
       this.send(ctx.res, wire);
 
       ctx.res = {
         id: sid,
         status: 200,
-        flags: MessageFlags.Next
+        flags: MessageStreamFlags.Next
       };
 
       ctx.send = (b) => {
         ctx.res.body = b;
-        console.log(ctx.res);
         this.send(ctx.res, wire);
       };
 
+      ctx.end = (body?) => {
+        ctx.res.flags = MessageStreamFlags.End;
+        ctx.res.body = body;
+
+        this.send(ctx.res, wire);
+
+        delete ctx.send;
+        delete ctx.end;
+      };
+
       delete ctx.begin;
-    };
-
-    ctx.end = (body?) => {
-      ctx.res.flags = MessageFlags.End;
-      ctx.res.body = body;
-
-      console.log(ctx.res);
-      this.send(ctx.res, wire);
-      delete ctx.send;
-      delete ctx.end;
     };
 
     ctx.send = (body) => {
@@ -198,13 +141,20 @@ export class Via implements IRowan<ViaContext> {
 
     return ctx;
   }
-  
 
-  private responseStreamer() {
+  private handlerIntercept() {
     return async (ctx: ViaContext) => {
+      if ((ctx.res.id || ctx.req.id) == undefined) return;
+      const interceptor = this._interceptors.get((ctx.res.id || ctx.req.id));
+      if (!!interceptor) { return await Rowan.execute(ctx, undefined, interceptor.handlers); }
+    };
+  };
+
+  private handlerResponseStream() {
+    return (ctx: ViaContext) => {
       if (ctx.res != undefined &&
         ctx.res.flags !== undefined &&
-        ctx.res.flags == MessageFlags.Begin &&
+        ctx.res.flags == MessageStreamFlags.Begin &&
         ctx.res.body !== undefined &&
         typeof (ctx.res.body) == "string"
       ) {
@@ -219,7 +169,7 @@ export class Via implements IRowan<ViaContext> {
           if (ctx2.res != undefined && ctx2.res.body! + undefined) {
             stream.push(ctx2.res.body);
           }
-          if (ctx2.res.flags == MessageFlags.End) {
+          if (ctx2.res.flags == MessageStreamFlags.End) {
             dispose();
             stream.push(null);
           }
@@ -228,4 +178,37 @@ export class Via implements IRowan<ViaContext> {
       }
     };
   }
+
+  private handlerUnhandled() {
+    return (ctx: ViaContext) => {
+      throw 404;
+    };
+  }
+
+  private handlerUnhandledError() {
+    return (ctx: ViaContext, err: any) => {
+
+      if (typeof (err) == "number")
+        ctx.res.status = err;
+      else
+        ctx.res.status = 500;
+
+      if (ctx.send != undefined)
+        return ctx.send();
+    };
+  }
 }
+
+export interface ViaContext {
+  wire: Wire;
+
+  req?: Request;
+  res?: Message;
+
+  begin?();
+  send?(body?: string | Uint8Array | Object);
+  end?(body?: string | Uint8Array | Object);
+}
+
+export type ViaHandler = Handler<ViaContext>;
+export type ViaInterceptor = { dispose: () => void, timestamp: number, handlers: ViaHandler[] };

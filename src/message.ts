@@ -5,7 +5,7 @@ import { Method } from './method';
 import { Status } from './status';
 
 /* Streaming Flags */ 
-export enum MessageFlags{
+export enum MessageStreamFlags{
   None = 0, // Not Streaming
   Begin = 1,
   Next = 2,
@@ -19,7 +19,7 @@ export interface Message {
   status?: Status;
   headers?: {};
   body?: any;
-  flags?: MessageFlags;
+  flags?: MessageStreamFlags;
 }
 
 export namespace Message {
@@ -40,6 +40,7 @@ export namespace Message {
 
     return numbers;
   };
+  
   export var genIdString = function () {
     let id = genId();
     return bytesToHex(genId());
