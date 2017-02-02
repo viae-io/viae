@@ -3,7 +3,8 @@ import { ViaContext } from '../via';
 
 export type ViaPath = string | RegExp | (string | RegExp)[];
 
-export function pathHandler(path: ViaPath) {
+/* the message is a request with a path matching the parameter */
+export function requestPath(path: ViaPath) {
   let keys = [];
   var exp = pathToRegexp(path, keys);
   return (ctx: ViaContext) => {
