@@ -1,8 +1,7 @@
 import { Wire, WireServer } from './wire';
 import { Via, ViaHandler } from './via';
-import { ViaPath, pathHandler } from './middleware/path-handler';
+import { ViaPath, pathHandler, methodHandler } from './middleware';
 import { Method } from './method';
-
 
 export class Viae extends Via {
   private _connections = new Array<Wire>();
@@ -56,10 +55,10 @@ export class Viae extends Via {
   }
 
   method(method: Method, path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
-    return this.use((ctx) => ctx.req.method === method, pathHandler(path), handler, ...handlers);
+    return this.use(methodHandler(method), pathHandler(path), handler, ...handlers);
   }
 
   path(path: ViaPath, handler: ViaHandler, ...handlers: ViaHandler[]) {
     return this.use(pathHandler(path), handler, ...handlers);
-  }
+  }  
 }
