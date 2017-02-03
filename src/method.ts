@@ -1,6 +1,7 @@
 export enum Method {
-  SUBSCRIBE = 1,
-  UNSUBSCRIBE = 2,
+  PING = 0,
+  SUBSCRIBE = 7,
+  UNSUBSCRIBE = 8,
   GET = 10,
   PUT = 11,
   PATCH = 12,

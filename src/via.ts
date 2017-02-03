@@ -14,6 +14,7 @@ export class Via implements IRowan<ViaContext> {
   private _app = new Rowan<ViaContext>();
 
   constructor(private wire?: Wire) {
+    this._root.use(this.handlerPing());
     this._root.use(this.handlerIntercept());
     this._root.use(this.handlerResponseStream());
 
@@ -140,7 +141,16 @@ export class Via implements IRowan<ViaContext> {
     };
 
     return ctx;
-  }
+  }  
+  
+  private handlerPing() {
+    return async (ctx: ViaContext) => {
+      if (ctx.req != undefined && ctx.req.method === 0) {
+        ctx.send();
+        return false;
+      }
+    };
+  };
 
   private handlerIntercept() {
     return async (ctx: ViaContext) => {
