@@ -10,6 +10,7 @@
     "posttest": "npm run build",
     "cover": "codecov",
     "build": "webpack && gulp typings",
+    "prepublish": "npm run test",
     "prepare-release": "npm test",
     "clean": "rimraf coverage .nyc_output lib",
     "lint": "tslint ./src/*.ts"
