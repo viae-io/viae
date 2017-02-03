@@ -2,7 +2,7 @@ const WebSocketServer = require('ws').Server;
 const Viae = require('./lib/index').Viae;
 const EventEmitter = require('events');
 
-let wss = new WebSocketServer({ port: 8080, handleProtocols: ["viae"] });
+let wss = new WebSocketServer({ port: 9090, handleProtocols: ["viae"] });
 let server = new Viae(wss);
 
 server.path("/greet", (ctx) => {
@@ -30,7 +30,7 @@ server.use((ctx, err) => {
   return ctx.send();
 });
 
-console.log("Server Running on 8080....");
+console.log("Server Running on 9090....");
 
 setInterval(() => {
   server.broadcast({

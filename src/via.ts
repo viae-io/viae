@@ -141,11 +141,12 @@ export class Via implements IRowan<ViaContext> {
     };
 
     return ctx;
-  }  
-  
+  }
+
   private handlerPing() {
-    return async (ctx: ViaContext) => {
-      if (ctx.req != undefined && ctx.req.method === 0) {
+    return (ctx: ViaContext) => {
+      if (ctx.req != undefined && (ctx.req.method == undefined || ctx.req.method == Method.PING)) {
+        ctx.res.status = 100;
         ctx.send();
         return false;
       }
@@ -197,7 +198,6 @@ export class Via implements IRowan<ViaContext> {
 
   private handlerUnhandledError() {
     return (ctx: ViaContext, err: any) => {
-
       if (typeof (err) == "number")
         ctx.res.status = err;
       else
