@@ -84,7 +84,7 @@ export class Via implements IRowan<ViaContext> {
     let reject;
     let resolve;
     let resolved = false;
-    let promise = new Promise<Message>((r, x) => { resolve = r, reject = x });
+    let promise = new Promise<Message>((r, x) => { resolve = r, reject = x; });
 
     var dispose = this.intercept(msg.id, (ctx) => {
       if (!resolved)
