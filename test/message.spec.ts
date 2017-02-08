@@ -86,6 +86,17 @@ describe("Message", () => {
       expect(result.body).to.deep.equal({ foo: "bar" });
     });
 
+    it("should correctly serialise message with json-string body", () => {
+
+      let msg: Message = {
+        body: ' {"foo":"bar"}    ',
+      };
+
+      let result = Message.deserialiseBinary(Message.serialiseBinary(msg));
+
+      expect(result.body).to.deep.equal({ foo: "bar" });
+    });
+
     it("should correctly serialise message with Uint8Array body", () => {
 
       let msg: Message = {

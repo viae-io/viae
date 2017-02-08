@@ -4,12 +4,12 @@ import { textToBytes, bytes2Text, bytesToHex, hexToBytes } from './utils/utils';
 import { Method } from './method';
 import { Status } from './status';
 
-/* Streaming Flags */ 
-export enum MessageStreamFlags{
+/* Streaming Flags */
+export enum MessageStreamFlags {
   None = 0, // Not Streaming
   Begin = 1,
   Next = 2,
-  End = 4,     
+  End = 4,
 }
 
 export interface Message {
@@ -40,7 +40,7 @@ export namespace Message {
 
     return numbers;
   };
-  
+
   export var genIdString = function () {
     let id = genId();
     return bytesToHex(genId());
@@ -72,16 +72,18 @@ export namespace Message {
       list.push(bytes);
     }
     /* #5 streaming flags */
-    if (msg.flags){
+    if (msg.flags) {
       list.push(varint.encode((msg.flags << 3) | 5));
-    }    
+    }
     /* #6 - reserved */
 
     /* #7 - data type + body bytes */
     if (msg.body) {
       if (typeof (msg.body) == "string") {
+        let trimmed = msg.body.trim();
+        let type = (trimmed.charAt(0) == "{" && trimmed.charAt(trimmed.length - 1) == "}") ? DataType.Json : DataType.String;
         let bytes = textToBytes(msg.body);
-        list.push(varint.encode((DataType.String << 3) | 7));
+        list.push(varint.encode((type << 3) | 7));
         list.push(bytes);
       }
       else if (msg.body instanceof Uint8Array) {
