@@ -72,8 +72,8 @@ export class Via implements IRowan<ViaContext> {
       }
     }
   }
-  request(msg: Message, keepAlive = false, ...handlers: ViaHandler[]) {
-    if (this.wire == undefined)
+  request(msg: Message, keepAlive = false, wire = this.wire, ...handlers: ViaHandler[]) {
+    if (wire == undefined)
       return Promise.resolve(undefined);
 
     if (msg.id == undefined)

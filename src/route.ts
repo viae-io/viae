@@ -1,29 +1,11 @@
-import { Wire, WireServer } from './wire';
-import { Via, ViaHandler } from './via';
+import { Rowan } from 'rowan';
+import { Via, ViaHandler, ViaContext } from './via';
 import { PathRequest, requestPath, requestMethod } from './middleware';
 import { Method } from './method';
 
-export class Viae extends Via {
-  private _connections = new Array<Wire>();
-  get connections() { return this._connections; };
-
-  constructor(protected server: WireServer) {
+export class Route extends Rowan<ViaContext> {
+  constructor() {
     super();
-
-    server.on("connection", (wire) => {
-      this._connections.push(wire);
-      wire.on("close", () => {
-        this._connections.splice(this._connections.indexOf(wire), 1);
-        //this.clean(wire);
-      });
-      wire.on("message", (data) => {
-        this.processMessage(data, wire);
-      });
-    });
-  }
-
-  broadcast(message) {
-    this.send(message, ...this._connections);
   }
 
   get(path: PathRequest, handler: ViaHandler, ...handlers: ViaHandler[]) {
@@ -60,5 +42,5 @@ export class Viae extends Via {
 
   path(path: PathRequest, handler: ViaHandler, ...handlers: ViaHandler[]) {
     return this.use(requestPath(path), handler, ...handlers);
-  }  
+  }
 }
