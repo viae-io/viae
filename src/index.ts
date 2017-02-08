@@ -6,3 +6,4 @@ export * from './via';
 export * from './viae';
 export * from './wire';
 export * from './middleware';
+export * from './route';

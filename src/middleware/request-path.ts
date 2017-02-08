@@ -1,10 +1,10 @@
 import * as pathToRegexp from 'path-to-regexp';
 import { ViaContext } from '../via';
 
-export type ViaPath = string | RegExp | (string | RegExp)[];
+export type PathRequest = string | RegExp | (string | RegExp)[];
 
 /* the message is a request with a path matching the parameter */
-export function requestPath(path: ViaPath) {
+export function requestPath(path: PathRequest) {
   let keys = [];
   var exp = pathToRegexp(path, keys);
   return (ctx: ViaContext) => {
