@@ -72,8 +72,7 @@ export class Via implements IRowan<ViaContext> {
       }
     }
   }
-
-  request(msg: Message, ...handlers: ViaHandler[]) {
+  request(msg: Message, keepAlive = false, ...handlers: ViaHandler[]) {
     if (this.wire == undefined)
       return Promise.resolve(undefined);
 
@@ -82,18 +81,24 @@ export class Via implements IRowan<ViaContext> {
 
     let bin = Message.serialiseBinary(msg).buffer;
 
-    var resolve;
-    let promise = new Promise<Message>((r) => resolve = r);
+    let reject;
+    let resolve;
+    let resolved = false;
+    let promise = new Promise<Message>((r, x) => { resolve = r, reject = x });
 
     var dispose = this.intercept(msg.id, (ctx) => {
-      resolve(ctx);
-      dispose();
+      if (!resolved)
+        resolve(ctx);
+      if (!keepAlive)
+        dispose();
     }, ...handlers);
 
     try {
       this.wire.send(bin);
     } catch (err) {
       console.log(err);
+      dispose();
+      reject();
     }
     return promise;
   }
