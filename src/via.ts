@@ -65,11 +65,18 @@ export class Via implements IRowan<ViaContext> {
     let bin = Message.serialiseBinary(msg).buffer;
 
     for (var wire of wires) {
-      wire.send(bin);
+      try {
+        wire.send(bin);
+      } catch (err) {
+        console.log(err);
+      }
     }
   }
 
   request(msg: Message, ...handlers: ViaHandler[]) {
+    if (this.wire == undefined)
+      return Promise.resolve(undefined);
+
     if (msg.id == undefined)
       msg.id = Message.genIdString();
 
@@ -83,7 +90,11 @@ export class Via implements IRowan<ViaContext> {
       dispose();
     }, ...handlers);
 
-    this.wire.send(bin);
+    try {
+      this.wire.send(bin);
+    } catch (err) {
+      console.log(err);
+    }
     return promise;
   }
 
