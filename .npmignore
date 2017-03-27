@@ -8,12 +8,12 @@ src
 spec
 test
 coverage
-tsconfig.json
+tsconfig
 tsfmt.json
 tslint.json
 gulpfile.js
-server.js
-client.js
+server.ts
+client.ts
 webpack.config.js
 gulpfile.js
 
