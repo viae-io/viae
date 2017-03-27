@@ -1,7 +1,6 @@
 
 import * as varint from 'varint';
 import { textToBytes, bytes2Text, bytesToHex, hexToBytes } from './utils/utils';
-import { Method } from './method';
 import { Status } from './status';
 
 /* Streaming Flags */
@@ -14,7 +13,7 @@ export enum MessageStreamFlags {
 
 export interface Message {
   id?: string; //8-byte short-uid (as hex)
-  method?: Method;
+  method?: string;
   path?: string;
   status?: Status;
   headers?: {};
@@ -53,7 +52,9 @@ export namespace Message {
 
     /* #1 method */
     if (msg.method) {
-      list.push(varint.encode((msg.method << 3) | 1));
+      let bytes = textToBytes(msg.method);
+      list.push(varint.encode((bytes.length << 3) | 1));
+      list.push(bytes);
     }
     /* #2 status */
     if (msg.status) {
@@ -117,10 +118,9 @@ export namespace Message {
 
   export function deserialiseBinary(binary: Uint8Array): Message {
     //binary = pako.inflate(binary);
-    let msg: Message = {};
     let off = 0;
-
-    msg.id = bytesToHex(binary.slice(0, off += 8));
+    const id = bytesToHex(binary.slice(0, off += 8));
+    const msg: Message = { id: id };
 
     while (off < binary.length) {
       let enc = varint.decode(binary, off); off += varint.decode.bytes;
@@ -128,7 +128,8 @@ export namespace Message {
 
       switch (enc & 0x7) {
         case 1: //method
-          msg.method = enc >> 3;
+          len = enc >> 3;
+          msg.method = bytes2Text(binary.subarray(off, off += len));
           break;
         case 2: //status
           msg.status = enc >> 3;

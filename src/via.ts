@@ -3,7 +3,6 @@ import { Readable } from 'stream';
 import { Rowan, IRowan, Handler } from 'rowan';
 import { EventEmitter } from './utils/events';
 import { Wire } from './wire';
-import { Method } from './method';
 import { Message, MessageStreamFlags } from './message';
 import { Request } from './request';
 
@@ -21,7 +20,6 @@ export class Via implements IRowan<ViaContext> {
     this._root.use(this._app);
 
     this._root.use(this.handlerUnhandled());
-    this._root.use(this.handlerUnhandledError());
 
     if (!!wire) {
       wire.on("message", x => this.processMessage(x, this.wire));
@@ -72,7 +70,8 @@ export class Via implements IRowan<ViaContext> {
       }
     }
   }
-  request(msg: Message, keepAlive = false, wire = this.wire, ...handlers: ViaHandler[]) {
+
+  request(msg: Message = {}, keepAlive = false, wire = this.wire, ...handlers: ViaHandler[]) {
     if (wire == undefined)
       return Promise.resolve(undefined);
 
@@ -103,14 +102,14 @@ export class Via implements IRowan<ViaContext> {
     return promise;
   }
 
-  private createContext(wire: Wire, msg: Message) {
-    let ctx: ViaContext = {
-      wire: wire,
+  private createContext(wire: Wire, msg: Message): ViaContext {
+    let ctx: Partial<ViaContext> = {
+      wire: wire
     };
 
     if (msg.status != undefined) {
       ctx.res = msg;
-      return ctx;
+      return <ViaContext>ctx;
     }
 
     ctx.req = msg;
@@ -156,12 +155,12 @@ export class Via implements IRowan<ViaContext> {
       return false;
     };
 
-    return ctx;
+    return <ViaContext>ctx;
   }
 
   private handlerPing() {
     return (ctx: ViaContext) => {
-      if (ctx.req != undefined && (ctx.req.method == undefined || ctx.req.method == Method.PING)) {
+      if (ctx.req != undefined && (ctx.req.method == undefined || ctx.req.method == undefined)) {
         ctx.res.status = 100;
         ctx.send();
         return false;
@@ -207,8 +206,18 @@ export class Via implements IRowan<ViaContext> {
   }
 
   private handlerUnhandled() {
-    return (ctx: ViaContext) => {
-      throw 404;
+    return {
+      process(ctx: ViaContext, err: any) {
+        if (err != undefined)
+          ctx.res.status = 404;
+        else if (typeof (err) == "number")
+          ctx.res.status = err;
+        else
+          ctx.res.status = 500;
+
+        if (ctx.send != undefined)
+          return ctx.send();
+      }
     };
   }
 
@@ -227,13 +236,12 @@ export class Via implements IRowan<ViaContext> {
 
 export interface ViaContext {
   wire: Wire;
+  req: Request;
+  res: Message;
 
-  req?: Request;
-  res?: Message;
-
-  begin?();
-  send?(body?: string | Uint8Array | Object);
-  end?(body?: string | Uint8Array | Object);
+  begin();
+  send(body?: string | Uint8Array | Object);
+  end(body?: string | Uint8Array | Object);
 }
 
 export type ViaHandler = Handler<ViaContext>;

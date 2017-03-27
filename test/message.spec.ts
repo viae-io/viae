@@ -1,4 +1,4 @@
-import { Method, Message } from '../src/index';
+import { Message } from '../src/index';
 import { assert, expect } from 'chai';
 
 
@@ -129,9 +129,8 @@ describe("Message", () => {
     it("should correctly serialise message with method", () => {
 
       let msg: Message = {
-        method: Method.GET,
+        method: "GET",
       };
-
 
       let result = Message.deserialiseBinary(Message.serialiseBinary(msg));
 
@@ -143,7 +142,7 @@ describe("Message", () => {
 
       let msg: Message = {
         id: "f0e1d2c3b4a59687",
-        method: Method.SUBSCRIBE,
+        method: "SUBSCRIBE",
         status: 100,
         path: "path/to/resource",
         body: "hello world",

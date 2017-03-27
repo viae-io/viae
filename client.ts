@@ -1,15 +1,15 @@
-const WebSocket = require('ws');
-const readline = require('readline');
-const EventEmitter = require('events');
-const Via = require('./lib/index.js').Via;
+import * as Ws from 'ws';
+import * as readline from 'readline';
+import { Via } from './src/index';
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
 
-let ws = new WebSocket("ws://localhost:9090", "viae");
+let ws = new Ws("ws://localhost:9090", "viae");
 let via = new Via(ws);
 
 via.use((ctx) => {
   if (isPipeable(ctx.res.body)) {
+
     ctx.res.body.pipe(process.stdout, { end: false });
     return false;
   } else {
@@ -18,16 +18,16 @@ via.use((ctx) => {
 });
 
 rl.on("line", (line) => {
-  via.request({ path: "/greet", body: line });
+  via.request({ method: "GET", path: "/greet", body: line });
 });
 
-function isPipeable(object) {
-  return object.pipe !== undefined && typeof (object.pipe) == "function";
+function isPipeable(obj): obj is { pipe: (stream: any, opts?: any) => void } {
+  return obj.pipe !== undefined && typeof (obj.pipe) == "function";
 }
 
 setInterval(() => {
 
-  via.request({ method: 0 }).then(x => {
+  via.request({}).then(x => {
     console.log("PONG!");
   });
 }, 3000);
