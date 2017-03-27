@@ -24,7 +24,7 @@ check [Documentation](https://github.com/MeirionHughes/viae/wiki) for more examp
 const WebSocket = require('ws'); // or browser
 const Via = require('viae').Via;
 
-let ws = new WebSocket("ws://localhost:8080", "viae");
+let ws = new WebSocket("ws://localhost:8080");
 let via = new Via(ws);
 
 ```
@@ -35,7 +35,7 @@ let via = new Via(ws);
 const WebSocketServer = require('ws').Server;
 const Viae = require('viae').Viae;
 
-let wss = new WebSocketServer({ port: 8080, handleProtocols: ["viae"] });
+let wss = new WebSocketServer({ port: 8080 });
 let server = new Viae(wss);
 ```
 
