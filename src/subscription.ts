@@ -12,13 +12,13 @@ export type Subscriber = {
 };
 
 export class Subscription extends Rowan<ViaContext> {
-  private _path: string;
-  private _server: Viae;
-  private _subs: Subscriber[] = [];
-  private _events = new LiteEventEmitter();
+  protected _path: string;
+  protected _server: Viae;
+  protected _subs: Subscriber[] = [];
+  protected _events = new LiteEventEmitter();
 
   public get subscribers() { return this._subs; }
-
+  
   constructor(opts: {
     path: string,
     server: Viae,
