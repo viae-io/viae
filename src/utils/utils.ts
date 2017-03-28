@@ -1,4 +1,3 @@
-export * from './events';
 
 export function textToBytes(s: string): Uint8Array {
   var ua = new Uint8Array(s.length);

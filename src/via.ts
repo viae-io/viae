@@ -1,7 +1,6 @@
 
 import { Readable } from 'stream';
-import { Rowan, IRowan, Handler } from 'rowan';
-import { EventEmitter } from './utils/events';
+import { Rowan, IRowan, Handler, IProcessor } from 'rowan';
 import { Wire } from './wire';
 import { Message, MessageStreamFlags } from './message';
 import { Request } from './request';
@@ -246,3 +245,4 @@ export interface ViaContext {
 
 export type ViaHandler = Handler<ViaContext>;
 export type ViaInterceptor = { dispose: () => void, timestamp: number, handlers: ViaHandler[] };
+export type ViaProcessor = IProcessor<ViaContext>;
