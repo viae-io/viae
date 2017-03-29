@@ -7,7 +7,8 @@
   "scripts": {
     "lint": "cross-env tslint --project tsconfig.json --config tslint.json",
     "clean": "cross-env rimraf .tmp .nyc_output coverage dist",
-    "build": "npm run clean && concurrently \"npm run build:es2015\" \"npm run build:commonjs\"",
+    "build": "npm run clean && concurrently \"npm run build:es2017\" \"npm run build:es2015\" \"npm run build:commonjs\"",
+    "build:es2017": "cross-env tsc --project tsconfig.build.json --rootDir src/ --outDir ./dist/es2017 --module es2015 --target es2015",
     "build:es2015": "cross-env tsc --project tsconfig.build.json --rootDir src/ --outDir ./dist/es2015 --module es2015",
     "build:commonjs": "cross-env tsc --project tsconfig.build.json --rootDir src/ --outDir ./dist/commonjs --module commonjs",
     "debug": "npm run clean && cross-env tsc --project tsconfig.json --outDir ./.tmp/ --module commonjs ",
@@ -55,7 +56,7 @@
   "dependencies": {
     "lite-event-emitter": "^1.0.2",
     "path-to-regexp": "^1.7.0",
-    "rowan": "^0.2.1",
+    "rowan": "^0.3.1",
     "tslib": "^1.5.0",
     "varint": "^5.0.0"
   },
