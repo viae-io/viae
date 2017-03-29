@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "A bi-directional communication api framework with streaming support.",
   "main": "dist/commonjs/index.js",
   "typings": "dist/commonjs/index.d.ts",
