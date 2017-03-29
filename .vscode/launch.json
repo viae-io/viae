@@ -1,58 +1,32 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Launch",
-            "type": "node",
-            "request": "launch",
-            "program": "${workspaceRoot}/node_modules/gulp/bin/gulp.js",
-            "stopOnEntry": false,
-            "args": ["test:nocompile"],
-            "cwd": "${workspaceRoot}",
-            "internalConsoleOptions": "openOnSessionStart" ,
-            "preLaunchTask": "compile:spec",
-            "runtimeExecutable": null,
-            "runtimeArgs": [
-                "--nolazy"
-            ],
-            "env": {
-                "NODE_ENV": "development"
-            },
-            "externalConsole": false,
-            "sourceMaps": true,
-            "outDir": "${workspaceRoot}/lib"
-        },
-        {
-            "name": "Test",
-            "type": "node",
-            "request": "launch",
-            "program": "${workspaceRoot}/dist/test.js",
-            "stopOnEntry": false,
-            "cwd": "${workspaceRoot}",
-            "internalConsoleOptions": "openOnSessionStart" ,
-            "preLaunchTask": "compile:spec",
-            "runtimeExecutable": null,
-            "runtimeArgs": [
-                "--nolazy"
-            ],
-            "env": {
-                "NODE_ENV": "development"
-            },
-            "externalConsole": false,
-            "sourceMaps": true,
-            "outDir": "${workspaceRoot}/dist"
-        },
-        {
-            "name": "Attach",
-            "type": "node",
-            "request": "attach",
-            "port": 5858,
-            "address": "localhost",
-            "restart": false,
-            "sourceMaps": false,
-            "outDir": null,
-            "localRoot": "${workspaceRoot}",
-            "remoteRoot": null
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
+      "stopOnEntry": false,
+      "args": [
+        "--require",
+        "source-map-support/register",
+        "--no-timeouts",
+        "test/"
+      ],
+      "cwd": "${workspaceRoot}",
+      "preLaunchTask": "build",
+      "internalConsoleOptions": "openOnSessionStart",
+      "runtimeExecutable": null,
+      "runtimeArgs": [
+        "--nolazy"
+      ],
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "sourceMaps": true,
+      "outFiles": [
+        "src/**/*"
+      ]
+    }
+  ]
 }
