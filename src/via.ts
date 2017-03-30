@@ -171,7 +171,7 @@ export class Via implements IRowan<ViaContext> {
 
     ctx.send = (body) => {
       ctx.res.body = body;
-      ctx.res.status = ctx.res.status | 200;
+      ctx.res.status = ctx.res.status || 200;
       this.send(ctx.res, wire);
       ctx.send = $noOp;        
       return false;
@@ -236,15 +236,11 @@ export class Via implements IRowan<ViaContext> {
   private handlerUnhandled() {
     return {
       process(ctx: ViaContext, err: any) {
-        if (err != undefined)
-          ctx.res.status = 404;
-        else if (typeof (err) == "number")
-          ctx.res.status = err;
-        else
-          ctx.res.status = 500;
+        console.log("unhandled");
 
-        if (ctx.send != undefined)
-          return ctx.send();
+        ctx.res
+        
+        return ctx.sendStatus(Status.NotFound);
       }
     };
   }
