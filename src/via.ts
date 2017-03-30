@@ -136,7 +136,7 @@ export class Via implements IRowan<ViaContext> {
 
     ctx.req = msg;
     ctx.res = { id: msg.id };
-    
+
     ctx.end = $noOp;
     ctx.begin = () => {
       let sid = Message.genIdString();
@@ -173,14 +173,14 @@ export class Via implements IRowan<ViaContext> {
       ctx.res.body = body;
       ctx.res.status = ctx.res.status || 200;
       this.send(ctx.res, wire);
-      ctx.send = $noOp;        
+      ctx.send = $noOp;
       return false;
     };
 
     ctx.sendStatus = (code: Status) => {
       ctx.res.status = code;
-      this.send(ctx.res, wire);  
-      return false;  
+      this.send(ctx.res, wire);
+      return false;
     };
 
     return <ViaContext>ctx;
@@ -236,24 +236,22 @@ export class Via implements IRowan<ViaContext> {
   private handlerUnhandled() {
     return {
       process(ctx: ViaContext, err: any) {
-        console.log("unhandled");
+        if (err == undefined) {
+          ctx.res.status = 404;
+        }
+        else if (typeof (err) == "number") {
+          ctx.res.status = err;
+        }
+        else {
+          ctx.res.status = 500;
+        }
 
-        ctx.res
-        
-        return ctx.sendStatus(Status.NotFound);
+        if (ctx.send != undefined){
+          return ctx.send();
+        }
+
+        return err;
       }
-    };
-  }
-
-  private handlerUnhandledError() {
-    return (ctx: ViaContext, err: any) => {
-      if (typeof (err) == "number")
-        ctx.res.status = err;
-      else
-        ctx.res.status = 500;
-
-      if (ctx.send != undefined)
-        return ctx.send();
     };
   }
 }
