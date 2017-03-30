@@ -241,6 +241,8 @@ export interface ViaContext {
   begin();
   send(body?: string | Uint8Array | Object);
   end(body?: string | Uint8Array | Object);
+
+  _done?: true;
 }
 
 export type ViaHandler = Handler<ViaContext>;
