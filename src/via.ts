@@ -4,20 +4,21 @@ import { Rowan, IRowan, Handler, IProcessor } from 'rowan';
 import { Wire } from './wire';
 import { Message, MessageStreamFlags } from './message';
 import { Request } from './request';
+import { Status } from './status';
 
 export class Via implements IRowan<ViaContext> {
   private _interceptors = new Map<string, ViaInterceptor>();
 
   private _root = new Rowan<ViaContext>();
   private _app = new Rowan<ViaContext>();
+  private _before = new Rowan<ViaContext>();
+  private _after = new Rowan<ViaContext>();
 
   constructor(private wire?: Wire) {
-    this._root.use(this.handlerPing());
+    this._root.use(this._before);
     this._root.use(this.handlerIntercept());
     this._root.use(this.handlerResponseStream());
-
     this._root.use(this._app);
-
     this._root.use(this.handlerUnhandled());
 
     if (!!wire) {
@@ -31,15 +32,36 @@ export class Via implements IRowan<ViaContext> {
     await this.process(ctx);
   }
 
-  process(ctx: ViaContext, err?: any) {
-    return this._root.process(ctx, err);
+  async process(ctx: ViaContext, err?: any) {
+    let result: any;
+
+    try {
+      result = await this._root.process(ctx, err);
+    } catch (_err) {
+      err = err;
+    };
+
+    if (result != undefined && typeof (result) != "boolean") {
+      err = result;
+    }
+
+    delete ctx._done;
+
+    this._after.process(ctx, err);
   }
 
   use(handler: ViaHandler, ...handlers: ViaHandler[]): this {
     this._app.use(handler, ...handlers);
     return this;
   }
-
+  after(handler: ViaHandler, ...handlers: ViaHandler[]): this {
+    this._after.use(handler, ...handlers);
+    return this;
+  }
+  before(handler: ViaHandler, ...handlers: ViaHandler[]): this {
+    this._before.use(handler, ...handlers);
+    return this;
+  }
   private intercept(id: string, handler: ViaHandler, ...handlers: ViaHandler[]): () => void {
     let dispose = () => this._interceptors.delete(id);
 
@@ -102,6 +124,7 @@ export class Via implements IRowan<ViaContext> {
   }
 
   private createContext(wire: Wire, msg: Message): ViaContext {
+    const $noOp = function () { };
     let ctx: Partial<ViaContext> = {
       wire: wire
     };
@@ -113,7 +136,8 @@ export class Via implements IRowan<ViaContext> {
 
     ctx.req = msg;
     ctx.res = { id: msg.id };
-
+    
+    ctx.end = $noOp;
     ctx.begin = () => {
       let sid = Message.genIdString();
       ctx.res.status = 200;
@@ -139,19 +163,24 @@ export class Via implements IRowan<ViaContext> {
 
         this.send(ctx.res, wire);
 
-        delete ctx.send;
-        delete ctx.end;
+        ctx.send = $noOp;
+        ctx.end = $noOp;
       };
-
-      delete ctx.begin;
+      ctx.begin = $noOp;
     };
 
     ctx.send = (body) => {
       ctx.res.body = body;
-      ctx.res.status = 200;
+      ctx.res.status = ctx.res.status | 200;
       this.send(ctx.res, wire);
-      delete ctx.send;
+      ctx.send = $noOp;        
       return false;
+    };
+
+    ctx.sendStatus = (code: Status) => {
+      ctx.res.status = code;
+      this.send(ctx.res, wire);  
+      return false;  
     };
 
     return <ViaContext>ctx;
@@ -240,6 +269,7 @@ export interface ViaContext {
 
   begin();
   send(body?: string | Uint8Array | Object);
+  sendStatus(status: Status);
   end(body?: string | Uint8Array | Object);
 
   _done?: true;

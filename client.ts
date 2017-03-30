@@ -26,8 +26,7 @@ function isPipeable(obj): obj is { pipe: (stream: any, opts?: any) => void } {
 }
 
 setInterval(() => {
-
-  via.request({}).then(x => {
+  via.request({ method: "PING", path: "/" }).then(x => {
     console.log("PONG!");
   });
 }, 3000);

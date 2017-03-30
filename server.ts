@@ -1,5 +1,5 @@
 import { Server } from 'ws';
-import { Viae } from './src/index';
+import { Viae, ViaContext } from './src/index';
 
 
 
@@ -22,6 +22,12 @@ server.route({
     }]
 });
 
+server.route({
+  method: "PING",
+  path: "/",
+  handlers: [(ctx: ViaContext) => ctx.sendStatus(200)]
+});
+
 server.use((ctx) => {
   return 404;
 });
@@ -34,6 +40,16 @@ server.use((ctx, err) => {
     ctx.res.status = 504;
   }
   return ctx.send();
+});
+
+server.before((ctx: ViaContext) => {
+  ctx["_start"] = Date.now();
+});
+
+server.after((ctx: ViaContext) => {
+  let start = ctx["_start"];
+  let span = Date.now() - start;
+  console.log(`${ctx.req.method} ${ctx.req.path} - ${ctx.res.status} (${span}ms)`);
 });
 
 console.log("Server Running on 9090....");
