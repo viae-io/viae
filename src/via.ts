@@ -152,14 +152,14 @@ export class Via implements IRowan<ViaContext> {
         flags: MessageStreamFlags.Next
       };
 
-      ctx.send = (b) => {
-        ctx.res.body = b;
+      ctx.send = (body) => {
+        ctx.res.body = body || ctx.res.body;
         this.send(ctx.res, wire);
       };
 
       ctx.end = (body?) => {
         ctx.res.flags = MessageStreamFlags.End;
-        ctx.res.body = body;
+        ctx.res.body = body || ctx.res.body;
 
         this.send(ctx.res, wire);
 
@@ -170,7 +170,7 @@ export class Via implements IRowan<ViaContext> {
     };
 
     ctx.send = (body) => {
-      ctx.res.body = body;
+      ctx.res.body = body || ctx.res.body;
       ctx.res.status = ctx.res.status || 200;
       this.send(ctx.res, wire);
       ctx.send = $noOp;
