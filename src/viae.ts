@@ -18,7 +18,7 @@ export class Viae extends Via {
       wire.on("message", (data) => {
         this.processMessage(data, wire);
       });
-    });
+    });    
   }
 
   broadcast(message) {

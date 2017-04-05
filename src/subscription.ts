@@ -11,6 +11,10 @@ export type Subscriber = {
   [index: string]: any
 };
 
+export type SubscriptionContext = ViaContext & {
+  sub: Subscriber
+};
+
 export class Subscription extends Rowan<ViaContext> {
   protected _path: string;
   protected _server: Viae;
@@ -18,7 +22,7 @@ export class Subscription extends Rowan<ViaContext> {
   protected _events = new LiteEventEmitter();
 
   public get subscribers() { return this._subs; }
-  
+
   constructor(opts: {
     path: string,
     server: Viae,
@@ -31,20 +35,23 @@ export class Subscription extends Rowan<ViaContext> {
     this.use(
       requestMethod("SUBSCRIBE"),
       requestPath(opts.path),
+      (ctx: SubscriptionContext) => {
+        ctx.sub = { wire: ctx.wire, id: ctx.req.id };
+      },
       ...(opts.subscribe || []),
-      (ctx: ViaContext) => {
-        const wire = ctx.wire;
+      (ctx: SubscriptionContext) => {
+        const sub = ctx.sub;
+
         let dispose = () => {
-          let index = this._subs.findIndex(x => x.wire == wire);
+          let index = this._subs.findIndex(x => x.wire == ctx.wire);
           if (index > -1) {
             this._subs.splice(index, 1);
           }
         };
+
         ctx.wire.on("close", () => {
           dispose();
         });
-
-        let sub = { wire: wire, id: ctx.req.id };
 
         this._subs.push(sub);
 
@@ -59,23 +66,25 @@ export class Subscription extends Rowan<ViaContext> {
     this.use(
       requestMethod("UNSUBSCRIBE"),
       requestPath(opts.path),
+      (ctx: SubscriptionContext) => {
+        const sub = this._subs.find(x => x.wire == ctx.wire);
+        if (sub == undefined) {
+          return ctx.sendStatus(400);
+        }
+        ctx.sub = sub;
+      },
       ...(opts.unsubscribe || []),
-      (ctx: ViaContext) => {
-        const wire = ctx.wire;
-        let index = this._subs.findIndex(x => x.wire == wire);
+      (ctx: SubscriptionContext) => {
+        const sub = ctx.sub;
 
+        let index = this._subs.findIndex(x => x == sub);
         if (index > -1) {
           let sub = this._subs[index];
           this._subs.splice(index, 1);
-          ctx.res.status = 200;
-          ctx.send();
-          if (sub != undefined)
-            this._events.emit("unsubscribe", sub);
         }
-        else {
-          ctx.res.status = 400;
-          ctx.send();
-        }
+
+        ctx.sendStatus(200);
+
         return false;
       });
   }

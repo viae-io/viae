@@ -74,7 +74,7 @@ export class Via implements IRowan<ViaContext> {
     return dispose;
   }
 
-  /* solicited or unsolicited response */
+  /* send a solicited or unsolicited */
   send(msg: Message, ...wires: Wire[]) {
     wires = wires || [this.wire];
 
@@ -91,7 +91,7 @@ export class Via implements IRowan<ViaContext> {
       }
     }
   }
-
+  /* send a request message to the target wire */
   request(msg: Message = {}, keepAlive = false, wire = this.wire, ...handlers: ViaHandler[]) {
     if (wire == undefined)
       return Promise.resolve(undefined);
@@ -157,14 +157,17 @@ export class Via implements IRowan<ViaContext> {
         this.send(ctx.res, wire);
       };
 
+      ctx.sendStatus = $noOp;
+
       ctx.end = (body?) => {
         ctx.res.flags = MessageStreamFlags.End;
         ctx.res.body = body || ctx.res.body;
 
         this.send(ctx.res, wire);
-
+        ctx._done = true;
+        
         ctx.send = $noOp;
-        ctx.end = $noOp;
+        ctx.end = $noOp;        
       };
       ctx.begin = $noOp;
     };
@@ -173,28 +176,24 @@ export class Via implements IRowan<ViaContext> {
       ctx.res.body = body || ctx.res.body;
       ctx.res.status = ctx.res.status || 200;
       this.send(ctx.res, wire);
+      ctx._done = true;
       ctx.send = $noOp;
+      ctx.sendStatus = $noOp;
       return false;
     };
 
-    ctx.sendStatus = (code: Status) => {
+    ctx.sendStatus = (code: Status, body?: any) => {
+      ctx.res.body = body || ctx.res.body;  
       ctx.res.status = code;
-      this.send(ctx.res, wire);
+      this.send(ctx.res, wire);      
+      ctx._done = true;
+      ctx.send = $noOp;
+      ctx.sendStatus = $noOp;
       return false;
     };
 
     return <ViaContext>ctx;
   }
-
-  private handlerPing() {
-    return (ctx: ViaContext) => {
-      if (ctx.req != undefined && (ctx.req.method == undefined || ctx.req.method == undefined)) {
-        ctx.res.status = 100;
-        ctx.send();
-        return false;
-      }
-    };
-  };
 
   private handlerIntercept() {
     return async (ctx: ViaContext) => {
@@ -268,7 +267,7 @@ export interface ViaContext {
 
   begin();
   send(body?: string | Uint8Array | Object);
-  sendStatus(status: Status);
+  sendStatus(status: Status, body?: string | Uint8Array | Object);
   end(body?: string | Uint8Array | Object);
 
   _done?: true;
