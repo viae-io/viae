@@ -5,6 +5,9 @@ export interface Wire {
   /** Session ID */
   sid?: string;
 
+  /** Remote Address */
+  address?: string;
+
   send(data: ArrayBuffer): void;
   close();
 
