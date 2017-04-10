@@ -20,6 +20,10 @@ ws.on("open", () => {
   });
 
   via.send({ method: "GET", path: "/nothing" });
+
+  via.request({ method: "GET", path: "/exception" }).then((ctx) => {
+    console.log(ctx.res.body);
+  });
 });
 
 function isPipeable(obj) {

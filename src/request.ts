@@ -1,5 +1,5 @@
-import { Message } from './message';
+import { ViaMessage } from './message';
 
-export interface Request extends Message {
+export interface ViaRequest extends ViaMessage {
   params?: any;
 }

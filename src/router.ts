@@ -1,5 +1,6 @@
 import { Rowan } from 'rowan';
-import { ViaHandler, ViaContext } from './via';
+import { ViaHandler } from './via';
+import { ViaContext } from './context';
 import { requestPath, requestMethod } from './middleware';
 
 export class Router extends Rowan<ViaContext>{

@@ -22,7 +22,7 @@ export class Viae extends Via {
   }
 
   broadcast(message) {
-    this.send(message, ...this._connections);
+    this.send(message, this._connections);
   }
 
   route(opts: {

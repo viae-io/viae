@@ -1,5 +1,6 @@
 import { Wire } from './wire';
-import { ViaContext, ViaHandler } from './via';
+import { ViaHandler } from './via';
+import { ViaContext } from './context';
 import { Viae } from './viae';
 import { requestMethod, requestPath } from './middleware';
 import { LiteEventEmitter } from 'lite-event-emitter';
@@ -99,7 +100,7 @@ export class Subscription extends Rowan<ViaContext> {
         id: sub.id,
         body: value,
         status: 100
-      }, sub.wire);
+      }, [sub.wire]);
     }
   }
 }

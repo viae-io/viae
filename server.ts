@@ -30,15 +30,20 @@ server.route({
   handlers: [(ctx: ViaContext) => ctx.sendStatus(200)]
 });
 
+server.route({
+  method: "GET",
+  path: "/exception",
+  handlers: [(ctx: ViaContext) => { throw Error("something nasty happened"); }]
+});
+
 server.use((ctx) => {
   return 404;
 });
-
 server.use((ctx, err) => {
-  console.log(err);
   if (typeof (err) == "number") {
     ctx.res.status = err;
   } else {
+    ctx.res.body = JSON.stringify(err, Object.getOwnPropertyNames(err))
     ctx.res.status = 504;
   }
   return ctx.send();

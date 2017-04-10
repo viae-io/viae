@@ -1,5 +1,5 @@
 import * as pathToRegexp from 'path-to-regexp';
-import { ViaContext } from '../via';
+import { ViaContext } from '../context';
 
 export type PathRequest = string | RegExp | (string | RegExp)[];
 

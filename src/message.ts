@@ -11,7 +11,7 @@ export enum MessageStreamFlags {
   End = 4,
 }
 
-export interface Message {
+export interface ViaMessage {
   id?: string; //8-byte short-uid (as hex)
   method?: string;
   path?: string;
@@ -21,7 +21,7 @@ export interface Message {
   flags?: MessageStreamFlags;
 }
 
-export namespace Message {
+export namespace ViaMessage {
   /* a simple id good enough for small servers */
   export var genId = function () {
     var time = Date.now();
@@ -45,10 +45,10 @@ export namespace Message {
     return bytesToHex(genId());
   };
 
-  export function serialiseBinary(msg: Message): Uint8Array {
+  export function serialiseBinary(msg: ViaMessage): Uint8Array {
     let list = [];
 
-    list.push(msg.id ? hexToBytes(msg.id) : Message.genId());
+    list.push(msg.id ? hexToBytes(msg.id) : ViaMessage.genId());
 
     /* #1 method */
     if (msg.method) {
@@ -116,11 +116,11 @@ export namespace Message {
     return buffer;
   }
 
-  export function deserialiseBinary(binary: Uint8Array): Message {
+  export function deserialiseBinary(binary: Uint8Array): ViaMessage {
     //binary = pako.inflate(binary);
     let off = 0;
     const id = bytesToHex(binary.slice(0, off += 8));
-    const msg: Message = { id: id };
+    const msg: ViaMessage = { id: id };
 
     while (off < binary.length) {
       let enc = varint.decode(binary, off); off += varint.decode.bytes;
