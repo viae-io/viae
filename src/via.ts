@@ -16,8 +16,8 @@ export class Via implements IRowan<ViaContext> {
 
   constructor(private wire?: Wire) {
     this._root.use(this._before);
-    this._root.use(this.handlerIntercept());
     this._root.use(this.handlerResponseStream());
+    this._root.use(this.handlerIntercept());    
     this._root.use(this._app);
     this._root.use(this.handlerUnhandled());
 
@@ -62,6 +62,7 @@ export class Via implements IRowan<ViaContext> {
     this._before.use(handler, ...handlers);
     return this;
   }
+  
   private intercept(id: string, handler: ViaHandler, ...handlers: ViaHandler[]): () => void {
     let dispose = () => this._interceptors.delete(id);
 
@@ -155,6 +156,7 @@ export class Via implements IRowan<ViaContext> {
       ctx.send = (body) => {
         ctx.res.body = body || ctx.res.body;
         this.send(ctx.res, wire);
+        delete ctx.res.body;    
       };
 
       ctx.sendStatus = $noOp;
