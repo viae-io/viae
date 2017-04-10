@@ -18,6 +18,65 @@ A bi-directional communication api framework with streaming support.
 
 check [Documentation](https://github.com/MeirionHughes/viae/wiki) for more examples; 
 
+### WebSocket - Server
+
+```ts
+const WebSocketServer = require('ws').Server;
+const Viae = require('viae').Viae;
+
+let wss = new WebSocketServer({ port: 8080 });
+let server = new Viae(wss);
+
+server.route({
+  method: "GET",
+  path: "/greet",
+  handlers: [
+    (ctx) => {
+      ctx.begin();
+      ctx.send("hello ");
+      ctx.send("w");
+      ctx.send("o");
+      ctx.send("r");
+      ctx.send("l");
+      ctx.send("d");
+      ctx.send("\n");
+      ctx.end();
+    }]
+});
+
+server.route({
+  method: "PING",
+  path: "/",
+  handlers: [(ctx: ViaContext) => ctx.sendStatus(200)]
+});
+
+server.use((ctx) => {
+  return 404;
+});
+
+server.use((ctx, err) => {
+  console.log(err);
+  if (typeof (err) == "number") {
+    ctx.res.status = err;
+  } else {
+    ctx.res.status = 504;
+  }
+  return ctx.send();
+});
+
+server.before((ctx: ViaContext) => {
+  ctx["_start"] = Date.now();
+});
+
+server.after((ctx: ViaContext) => {
+  let start = ctx["_start"];
+  let span = Date.now() - start;
+  console.log(`${ctx.req.method} ${ctx.req.path} - ${ctx.res.status} (${span}ms)`);
+});
+
+console.log("Server Running on 9090....");
+```
+
 ### WebSocket - Client
 
 ```ts
@@ -27,16 +86,29 @@ const Via = require('viae').Via;
 let ws = new WebSocket("ws://localhost:8080");
 let via = new Via(ws);
 
-```
+let ws = new Ws("ws://localhost:9090");
+let via = new Via(ws);
 
-### WebSocket - Server
+ws.on("open", () => {
+  via.request({ method: "PING", path: "/" }).then(x => {
+    console.log("PONG!");
+  });
 
-```ts
-const WebSocketServer = require('ws').Server;
-const Viae = require('viae').Viae;
+  via.request({ method: "GET", path: "/greet" }).then((ctx) => {
+    if (isPipeable(ctx.res.body)) {
+      ctx.res.body.pipe(process.stdout);
+      return false;
+    } else {
+      console.log(ctx.res.body);
+    }
+  });
 
-let wss = new WebSocketServer({ port: 8080 });
-let server = new Viae(wss);
+  via.send({ method: "GET", path: "/nothing" });
+});
+
+function isPipeable(obj) {
+  return obj.pipe !== undefined && typeof (obj.pipe) == "function";
+}
 ```
 
 ## Build

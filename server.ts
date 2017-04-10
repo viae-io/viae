@@ -12,11 +12,13 @@ server.route({
   handlers: [
     (ctx) => {
       ctx.begin();
+      ctx.send("hello ");
       ctx.send("w");
       ctx.send("o");
       ctx.send("r");
       ctx.send("l");
       ctx.send("d");
+      ctx.send("\n");
       ctx.end();
       return false;
     }]
