@@ -1,11 +1,11 @@
-import { Intercept } from './intercept';
+import { Interceptor } from './interceptor';
 import { ViaProcessor, ViaContext, ViaHandler } from '../via';
 import { ViaMessageStreamFlags } from '../message';
 import { Readable } from 'stream';
 
 export class Streamer implements ViaProcessor {
 
-  constructor(private _interceptor?: Intercept){
+  constructor(private _interceptor?: Interceptor){
   }
 
   /**

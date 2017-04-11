@@ -6,7 +6,7 @@ import { ViaMessage, ViaMessageStreamFlags } from './message';
 import { ViaRequest } from './request';
 import { ViaStatus } from './status';
 
-import { Intercept, Streamer, Unhandled } from './middleware';
+import { Interceptor, Streamer, Unhandled } from './middleware';
 
 import ctxFactory from './context-factory';
 
@@ -15,7 +15,7 @@ export type ViaHandler = Handler<ViaContext>;
 export type ViaProcessor = IProcessor<ViaContext>;
 
 function defaultConfig() {
-  let interceptor = new Intercept();
+  let interceptor = new Interceptor();
   let streamer = new Streamer(interceptor);
   let unhandled = new Unhandled();
 
@@ -108,7 +108,7 @@ export class Via implements IRowan<ViaContext> {
   /* send a request */
   request(msg: ViaMessage = {}, keepAlive = false, wire = this._wire, ...handlers: ViaHandler[]): Promise<ViaContext> {
     if (wire == undefined)
-      return Promise.resolve(undefined);
+      return Promise.reject(undefined);
 
     if (msg.id == undefined)
       msg.id = ViaMessage.genIdString();
@@ -128,7 +128,7 @@ export class Via implements IRowan<ViaContext> {
     }, ...handlers, (_) => false]);
 
     try {
-      this._wire.send(bin);
+      wire.send(bin);
     } catch (err) {
       dispose();
       reject(err);
