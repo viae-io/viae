@@ -65,12 +65,13 @@ server.use((ctx, err) => {
 });
 
 server.before((ctx: ViaContext) => {
-  ctx["_start"] = Date.now();
+  ctx["_start"] = process.hrtime();
 });
 
 server.after((ctx: ViaContext) => {
   let start = ctx["_start"];
-  let span = Date.now() - start;
+  let hrspan = process.hrtime(start);
+  let span = hrspan[0] * 1000 + hrspan[1] / 1000000;
   console.log(`${ctx.req.method} ${ctx.req.path} - ${ctx.res.status} (${span}ms)`);
 });
 
