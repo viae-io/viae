@@ -1,6 +1,6 @@
 import { Intercept } from './intercept';
 import { ViaProcessor, ViaContext, ViaHandler } from '../via';
-import { MessageStreamFlags } from '../message';
+import { ViaMessageStreamFlags } from '../message';
 import { Readable } from 'stream';
 
 export class Streamer implements ViaProcessor {
@@ -15,7 +15,7 @@ export class Streamer implements ViaProcessor {
     if (!err) {
       if (ctx.res != undefined &&
         ctx.res.flags !== undefined &&
-        ctx.res.flags == MessageStreamFlags.Begin &&
+        ctx.res.flags == ViaMessageStreamFlags.Begin &&
         ctx.res.body !== undefined &&
         typeof (ctx.res.body) == "string"
       ) {
@@ -30,7 +30,7 @@ export class Streamer implements ViaProcessor {
           if (ctx2.res != undefined && ctx2.res.body! + undefined) {
             stream.push(ctx2.res.body);
           }
-          if (ctx2.res.flags == MessageStreamFlags.End) {
+          if (ctx2.res.flags == ViaMessageStreamFlags.End) {
             dispose();
             stream.push(null);
           }

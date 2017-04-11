@@ -2,11 +2,13 @@ import { ViaContext } from './context';
 
 import { Rowan, IRowan, Handler, IProcessor } from 'rowan';
 import { Wire } from './wire';
-import { ViaMessage, MessageStreamFlags } from './message';
+import { ViaMessage, ViaMessageStreamFlags } from './message';
 import { ViaRequest } from './request';
-import { Status } from './status';
+import { ViaStatus } from './status';
 
 import { Intercept, Streamer, Unhandled } from './middleware';
+
+import ctxFactory from './context-factory';
 
 export { ViaContext } from './context';
 export type ViaHandler = Handler<ViaContext>;
@@ -20,7 +22,9 @@ function defaultConfig() {
   return {
     interceptor: interceptor,
     streamer: streamer,
-    unhandled: unhandled
+    unhandled: unhandled,
+    noop: function () { },
+    genid: ViaMessage.genIdString
   };
 }
 
@@ -30,6 +34,8 @@ export class Via implements IRowan<ViaContext> {
   private _before = new Rowan<ViaContext>();
   private _after = new Rowan<ViaContext>();
 
+  private _createCtx: (wire: Wire, msg: ViaMessage) => ViaContext;
+
   constructor(private _wire?: Wire, private _config = defaultConfig()) {
     this._root.use(this._before);
     this._root.use(this._config.streamer);
@@ -37,12 +43,14 @@ export class Via implements IRowan<ViaContext> {
     this._root.use(this._app);
     this._root.use(this._config.unhandled);
 
+    this._createCtx = ctxFactory(this.send, this._config.genid, this._config.noop);
+
     if (_wire) _wire.on("message", x => this.processMessage(x, this._wire));
   }
 
   protected async processMessage(data: ArrayBuffer, wire: Wire) {
     let msg = ViaMessage.deserialiseBinary(new Uint8Array(data));
-    let ctx = this.createContext(wire, msg);
+    let ctx = this._createCtx(wire, msg);
     await this.process(ctx);
   }
 
@@ -128,77 +136,6 @@ export class Via implements IRowan<ViaContext> {
     return promise;
   }
 
-  private createContext(wire: Wire, msg: ViaMessage): ViaContext {
-    const $noOp = function () { };
-    let ctx: Partial<ViaContext> = {
-      wire: wire
-    };
 
-    if (msg.status != undefined) {
-      ctx.res = msg;
-      return <ViaContext>ctx;
-    }
-
-    ctx.req = msg;
-    ctx.res = { id: msg.id };
-
-    ctx.end = $noOp;
-    ctx.begin = () => {
-      let sid = ViaMessage.genIdString();
-      ctx.res.status = 200;
-      ctx.res.flags = MessageStreamFlags.Begin;
-      ctx.res.body = sid;
-
-      this.send(ctx.res, [wire]);
-
-      ctx.res = {
-        id: sid,
-        status: 200,
-        flags: MessageStreamFlags.Next
-      };
-
-      ctx.send = (body) => {
-        ctx.res.body = body || ctx.res.body;
-        this.send(ctx.res, [wire]);
-        delete ctx.res.body;
-      };
-
-      ctx.sendStatus = $noOp;
-
-      ctx.end = (body?) => {
-        ctx.res.flags = MessageStreamFlags.End;
-        ctx.res.body = body || ctx.res.body;
-
-        this.send(ctx.res, [wire]);
-        ctx._done = true;
-
-        ctx.send = $noOp;
-        ctx.end = $noOp;
-      };
-      ctx.begin = $noOp;
-    };
-
-    ctx.send = (body) => {
-      ctx.res.body = body || ctx.res.body;
-      ctx.res.status = ctx.res.status || 200;
-      this.send(ctx.res, [wire]);
-      ctx._done = true;
-      ctx.send = $noOp;
-      ctx.sendStatus = $noOp;
-      return false;
-    };
-
-    ctx.sendStatus = (code: Status, body?: any) => {
-      ctx.res.body = body || ctx.res.body;
-      ctx.res.status = code;
-      this.send(ctx.res, [wire]);
-      ctx._done = true;
-      ctx.send = $noOp;
-      ctx.sendStatus = $noOp;
-      return false;
-    };
-
-    return <ViaContext>ctx;
-  }
 }
 

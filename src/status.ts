@@ -1,4 +1,4 @@
-export enum Status{
+export enum ViaStatus{
   Continue = 100,
   OK = 200,
   NotFound = 404,

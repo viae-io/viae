@@ -1,10 +1,10 @@
 
 import * as varint from 'varint';
 import { textToBytes, bytes2Text, bytesToHex, hexToBytes } from './utils/utils';
-import { Status } from './status';
+import { ViaStatus } from './status';
 
 /* Streaming Flags */
-export enum MessageStreamFlags {
+export enum ViaMessageStreamFlags {
   None = 0, // Not Streaming
   Begin = 1,
   Next = 2,
@@ -15,10 +15,10 @@ export interface ViaMessage {
   id?: string; //8-byte short-uid (as hex)
   method?: string;
   path?: string;
-  status?: Status;
+  status?: ViaStatus;
   headers?: {};
   body?: any;
-  flags?: MessageStreamFlags;
+  flags?: ViaMessageStreamFlags;
 }
 
 export namespace ViaMessage {

@@ -1,6 +1,6 @@
 import { Intercept } from './intercept';
 import { ViaProcessor, ViaContext, ViaHandler } from '../via';
-import { MessageStreamFlags } from '../message';
+import { ViaMessageStreamFlags } from '../message';
 import { Readable } from 'stream';
 
 export class Unhandled implements ViaProcessor {

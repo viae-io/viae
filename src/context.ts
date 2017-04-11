@@ -1,7 +1,7 @@
 import { Wire } from './wire';
 import { ViaRequest} from './request';
 import { ViaMessage } from './message';
-import { Status } from './status';
+import { ViaStatus } from './status';
 
 export interface ViaContext {
   wire: Wire;
@@ -10,7 +10,7 @@ export interface ViaContext {
 
   begin();
   send(body?: string | Uint8Array | Object);
-  sendStatus(status: Status, body?: string | Uint8Array | Object);
+  sendStatus(status: ViaStatus, body?: string | Uint8Array | Object);
   end(body?: string | Uint8Array | Object);
 
   _done?: true;
