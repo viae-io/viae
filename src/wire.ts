@@ -12,7 +12,6 @@ export interface Wire {
   close();
 
   on(event: "message", cb: (data: ArrayBuffer) => void): void;
-  on(event: "sid", cb: (sid: string) => void): void;
   on(event: "close", cb: () => void): void;
   on(event: "error", cb: (err: any) => void): void;
 
