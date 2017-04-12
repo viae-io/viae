@@ -8,7 +8,7 @@ type InterceptConfig = {
 };
 
 /** used to intercept messages with matching request/response ids */
-export class Intercept implements ViaProcessor {
+export class Interceptor implements ViaProcessor {
   private _interceptors = new Map<string, InterceptConfig>();
 
   /**
