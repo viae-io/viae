@@ -23,6 +23,7 @@ function defaultConfig() {
     interceptor: interceptor,
     streamer: streamer,
     unhandled: unhandled,
+    rethrow: false,
     noop: function () { },
     genid: ViaMessage.genIdString
   };
@@ -48,10 +49,10 @@ export class Via implements IRowan<ViaContext> {
     if (_wire) _wire.on("message", x => this.processMessage(x, this._wire));
   }
 
-  protected async processMessage(data: ArrayBuffer, wire: Wire) {
-    let msg = ViaMessage.deserialiseBinary(new Uint8Array(data));
-    let ctx = this._createCtx(wire, msg);
-    await this.process(ctx);
+  protected processMessage(data: ArrayBuffer, wire: Wire) {
+    const msg = ViaMessage.deserialiseBinary(new Uint8Array(data));
+    const ctx = this._createCtx(wire, msg);
+    return this.process(ctx);
   }
 
   /** @internal */
@@ -70,12 +71,16 @@ export class Via implements IRowan<ViaContext> {
 
     delete ctx._done;
 
-    await this._after.process(ctx, err);
+    try {
+      await this._after.process(ctx, err);
+    } catch (err) {
+      if (this._config.rethrow) throw err;
+    }
   }
 
-  /** insert middleware to run before any processing */
-  after(handler: ViaHandler, ...handlers: ViaHandler[]): this {
-    this._after.use(handler, ...handlers);
+  /** insert middleware to run after any processing */
+  before(handler: ViaHandler, ...handlers: ViaHandler[]): this {
+    this._before.use(handler, ...handlers);
     return this;
   }
   /** insert a handler (or chain) to run during processing*/
@@ -83,11 +88,12 @@ export class Via implements IRowan<ViaContext> {
     this._app.use(handler, ...handlers);
     return this;
   }
-  /** insert middleware to run after any processing */
-  before(handler: ViaHandler, ...handlers: ViaHandler[]): this {
-    this._before.use(handler, ...handlers);
+  /** insert middleware to run before any processing */
+  after(handler: ViaHandler, ...handlers: ViaHandler[]): this {
+    this._after.use(handler, ...handlers);
     return this;
   }
+
 
   /**
    * send a message
@@ -105,7 +111,9 @@ export class Via implements IRowan<ViaContext> {
     }
   }
 
-  /* send a request */
+  /**
+   * send a request 
+   **/
   request(msg: ViaMessage = {}, keepAlive = false, wire = this._wire, ...handlers: ViaHandler[]): Promise<ViaContext> {
     if (wire == undefined)
       return Promise.resolve(undefined);
@@ -135,7 +143,5 @@ export class Via implements IRowan<ViaContext> {
     }
     return promise;
   }
-
-
 }
 
