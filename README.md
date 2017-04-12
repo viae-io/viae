@@ -10,7 +10,29 @@ A bi-directional communication api framework with streaming support.
 [![codecov](https://codecov.io/gh/MeirionHughes/viae/branch/master/graph/badge.svg)](https://codecov.io/gh/MeirionHughes/viae)
 [![Stability][stability-image]][stability-url]
 
-## install
+## Usage
+
+`viae` is a library that helps to create an API middleware system for abstracted (`Wire`) connections. A hello-world example might resemble: 
+
+```ts
+const Viae = require('viae').Viae;
+
+let wireServer; // implements WireServer
+let server = new Viae(wireServer);
+
+server.route({
+  method: "GET",
+  path: "/greet",
+  handlers: [
+    (ctx) => { ctx.send("hello world"); }
+  ]
+);
+```
+
+There are two primary classes in `viae`: `Via` and `Viae`. 
+
+
+## Install
 
 * `npm install viae` 
 
