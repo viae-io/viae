@@ -9,7 +9,7 @@ export interface ViaContext {
   res: ViaMessage;
 
   begin();
-  send(body?: string | Uint8Array | Object);
+  send(body?: string | Uint8Array | Object, done?:boolean);
   sendStatus(status: ViaStatus, body?: string | Uint8Array | Object);
   end(body?: string | Uint8Array | Object);
 

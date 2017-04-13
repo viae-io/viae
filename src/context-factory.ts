@@ -3,8 +3,8 @@ import { ViaMessage, ViaMessageStreamFlags } from './message';
 import { ViaContext } from './context';
 import { ViaStatus } from './status';
 
-export default function (
-  $send: (msg: ViaMessage, wire: Wire[]) => void,
+export default function contextFactory(
+  $send: (msg: ViaMessage, wire: Wire[]) => void = function () { },
   $genId: () => string = ViaMessage.genIdString,
   $noOp = function () { }
 ) {
@@ -58,14 +58,17 @@ export default function (
       ctx.begin = $noOp;
     };
 
-    ctx.send = (body) => {
+    ctx.send = (body: any, isDone = true) => {
       ctx.res.body = body || ctx.res.body;
       ctx.res.status = ctx.res.status || 200;
       $send(ctx.res, [wire]);
-      ctx._done = true;
-      ctx.send = $noOp;
-      ctx.sendStatus = $noOp;
-      return false;
+      if (isDone) {
+        ctx._done = true;
+
+        ctx.send = $noOp;
+        ctx.sendStatus = $noOp;
+      }
+      return !isDone;
     };
 
     ctx.sendStatus = (code: ViaStatus, body?: any) => {
