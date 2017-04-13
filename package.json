@@ -40,8 +40,8 @@
   },
   "homepage": "https://github.com/MeirionHughes/viae#readme",
   "devDependencies": {
-    "@types/chai": "^3.4.34",
-    "@types/mocha": "^2.2.38",
+    "@types/chai": "^3.5.0",
+    "@types/mocha": "^2.2.40",
     "@types/node": "^6.0.59",
     "chai": "^3.5.0",
     "codecov": "^1.0.1",
