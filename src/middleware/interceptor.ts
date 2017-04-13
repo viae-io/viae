@@ -38,16 +38,16 @@ export class Interceptor implements ViaProcessor {
    * @internal 
    */
   async process(ctx: ViaContext, err: any) {
-    if (!err) {
-      const id = (ctx.req) ? ctx.req.id : (ctx.res) ? ctx.res.id : undefined;
+    if (err) return;
+    
+    const id = (ctx.req) ? ctx.req.id : (ctx.res) ? ctx.res.id : undefined;
 
-      if (id) {
-        const interceptor = this._interceptors.get(id);
+    if (!id) return;
 
-        if (interceptor) {
-          return await Rowan.execute(ctx, undefined, interceptor.handlers);
-        }
-      }
+    const interceptor = this._interceptors.get(id);
+
+    if (interceptor) {
+      return await Rowan.execute(ctx, undefined, interceptor.handlers);
     }
   };
 }
