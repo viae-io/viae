@@ -18,7 +18,6 @@ export class Interceptor implements ViaProcessor {
    * @returns method to remove (dispose) the interception entry. 
    */
   intercept(id: string, handlers: ViaHandler[]): () => void {
-    if (this._interceptors == undefined) throw Error("interceptor has been disposed");
     if (id == undefined) throw Error("id cannot be undefined");
     if (id.length == 0) throw Error("id cannot be empty");
     if (handlers == undefined) throw Error("handlers cannot be undefined");
@@ -40,14 +39,15 @@ export class Interceptor implements ViaProcessor {
    */
   async process(ctx: ViaContext, err: any) {
     if (!err) {
-      if ((ctx.res.id || ctx.req.id) == undefined) {
-        return;
-      }
-      const interceptor = this._interceptors.get((ctx.res.id || ctx.req.id));
+      const id = (ctx.req) ? ctx.req.id : (ctx.res) ? ctx.res.id : undefined;
 
-      if (interceptor) {
-        return await Rowan.execute(ctx, undefined, interceptor.handlers);
+      if (id) {
+        const interceptor = this._interceptors.get(id);
+
+        if (interceptor) {
+          return await Rowan.execute(ctx, undefined, interceptor.handlers);
+        }
       }
-    };
-  }
+    }
+  };
 }
