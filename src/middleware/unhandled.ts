@@ -1,6 +1,10 @@
 import { ViaProcessor, ViaContext, ViaHandler } from '../via';
 
 export class Unhandled implements ViaProcessor {
+
+  constructor(private _opts = { debug: true }) {
+  }
+
   /**
   * @internal 
   */
@@ -16,6 +20,9 @@ export class Unhandled implements ViaProcessor {
           }
           else {
             ctx.res.status = 500;
+            if (this._opts.debug && err instanceof Error) {
+              ctx.res.body = err.stack;
+            }
           }
         }
         if (ctx.send != undefined) {
