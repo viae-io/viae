@@ -1,14 +1,12 @@
 import { ViaMessage } from '../src/index';
 import { assert, expect } from 'chai';
 
-
-describe("Message", () => {
+export default function() {
   describe("Serialiser", () => {
     it("should correctly serialise empty message", () => {
 
       let msg: ViaMessage = {
       };
-
 
       let bin = ViaMessage.serialiseBinary(msg);
 
@@ -160,4 +158,4 @@ describe("Message", () => {
       expect(result).to.deep.equal(msg);
     });
   });
-});
+}
