@@ -29,7 +29,7 @@ function defaultConfig() {
   };
 }
 
-export class Via implements IRowan<ViaContext> {
+export class Via implements IVia {
   private _root = new Rowan<ViaContext>();
   private _app = new Rowan<ViaContext>();
   private _before = new Rowan<ViaContext>();
@@ -94,7 +94,6 @@ export class Via implements IRowan<ViaContext> {
     return this;
   }
 
-
   /**
    * send a message
    */
@@ -143,5 +142,29 @@ export class Via implements IRowan<ViaContext> {
     }
     return promise;
   }
+}
+
+
+export interface IVia extends IRowan<ViaContext> {
+
+  /** insert middleware to run after any processing */
+  before(handler: ViaHandler, ...handlers: ViaHandler[]): this;
+  /** insert a handler (or chain) to run during processing*/
+  use(handler: ViaHandler, ...handlers: ViaHandler[]): this;
+  /** insert middleware to run before any processing */
+  after(handler: ViaHandler, ...handlers: ViaHandler[]): this;
+
+  /**
+   * send a message
+   */
+  send(msg: ViaMessage);
+  send(msg: ViaMessage, wires: Wire[]);
+
+  /**
+   * send a request 
+   **/
+  request(msg: ViaMessage): Promise<ViaContext>;
+  request(msg: ViaMessage, keepAlive: boolean): Promise<ViaContext>;
+  request(msg: ViaMessage, keepAlive: boolean, wire: Wire, ...handlers: ViaHandler[]): Promise<ViaContext>;
 }
 
