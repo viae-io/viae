@@ -99,7 +99,14 @@ export class Via implements IVia {
    */
   send(msg: ViaMessage)
   send(msg: ViaMessage, wires: Wire[])
-  send(msg: ViaMessage, wires: Wire[] = this._wire ? [this._wire] : []) {
+  send(msg: ViaMessage, wires?: Wire[]) {
+    if (!wires && this._wire != undefined) {
+      wires = [this._wire];
+    }
+    else {
+      return;
+    }
+
     let bin = ViaMessage.serialiseBinary(msg).buffer;
     for (var wire of wires) {
       try {
