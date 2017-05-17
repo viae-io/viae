@@ -26,7 +26,7 @@ export class Unhandled implements ViaProcessor {
           }
         }
         if (ctx.send != undefined) {
-          return ctx.send();
+          ctx.send();
         }
       }
     }
