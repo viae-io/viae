@@ -2,12 +2,6 @@
  * A basic interface defining a binary bi-directional communication wire. 
  */
 export interface Wire {
-  /** Session ID */
-  sid?: string;
-
-  /** Remote Address */
-  address?: string;
-
   send(data: ArrayBuffer): void;
   close(dispose?: boolean);
 
