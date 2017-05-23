@@ -18,6 +18,8 @@ A bi-directional communication api framework with streaming support.
 
 Check [Documentation](https://github.com/MeirionHughes/viae/wiki) 
 
+Currently under development and subject to potential breaking changes between minor versions. 
+
 ### Viae Server (WebSocket)
 
 ```ts
