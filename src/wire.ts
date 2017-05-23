@@ -24,3 +24,8 @@ export interface WireServer {
   on(event: "connection", cb: (connection: Wire) => void);
 }
 
+/** A reusable wire that can connect to a url */
+export interface ConnectableWire extends Wire {
+  connect(url: string);
+}
+
