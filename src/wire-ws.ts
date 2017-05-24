@@ -22,7 +22,7 @@ export class WebSocketWire extends LiteEventEmitter implements ConnectableWire {
     this.state = "opening";
 
     this.ws = new this.WS(url);
-
+    this.ws.binaryType = 'arraybuffer';
     this.ws.onopen = () => {
       this.state = "open";
       this.emit("open");
