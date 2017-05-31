@@ -50,7 +50,7 @@ export default function contextFactory(
         ctx.res.body = body || ctx.res.body;
 
         $send(ctx.res, [wire]);
-        ctx._done = true;
+        ctx.$done = true;
 
         ctx.send = $noOp;
         ctx.end = $noOp;
@@ -63,7 +63,7 @@ export default function contextFactory(
       ctx.res.status = ctx.res.status || 200;
       $send(ctx.res, [wire]);
       if (isDone) {
-        ctx._done = true;
+        ctx.$done = true;
 
         ctx.send = $noOp;
         ctx.sendStatus = $noOp;
@@ -75,7 +75,7 @@ export default function contextFactory(
       ctx.res.body = body || ctx.res.body;
       ctx.res.status = code;
       $send(ctx.res, [wire]);
-      ctx._done = true;
+      ctx.$done = true;
       ctx.send = $noOp;
       ctx.sendStatus = $noOp;
       return false;

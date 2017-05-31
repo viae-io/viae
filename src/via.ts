@@ -69,7 +69,7 @@ export class Via implements IVia {
       err = result;
     }
 
-    delete ctx._done;
+    delete ctx.$done;
 
     try {
       await this._after.process(ctx, err);

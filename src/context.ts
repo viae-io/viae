@@ -13,5 +13,5 @@ export interface ViaContext {
   sendStatus(status: ViaStatus, body?: string | Uint8Array | Object);
   end(body?: string | Uint8Array | Object);
 
-  _done?: true;
+  $done?: true;
 }
