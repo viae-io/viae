@@ -1,5 +1,5 @@
 import * as pathToRegexp from 'path-to-regexp';
-import { ViaContext } from '../context';
+import { ViaRequestContext } from '../context';
 
 export type PathRequest = string | RegExp | (string | RegExp)[];
 
@@ -7,7 +7,7 @@ export type PathRequest = string | RegExp | (string | RegExp)[];
 export function requestPath(path: PathRequest) {
   let keys = [];
   var exp = pathToRegexp(path, keys);
-  return (ctx: ViaContext) => {
+  return (ctx: ViaRequestContext) => {
     let match = (ctx.req.path) ? exp.exec(ctx.req.path) : null;
     if (match == null) {
       return false;

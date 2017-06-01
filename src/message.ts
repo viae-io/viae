@@ -1,10 +1,11 @@
 
 import * as varint from 'varint';
 import { textToBytes, bytes2Text, bytesToHex, hexToBytes } from './utils/utils';
+import { ViaMethod } from './method';
 import { ViaStatus } from './status';
 
 /* Streaming Flags */
-export enum ViaMessageStreamFlags {
+export enum ViaStreamFlags {
   None = 0, // Not Streaming
   Begin = 1,
   Next = 2,
@@ -13,12 +14,10 @@ export enum ViaMessageStreamFlags {
 
 export interface ViaMessage {
   id?: string; //8-byte short-uid (as hex)
-  method?: string;
+  method?: ViaMethod;
   path?: string;
   status?: ViaStatus;
-  headers?: {};
   body?: any;
-  flags?: ViaMessageStreamFlags;
 }
 
 export namespace ViaMessage {
@@ -67,11 +66,11 @@ export namespace ViaMessage {
       list.push(bytes);
     }
     /* #4 headers */
-    if (msg.headers) {
+    /*if (msg.headers) {
       let bytes = textToBytes(JSON.stringify(msg.headers));
       list.push(varint.encode((bytes.length << 3) | 4));
       list.push(bytes);
-    }
+    }*/
     /* #5 streaming flags */
     if (msg.flags) {
       list.push(varint.encode((msg.flags << 3) | 5));

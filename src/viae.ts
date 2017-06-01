@@ -1,5 +1,6 @@
 import { Wire, WireServer } from './wire';
 import { Via, ViaHandler } from './via';
+import { ViaMethod } from './method';
 import { PathRequest, requestPath, requestMethod } from './middleware';
 
 
@@ -21,13 +22,9 @@ export class Viae extends Via {
     });    
   }
 
-  broadcast(message) {
-    this.send(message, this._connections);
-  }
-
   route(opts: {
     path: string,
-    method: string,
+    method: ViaMethod,
     handlers: ViaHandler[]
   }) {
     this.use(

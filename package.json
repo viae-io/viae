@@ -20,6 +20,7 @@
     "url": "git+https://github.com/MeirionHughes/viae.git"
   },
   "publishConfig": {
+    "tag": "beta",
     "registry": "https://registry.npmjs.org/"
   },
   "keywords": [
@@ -30,7 +31,8 @@
     "response",
     "websocket",
     "ws",
-    "stream"
+    "stream",
+    "iot"
   ],
   "author": "Meirion Hughes <crakinshot@yahoo.com>",
   "license": "MIT",

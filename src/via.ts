@@ -2,177 +2,95 @@ import { ViaContext } from './context';
 
 import { Rowan, IRowan, Handler, IProcessor } from 'rowan';
 import { Wire } from './wire';
-import { ViaMessage, ViaMessageStreamFlags } from './message';
+import { ViaMessage, ViaStreamFlags } from './message';
 import { ViaRequest } from './request';
 import { ViaStatus } from './status';
+import { ViaMethod } from './method';
+import { ViaStream } from './stream';
 
-import { Interceptor, Streamer, Unhandled } from './middleware';
+import { Interceptor } from './middleware';
 
-import ctxFactory from './context-factory';
+export * from './context';
 
-export { ViaContext } from './context';
 export type ViaHandler = Handler<ViaContext>;
 export type ViaProcessor = IProcessor<ViaContext>;
 
-function defaultConfig() {
-  let interceptor = new Interceptor();
-  let streamer = new Streamer(interceptor);
-  let unhandled = new Unhandled();
-
-  return {
-    interceptor: interceptor,
-    streamer: streamer,
-    unhandled: unhandled,
-    rethrow: false,
-    noop: function () { },
-    genid: ViaMessage.genIdString
-  };
-}
-
-export class Via implements IVia {
-  private _root = new Rowan<ViaContext>();
+export class Via {
   private _app = new Rowan<ViaContext>();
-  private _before = new Rowan<ViaContext>();
-  private _after = new Rowan<ViaContext>();
+  private _interceptor = new Interceptor();
 
-  private _createCtx: (wire: Wire, msg: ViaMessage) => ViaContext;
+  constructor(private _wire?: Wire) {
+    this._app.use(this._interceptor);
 
-  constructor(private _wire?: Wire, private _config = defaultConfig()) {
-    this._root.use(this._before);
-    this._root.use(this._config.streamer);
-    this._root.use(this._config.interceptor);
-    this._root.use(this._app);
-    this._root.use(this._config.unhandled);
-
-    this._createCtx = ctxFactory(this.send, this._config.genid, this._config.noop);
-
-    if (_wire) _wire.on("message", x => this.processMessage(x, this._wire));
+    if (_wire) {
+      _wire.on("message", x => this.processMessage(x, this._wire));
+    }
   }
 
   protected processMessage(data: ArrayBuffer, wire: Wire) {
     const msg = ViaMessage.deserialiseBinary(new Uint8Array(data));
-    const ctx = this._createCtx(wire, msg);
+
+    const ctx = {
+      wire: wire,
+      req: msg
+    };
+
     return this.process(ctx);
   }
 
-  /** @internal */
   async process(ctx: ViaContext, err?: any) {
-    let result: any;
-
     try {
-      result = await this._root.process(ctx, err);
+      await this._app.process(ctx, err);
     } catch (_err) {
-      err = err;
+      console.log(err);
     };
-
-    if (result != undefined && typeof (result) != "boolean") {
-      err = result;
-    }
-
-    delete ctx.$done;
-
-    try {
-      await this._after.process(ctx, err);
-    } catch (err) {
-      if (this._config.rethrow) throw err;
-    }
   }
 
-  /** insert middleware to run after any processing */
-  before(handler: ViaHandler, ...handlers: ViaHandler[]): this {
-    this._before.use(handler, ...handlers);
-    return this;
-  }
   /** insert a handler (or chain) to run during processing*/
   use(handler: ViaHandler, ...handlers: ViaHandler[]): this {
     this._app.use(handler, ...handlers);
     return this;
   }
-  /** insert middleware to run before any processing */
-  after(handler: ViaHandler, ...handlers: ViaHandler[]): this {
-    this._after.use(handler, ...handlers);
-    return this;
+
+  send(msg: ViaMessage, wire = this._wire) {
+    if (wire == undefined) {
+      return Promise.reject("cannot send message to undefined wire");
+    }
+
+    const bin = ViaMessage.serialiseBinary(msg).buffer;
+
+    wire.send(bin);
   }
 
   /**
-   * send a message
-   */
-  send(msg: ViaMessage)
-  send(msg: ViaMessage, wires: Wire[])
-  send(msg: ViaMessage, wires?: Wire[]) {
-    if (wires === undefined) {
-      if (this._wire !== undefined) {
-        wires = [this._wire];
-      } else {
-        return;
-      }
-    }
-
-    let bin = ViaMessage.serialiseBinary(msg).buffer;
-    for (var wire of wires) {
-      try {
-        wire.send(bin);
-      } catch (err) {
-        console.log(err);
-      }
-    }
-  }
-
-  /**
-   * send a request 
+   * Send a request. @returns promise to await the reply. 
    **/
-  request(msg: ViaMessage = {}, keepAlive = false, wire = this._wire, ...handlers: ViaHandler[]): Promise<ViaContext> {
-    if (wire == undefined)
-      return Promise.reject(undefined);
-
-    if (msg.id == undefined)
-      msg.id = ViaMessage.genIdString();
-
-    let bin = ViaMessage.serialiseBinary(msg).buffer;
+  request(
+    method: ViaMethod,
+    body: string | ArrayBuffer | object | ViaStream,
+    id: string = ViaMessage.genIdString()): Promise<ViaContext> {
 
     let reject;
     let resolve;
-    let resolved = false;
     let promise = new Promise<ViaMessage>((r, x) => { resolve = r, reject = x; });
 
-    var dispose = this._config.interceptor.intercept(msg.id, [(ctx) => {
-      if (!resolved)
-        resolve(ctx);
-      if (!keepAlive)
+    var dispose = this._interceptor.intercept(id, [
+      (ctx) => {
+        if (resolve !== null) {
+          resolve(ctx);
+          resolve = reject = null;
+        }
         dispose();
-    }, ...handlers, (_) => false]);
+        return false;
+      }]);
 
     try {
-      wire.send(bin);
+      this.send(msg);
     } catch (err) {
       dispose();
       reject(err);
+      resolve = reject = null;
     }
     return promise;
   }
 }
-
-
-export interface IVia extends IRowan<ViaContext> {
-
-  /** insert middleware to run after any processing */
-  before(handler: ViaHandler, ...handlers: ViaHandler[]): this;
-  /** insert a handler (or chain) to run during processing*/
-  use(handler: ViaHandler, ...handlers: ViaHandler[]): this;
-  /** insert middleware to run before any processing */
-  after(handler: ViaHandler, ...handlers: ViaHandler[]): this;
-
-  /**
-   * send a message
-   */
-  send(msg: ViaMessage);
-  send(msg: ViaMessage, wires: Wire[]);
-
-  /**
-   * send a request 
-   **/
-  request(msg: ViaMessage): Promise<ViaContext>;
-  request(msg: ViaMessage, keepAlive: boolean): Promise<ViaContext>;
-  request(msg: ViaMessage, keepAlive: boolean, wire: Wire, ...handlers: ViaHandler[]): Promise<ViaContext>;
-}
-

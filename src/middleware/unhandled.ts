@@ -9,7 +9,7 @@ export class Unhandled implements ViaProcessor {
   * @internal 
   */
   process(ctx: ViaContext, err: any) {
-    if (ctx.req != undefined) {
+    /*if (ctx.req != undefined) {
       if (ctx.res != undefined) {
         if (ctx.res.status == undefined) {
           if (err == undefined) {
@@ -30,6 +30,6 @@ export class Unhandled implements ViaProcessor {
         }
       }
     }
-    return err;
+    return err;*/
   }
 };
