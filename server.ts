@@ -1,3 +1,5 @@
+import "core-js/modules/es7.symbol.async-iterator";
+
 import { Server } from 'ws';
 import { Viae, ViaRequestContext, ViaMethod, Wire } from './src/index';
 

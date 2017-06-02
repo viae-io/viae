@@ -32,7 +32,7 @@ export class Via {
   protected processMessage(data: ArrayBuffer, wire: Wire) {
     const msg = ViaMessage.deserialiseBinary(new Uint8Array(data));
 
-    console.log("received:", msg);
+    //console.log("received:", msg);
 
 
     this.process(this.createCtx(msg, wire));
@@ -74,8 +74,8 @@ export class Via {
 
   async process(ctx: ViaContext, err?: any) {
     try {
-      if (ctx["req"]) console.log("req:", ctx["req"]);
-      if (ctx["res"]) console.log("res:", ctx["res"]);
+      //if (ctx["req"]) console.log("req:", ctx["req"]);
+      //if (ctx["res"]) console.log("res:", ctx["res"]);
       await this._app.process(ctx, err);
     } catch (_err) {
       console.log(err);
@@ -101,15 +101,10 @@ export class Via {
       let stream = new Stream(iterable, () => dispose());
       let dispose = this._interceptor.intercept(sid, [stream]);
 
-    
-
       body["$stream"] = sid;
     }
 
-    console.log("sending", msg);    
-
-
-    
+    //console.log("sending", msg);        
     const bin = ViaMessage.serialiseBinary(msg).buffer;
     wire.send(bin);
   }
