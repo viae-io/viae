@@ -6,6 +6,7 @@ export default function() {
     it("should correctly serialise empty message", () => {
 
       let msg: ViaMessage = {
+
       };
 
       let bin = ViaMessage.serialiseBinary(msg);
@@ -107,27 +108,12 @@ export default function() {
       expect(result.body).to.deep.equal(new Uint8Array([1, 2, 3, 4]));
     });
 
-    it("should correctly serialise message with headers", () => {
-
-      let msg: ViaMessage = {
-        headers: {
-          foo: "bar",
-          ray: "day"
-        }
-      };
-
-      let result = ViaMessage.deserialiseBinary(ViaMessage.serialiseBinary(msg));
-
-      expect(result.headers).to.deep.equal({
-        foo: "bar",
-        ray: "day"
-      });
-    });
+   
 
     it("should correctly serialise message with method", () => {
 
       let msg: ViaMessage = {
-        method: "GET",
+        method: 1,
       };
 
       let result = ViaMessage.deserialiseBinary(ViaMessage.serialiseBinary(msg));
@@ -140,15 +126,10 @@ export default function() {
 
       let msg: ViaMessage = {
         id: "f0e1d2c3b4a59687",
-        method: "SUBSCRIBE",
-        status: 100,
+        method: 1,
+        status: 522,
         path: "path/to/resource",
         body: "hello world",
-        headers: {
-          foo: "bar",
-          ray: "day"
-        },
-        flags: 0xf,
       };
 
 

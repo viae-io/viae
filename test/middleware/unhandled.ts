@@ -2,7 +2,7 @@ import { ViaMessage, ViaContext, Unhandled } from '../../src/index';
 import { assert, expect } from 'chai';
 
 export default function unhandledTests() {
-
+/*
     it("sets status 500", async () => {
     const noop = function () {  };
     const unhandled = new Unhandled();
@@ -39,5 +39,5 @@ export default function unhandledTests() {
     let result = await unhandled.process(ctx, err);
 
     expect(result).is.eq(err);
-  });
+  });*/
 };

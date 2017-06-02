@@ -6,6 +6,7 @@ import { ViaStatus } from './status';
 
 export interface ViaContext {
   wire: Wire;
+  id: string;
   $done?: true;
 }
 

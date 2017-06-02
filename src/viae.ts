@@ -3,7 +3,6 @@ import { Via, ViaHandler } from './via';
 import { ViaMethod } from './method';
 import { PathRequest, requestPath, requestMethod } from './middleware';
 
-
 export class Viae extends Via {
   private _connections = new Array<Wire>();
   get connections() { return this._connections; };

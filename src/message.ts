@@ -5,7 +5,7 @@ import { ViaMethod } from './method';
 import { ViaStatus } from './status';
 
 export interface ViaMessage {
-  id: string;
+  id?: string;
   method?: ViaMethod;
   path?: string;   
   status?: ViaStatus;

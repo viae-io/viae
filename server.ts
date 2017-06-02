@@ -8,7 +8,7 @@ server.route({
   method: ViaMethod.GET,
   path: "/",
   handlers: [(ctx: ViaRequestContext) => {
-    ctx.send({ $stream: foo }, 200);
+    ctx.send({ $stream: foo() }, 200);
   }]
 });
 

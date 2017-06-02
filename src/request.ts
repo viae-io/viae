@@ -4,6 +4,6 @@ import { ViaMethod } from './method';
 export interface ViaRequest {
   id: string; 
   method: ViaMethod;
-  path: string;  
+  path?: string;  
   body?: string | ArrayBuffer | object;
 }

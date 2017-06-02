@@ -2,7 +2,7 @@ import { ViaMessage, ViaContext, Interceptor } from '../../src/index';
 import { assert, expect } from 'chai';
 
 export default function interceptorTests() {
-
+/*
   it("throws error if intercept called without id", () => {
     let interceptor = new Interceptor();
     expect(() => { interceptor.intercept(undefined, []); }).to.throw(Error);
@@ -152,5 +152,5 @@ export default function interceptorTests() {
     let result = await interceptor.process(ctx, undefined);
 
     expect(wasIntercepted).to.be.eql(true);
-  });
+  });*/
 };

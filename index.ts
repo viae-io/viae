@@ -1,4 +1,4 @@
-function * foo(){
+function* foo() {
   yield 1;
   yield 2;
   yield 3;
@@ -6,8 +6,11 @@ function * foo(){
 
 const a = foo();
 
-console.log(a.next());
 
-const b = a[Symbol.iterator]();
+async function main() {
+  for (let item of foo()) {
+    console.log(await item);
+  }
+}
 
-console.log(b.next());
+main();

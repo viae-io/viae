@@ -1,11 +1,11 @@
-export enum ViaMethod {
-  STREAM,
-  
-  GET,
+export enum ViaMethod {  
+
+  GET = 1,
   PUT,
   POST,
   DELETE,
 
-  SUBSCRIBE,
+  SUBSCRIBE,  
+  NEXT,  
   UNSUBSCRIBE,
 }
