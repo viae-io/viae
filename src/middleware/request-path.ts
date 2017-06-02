@@ -13,9 +13,9 @@ export function requestPath(path: PathRequest) {
       return false;
     }
     if (keys.length > 0) {
-      ctx.req.params = ctx.req.params || {};
+      ctx.params = ctx.params || {};
       for (let i = 0; i < keys.length; i += 1) {
-        ctx.req.params[keys[i].name] = match[i + 1];
+        ctx.params[keys[i].name] = match[i + 1];
       }
     }
   };

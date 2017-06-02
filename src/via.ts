@@ -1,12 +1,13 @@
-import { ViaContext } from './context';
-
+import { ViaContext, ViaRequestContext, ViaResponseContext } from './context';
 import { Rowan, IRowan, Handler, IProcessor } from 'rowan';
 import { Wire } from './wire';
-import { ViaMessage, ViaStreamFlags } from './message';
+import { ViaMessage } from './message';
 import { ViaRequest } from './request';
+import { ViaResponse } from './response';
 import { ViaStatus } from './status';
 import { ViaMethod } from './method';
 import { ViaStream } from './stream';
+import { shortId, bytesToHex, hexToBytes } from './utils';
 
 import { Interceptor } from './middleware';
 
@@ -14,7 +15,6 @@ export * from './context';
 
 export type ViaHandler = Handler<ViaContext>;
 export type ViaProcessor = IProcessor<ViaContext>;
-
 export class Via {
   private _app = new Rowan<ViaContext>();
   private _interceptor = new Interceptor();
@@ -29,13 +29,39 @@ export class Via {
 
   protected processMessage(data: ArrayBuffer, wire: Wire) {
     const msg = ViaMessage.deserialiseBinary(new Uint8Array(data));
+    this.process(this.createCtx(msg, wire));
+  }
 
-    const ctx = {
+  protected createCtx(msg: ViaMessage, wire: Wire) {
+    if (msg.status !== undefined)
+      return this.createResponseCtx(msg, wire);
+    return this.createRequestCtx(msg, wire);
+  }
+
+  protected createResponseCtx(msg: ViaMessage, wire: Wire) {
+    const ctx: ViaResponseContext = {
       wire: wire,
-      req: msg
+      res: msg as ViaResponse,
+    };
+    return ctx;
+  }
+
+  protected createRequestCtx(msg: ViaMessage, wire: Wire) {
+    const ctx: ViaRequestContext = {
+      wire: wire,
+      req: msg as ViaRequest,
+      send: (body, status) => {
+        this.send({
+          id: msg.id,
+          status: status | 404,
+          body: body
+        }, wire);
+        ctx.send = () => { throw Error("Already sent a reply"); };
+        ctx.$done = true;
+      }
     };
 
-    return this.process(ctx);
+    return ctx;
   }
 
   async process(ctx: ViaContext, err?: any) {
@@ -57,40 +83,55 @@ export class Via {
       return Promise.reject("cannot send message to undefined wire");
     }
 
-    const bin = ViaMessage.serialiseBinary(msg).buffer;
+    const body = msg.body;
+    if (body !== undefined && body["$stream"] !== undefined) {
+      let streamable = body["$stream"];
+      let sid = bytesToHex(shortId());
+      body["$stream"] = sid;
+    }
 
+    const bin = ViaMessage.serialiseBinary(msg).buffer;
     wire.send(bin);
   }
 
   /**
-   * Send a request. @returns promise to await the reply. 
+   * Send a request. @returns promise to await the response. 
    **/
   request(
     method: ViaMethod,
-    body: string | ArrayBuffer | object | ViaStream,
-    id: string = ViaMessage.genIdString()): Promise<ViaContext> {
+    path: string,
+    body?: string | Uint8Array | object | ViaStream | undefined,
+    id?: string): Promise<ViaResponse> {
+    id = id || bytesToHex(shortId());
 
     let reject;
     let resolve;
-    let promise = new Promise<ViaMessage>((r, x) => { resolve = r, reject = x; });
+    let promise = new Promise<ViaResponse>((r, x) => { resolve = r, reject = x; });
 
     var dispose = this._interceptor.intercept(id, [
-      (ctx) => {
+      (ctx: ViaResponseContext) => {
         if (resolve !== null) {
-          resolve(ctx);
+          resolve(ctx.res);
           resolve = reject = null;
         }
         dispose();
+        ctx.$done = true;
         return false;
       }]);
 
     try {
-      this.send(msg);
+      this.send({
+        id: id,
+        method: method,
+        body: body,
+        path: path
+      });
     } catch (err) {
       dispose();
       reject(err);
       resolve = reject = null;
     }
+
     return promise;
   }
 }

@@ -1,5 +1,6 @@
 import { Wire } from './wire';
 import { ViaRequest } from './request';
+import { ViaResponse } from './response';
 import { ViaMessage } from './message';
 import { ViaStatus } from './status';
 
@@ -9,13 +10,14 @@ export interface ViaContext {
 }
 
 export interface ViaRequestContext extends ViaContext {
+  params?: any;
   req: ViaRequest;
-}
+  send(body: any, status: ViaStatus);
+};
 
 export interface ViaResponseContext extends ViaContext {
-  res: ViaMessage;
+  res: ViaResponse;  
 }
-
 export function isResponse(ctx: ViaContext): ctx is ViaResponseContext {
   return ctx["res"] !== undefined;
 }

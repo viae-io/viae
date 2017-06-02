@@ -1,4 +1,19 @@
 
+export function shortId(): [number, number, number, number, number, number, number, number] {
+  var time = Date.now();
+
+  return [
+    Math.round(Math.random() * 255),
+    Math.round(Math.random() * 255),
+    Math.round(Math.random() * 255),
+    Math.round(Math.random() * 255),
+    (time >> 0) & 0xFF,
+    (time >> 8) & 0xFF,
+    Math.round((time / Math.random()) & 0xFF),
+    Math.round((time / Math.random()) & 0xFF),
+  ];
+};
+
 export function textToBytes(s: string): Uint8Array {
   var ua = new Uint8Array(s.length);
   for (var i = 0; i < s.length; i++) {
@@ -18,27 +33,27 @@ export function bytes2Text(ua: Uint8Array): string {
 // from crypto-js
 
 export function hexToBytes(hex) {
-    for (var bytes = [], c = 0; c < hex.length; c += 2)
+  for (var bytes = [], c = 0; c < hex.length; c += 2)
     bytes.push(parseInt(hex.substr(c, 2), 16));
-    return bytes;
+  return bytes;
 }
 
 export function bytesToHex(bytes) {
-    for (var hex = [], i = 0; i < bytes.length; i++) {
-        hex.push((bytes[i] >>> 4).toString(16));
-        hex.push((bytes[i] & 0xF).toString(16));
-    }
-    return hex.join("");
+  for (var hex = [], i = 0; i < bytes.length; i++) {
+    hex.push((bytes[i] >>> 4).toString(16));
+    hex.push((bytes[i] & 0xF).toString(16));
+  }
+  return hex.join("");
 }
 
 export function concatBuffers(...buffers: ArrayBuffer[]): ArrayBuffer {
-  
+
   if (buffers.length == 0)
     return new ArrayBuffer(0);
 
   let current = buffers[0];
-  
-  for (let i = 1; i < buffers.length; i++) {    
+
+  for (let i = 1; i < buffers.length; i++) {
     current = concatBuffer(current, buffers[i]);
   }
 

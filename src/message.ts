@@ -1,59 +1,26 @@
 
 import * as varint from 'varint';
-import { textToBytes, bytes2Text, bytesToHex, hexToBytes } from './utils/utils';
+import { shortId, textToBytes, bytes2Text, bytesToHex, hexToBytes } from './utils';
 import { ViaMethod } from './method';
 import { ViaStatus } from './status';
 
-/* Streaming Flags */
-export enum ViaStreamFlags {
-  None = 0, // Not Streaming
-  Begin = 1,
-  Next = 2,
-  End = 4,
-}
-
 export interface ViaMessage {
-  id?: string; //8-byte short-uid (as hex)
+  id: string;
   method?: ViaMethod;
-  path?: string;
+  path?: string;   
   status?: ViaStatus;
   body?: any;
 }
 
 export namespace ViaMessage {
-  /* a simple id good enough for small servers */
-  export var genId = function () {
-    var time = Date.now();
-    var numbers = new Array(8);
-
-    numbers[0] = Math.round(Math.random() * 255);
-    numbers[1] = Math.round(Math.random() * 255);
-    numbers[2] = Math.round(Math.random() * 255);
-    numbers[3] = Math.round(Math.random() * 255);
-
-    numbers[4] = (time >> 0) & 0xFF;
-    numbers[5] = (time >> 8) & 0xFF;
-    numbers[6] = Math.round(Math.random() * ((time >> 16) & 0xFF));
-    numbers[7] = Math.round(Math.random() * ((time >> 24) & 0xFF));
-
-    return numbers;
-  };
-
-  export var genIdString = function () {
-    let id = genId();
-    return bytesToHex(genId());
-  };
-
   export function serialiseBinary(msg: ViaMessage): Uint8Array {
     let list = [];
 
-    list.push(msg.id ? hexToBytes(msg.id) : ViaMessage.genId());
+    list.push(msg.id ? hexToBytes(msg.id) : shortId());
 
     /* #1 method */
     if (msg.method) {
-      let bytes = textToBytes(msg.method);
-      list.push(varint.encode((bytes.length << 3) | 1));
-      list.push(bytes);
+      list.push(varint.encode((msg.method << 3) | 1));
     }
     /* #2 status */
     if (msg.status) {
@@ -65,18 +32,6 @@ export namespace ViaMessage {
       list.push(varint.encode((bytes.length << 3) | 3));
       list.push(bytes);
     }
-    /* #4 headers */
-    /*if (msg.headers) {
-      let bytes = textToBytes(JSON.stringify(msg.headers));
-      list.push(varint.encode((bytes.length << 3) | 4));
-      list.push(bytes);
-    }*/
-    /* #5 streaming flags */
-    if (msg.flags) {
-      list.push(varint.encode((msg.flags << 3) | 5));
-    }
-    /* #6 - reserved */
-
     /* #7 - data type + body bytes */
     if (msg.body) {
       if (typeof (msg.body) == "string") {
@@ -111,12 +66,10 @@ export namespace ViaMessage {
       offset += x.length || 1;
     });
 
-    //return <Uint8Array><any>pako.deflate(buffer);
     return buffer;
   }
 
   export function deserialiseBinary(binary: Uint8Array): ViaMessage {
-    //binary = pako.inflate(binary);
     let off = 0;
     const id = bytesToHex(binary.slice(0, off += 8));
     const msg: ViaMessage = { id: id };
@@ -127,8 +80,7 @@ export namespace ViaMessage {
 
       switch (enc & 0x7) {
         case 1: //method
-          len = enc >> 3;
-          msg.method = bytes2Text(binary.subarray(off, off += len));
+          msg.method = enc >> 3;
           break;
         case 2: //status
           msg.status = enc >> 3;
@@ -136,14 +88,7 @@ export namespace ViaMessage {
         case 3: //path
           len = enc >> 3;
           msg.path = bytes2Text(binary.subarray(off, off += len));
-          break;
-        case 4: //headers
-          len = enc >> 3;
-          msg.headers = JSON.parse(bytes2Text(binary.subarray(off, off += len)));
-          break;
-        case 5: //stream flags;
-          msg.flags = enc >> 3;
-          break;
+          break;        
         case 7: //type + data        
           switch (enc >> 3) {
             case DataType.Json:

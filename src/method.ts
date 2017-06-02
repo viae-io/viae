@@ -1,13 +1,11 @@
 export enum ViaMethod {
-  /* request stream to start */
-  BEGIN,
-  /* request stream to stop */
-  ABORT,
+  STREAM,
   
   GET,
   PUT,
   POST,
   DELETE,
+
   SUBSCRIBE,
   UNSUBSCRIBE,
 }

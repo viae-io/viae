@@ -7,3 +7,6 @@ export * from './viae';
 export * from './wire';
 export * from './middleware';
 export * from './router';
+export * from './method';
+export * from './utils';
+export * from './stream';
