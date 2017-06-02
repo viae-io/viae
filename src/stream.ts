@@ -35,6 +35,8 @@ export class Stream extends Rowan<ViaRequestContext>{
         let body: any;
         let status: ViaStatus;
 
+         console.log("next");
+
         try {
           let result = iterator.next();
           body = result.value;

@@ -78,7 +78,7 @@ export class Via {
       //if (ctx["res"]) console.log("res:", ctx["res"]);
       await this._app.process(ctx, err);
     } catch (_err) {
-      console.log(err);
+      console.log(_err);
     };
   }
 

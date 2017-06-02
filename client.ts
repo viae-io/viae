@@ -8,7 +8,7 @@ import { Via, ViaMethod, ViaStatus } from './src';
 let ws = new Ws("ws://127.0.0.1:9090");
 let via = new Via(ws);
 
-async function* readStream(sid, via) {
+async function* readStreamAsync(sid: string, via: Via) {
   let response;
   response = await via.request(ViaMethod.SUBSCRIBE, undefined, undefined, sid);
   if (response.status != 200) { throw Error(response.body); }
@@ -29,12 +29,8 @@ async function* readStream(sid, via) {
 
 ws.on("open", async () => {
   let result = await via.request(ViaMethod.GET, "/");
-  console.log("got: ", result);
 
-  let sid = result.body["$stream"];
-
-  for await(let item of readStream(sid, via))
-  {
+  for await (let item of readStreamAsync(result.body["$stream"], via)) {
     console.log(item);
   }
 
