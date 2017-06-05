@@ -1,63 +1,70 @@
-export type Streamable = {
+import { Rowan } from 'rowan';
+import { ViaHandler } from './via';
+import { RequestContext } from './context';
+import { Method } from './method';
+import { Message } from './message';
+import { Status } from './status';
+import { request, requestPath, requestMethod } from './middleware';
+
+export type Stream = {
   $stream: IterableIterator<string | Uint8Array | object> | AsyncIterableIterator<string | Uint8Array | object>
 };
 
-import { Rowan } from 'rowan';
-import { ViaHandler } from './via';
-import { ViaRequestContext } from './context';
-import { ViaMethod } from './method';
-import { ViaMessage } from './message';
-import { ViaStatus } from './status';
-import { request, requestPath, requestMethod } from './middleware';
+export interface StreamIterator extends AsyncIterator<string | Uint8Array | object> {
+  unsubscribe();
+}
 
-export class Stream extends Rowan<ViaRequestContext>{
+export interface StreamIterable {
+  subscribe(): StreamIterator;
+}
 
-  constructor(iterable: Iterable<any>, dispose: () => void) {
+export class StreamIntercept extends Rowan<RequestContext>{
+  constructor(iterable: Iterable<any> | AsyncIterable<any>, dispose: () => void) {
     super();
 
     let iterator: Iterator<any>;
 
     this.use(
-      requestMethod(ViaMethod.SUBSCRIBE),
-      (ctx: ViaRequestContext) => {
+      requestMethod(Method.SUBSCRIBE),
+      (ctx: RequestContext) => {
         try {
-          iterator = iterable[Symbol.iterator]();
-          ctx.send(undefined, ViaStatus.OK);
+          if (iterable[Symbol.asyncIterator])
+            iterator = iterable[Symbol.asyncIterator]();
+          else
+            iterator = iterable[Symbol.iterator]();
+          ctx.send(undefined, Status.Ok);
         } catch (err) {
-          ctx.send(err.message, ViaStatus.Error);     
+          ctx.send(err.message, Status.Error);
         }
       });
 
     this.use(
       request(),
-      requestMethod(ViaMethod.NEXT),
-      (ctx: ViaRequestContext) => {
+      requestMethod(Method.NEXT),
+      async (ctx: RequestContext) => {
         let body: any;
-        let status: ViaStatus;
-
-         console.log("next");
+        let status: Status;
 
         try {
-          let result = iterator.next();
+          let result = await iterator.next();
           body = result.value;
-          status = result.done ? ViaStatus.Done : ViaStatus.Next;
+          status = result.done ? Status.Done : Status.Next;
         } catch (err) {
           body = err.message;
-          status = ViaStatus.Error;
+          status = Status.Error;
         }
         ctx.send(body, status);
-
-        if (status != ViaStatus.Next) {
+        if (status != Status.Next) {
           dispose();
         }
       });
 
     this.use(
       request(),
-      requestMethod(ViaMethod.UNSUBSCRIBE),
-      (ctx: ViaRequestContext) => {
+      requestMethod(Method.UNSUBSCRIBE),
+      (ctx: RequestContext) => {
         dispose();
-        ctx.send(undefined, ViaStatus.OK);
+        ctx.send(undefined, Status.Ok);
       });
   }
 }

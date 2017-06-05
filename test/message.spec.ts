@@ -1,19 +1,19 @@
-import { ViaMessage } from '../src/index';
+import { Message } from '../src/index';
 import { assert, expect } from 'chai';
 
 export default function() {
   describe("Serialiser", () => {
     it("should correctly serialise empty message", () => {
 
-      let msg: ViaMessage = {
+      let msg: Message = {
 
       };
 
-      let bin = ViaMessage.serialiseBinary(msg);
+      let bin = Message.serialiseBinary(msg);
 
       expect(bin.length).equals(8);
 
-      let result = ViaMessage.deserialiseBinary(bin);
+      let result = Message.deserialiseBinary(bin);
 
       expect(result.id).to.not.be.undefined;
 
@@ -23,15 +23,15 @@ export default function() {
 
     it("should correctly serialise message with id", () => {
 
-      let msg: ViaMessage = {
+      let msg: Message = {
         id: "f0e1d2c3b4a59687"
       };
 
-      let bin = ViaMessage.serialiseBinary(msg);
+      let bin = Message.serialiseBinary(msg);
 
       expect(bin.length).to.equal(8);
 
-      let result = ViaMessage.deserialiseBinary(bin);
+      let result = Message.deserialiseBinary(bin);
 
       expect(result.id).to.equal("f0e1d2c3b4a59687");
 
@@ -39,17 +39,17 @@ export default function() {
 
     it("should correctly serialise message with status", () => {
 
-      let msg: ViaMessage = {
+      let msg: Message = {
         id: "f0e1d2c3b4a59687",
         status: 404
       };
 
 
-      let bytes = ViaMessage.serialiseBinary(msg);
+      let bytes = Message.serialiseBinary(msg);
 
       expect(bytes.length).to.equal(10);
 
-      let result = ViaMessage.deserialiseBinary(bytes);
+      let result = Message.deserialiseBinary(bytes);
 
       expect(result.id).to.equal("f0e1d2c3b4a59687");
       expect(result.status).to.equal(404);
@@ -57,17 +57,17 @@ export default function() {
 
     it("should correctly serialise message with string body", () => {
 
-      let msg: ViaMessage = {
+      let msg: Message = {
         id: "f0e1d2c3b4a59687",
         body: "hello world",
       };
 
 
-      let bytes = ViaMessage.serialiseBinary(msg);
+      let bytes = Message.serialiseBinary(msg);
 
       expect(bytes.length).to.equal(20);
 
-      let result = ViaMessage.deserialiseBinary(bytes);
+      let result = Message.deserialiseBinary(bytes);
 
       expect(result.id).to.equal("f0e1d2c3b4a59687");
       expect(result.body).to.equal("hello world");
@@ -75,35 +75,35 @@ export default function() {
 
     it("should correctly serialise message with object body", () => {
 
-      let msg: ViaMessage = {
+      let msg: Message = {
         body: { foo: "bar" },
       };
 
 
-      let result = ViaMessage.deserialiseBinary(ViaMessage.serialiseBinary(msg));
+      let result = Message.deserialiseBinary(Message.serialiseBinary(msg));
 
       expect(result.body).to.deep.equal({ foo: "bar" });
     });
 
     it("should correctly serialise message with json-string body", () => {
 
-      let msg: ViaMessage = {
+      let msg: Message = {
         body: ' {"foo":"bar"}    ',
       };
 
-      let result = ViaMessage.deserialiseBinary(ViaMessage.serialiseBinary(msg));
+      let result = Message.deserialiseBinary(Message.serialiseBinary(msg));
 
       expect(result.body).to.deep.equal({ foo: "bar" });
     });
 
     it("should correctly serialise message with Uint8Array body", () => {
 
-      let msg: ViaMessage = {
+      let msg: Message = {
         body: new Uint8Array([1, 2, 3, 4]),
       };
 
 
-      let result = ViaMessage.deserialiseBinary(ViaMessage.serialiseBinary(msg));
+      let result = Message.deserialiseBinary(Message.serialiseBinary(msg));
 
       expect(result.body).to.deep.equal(new Uint8Array([1, 2, 3, 4]));
     });
@@ -112,11 +112,11 @@ export default function() {
 
     it("should correctly serialise message with method", () => {
 
-      let msg: ViaMessage = {
+      let msg: Message = {
         method: 1,
       };
 
-      let result = ViaMessage.deserialiseBinary(ViaMessage.serialiseBinary(msg));
+      let result = Message.deserialiseBinary(Message.serialiseBinary(msg));
 
       expect(result).not.to.deep.equal(msg);
       expect(result.method).to.equal(msg.method);
@@ -124,7 +124,7 @@ export default function() {
 
     it("should correctly serialise message with all fields", () => {
 
-      let msg: ViaMessage = {
+      let msg: Message = {
         id: "f0e1d2c3b4a59687",
         method: 1,
         status: 522,
@@ -133,7 +133,7 @@ export default function() {
       };
 
 
-      let result = ViaMessage.deserialiseBinary(ViaMessage.serialiseBinary(msg));
+      let result = Message.deserialiseBinary(Message.serialiseBinary(msg));
 
       expect(result).to.not.equal(msg);
       expect(result).to.deep.equal(msg);

@@ -1,28 +1,29 @@
 import { Wire } from './wire';
-import { ViaRequest } from './request';
-import { ViaResponse } from './response';
-import { ViaMessage } from './message';
-import { ViaStatus } from './status';
+import { Request } from './request';
+import { Response } from './response';
+import { Message } from './message';
+import { Status } from './status';
 
-export interface ViaContext {
-  wire: Wire;
+export interface Context {
   id: string;
   $done?: true;
+  wire: Wire;
 }
 
-export interface ViaRequestContext extends ViaContext {
+export interface RequestContext extends Context {
   params?: any;
-  req: ViaRequest;
-  send(body: any, status: ViaStatus);
+  req: Request;
+  send(body: any | undefined, status: Status);
 };
 
-export interface ViaResponseContext extends ViaContext {
-  res: ViaResponse;  
+export interface ResponseContext extends Context {
+  res: Response;  
 }
-export function isResponse(ctx: ViaContext): ctx is ViaResponseContext {
+
+export function isResponse(ctx: Context): ctx is ResponseContext {
   return ctx["res"] !== undefined;
 }
 
-export function isRequest(ctx: ViaContext): ctx is ViaRequestContext {
+export function isRequest(ctx: Context): ctx is RequestContext {
   return ctx["req"] !== undefined;
 }

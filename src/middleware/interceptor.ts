@@ -1,4 +1,4 @@
-import { ViaContext, isResponse, isRequest } from '../context';
+import { Context, isResponse, isRequest } from '../context';
 import { ViaProcessor, ViaHandler } from '../via';
 import { Rowan } from 'rowan';
 
@@ -38,7 +38,7 @@ export class Interceptor implements ViaProcessor {
   /**
    * @internal 
    */
-  async process(ctx: ViaContext, err: any) {
+  async process(ctx: Context, err: any) {
     if (err) return;
 
     const id = isRequest(ctx) ? ctx.req.id : isResponse(ctx) ? ctx.res.id : undefined;
@@ -48,6 +48,7 @@ export class Interceptor implements ViaProcessor {
     const interceptor = this._interceptors.get(id);
 
     if (interceptor) {
+      ctx["$intercepted"] = true;
       return await Rowan.execute(ctx, undefined, interceptor.handlers);
     }
   };

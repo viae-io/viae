@@ -1,13 +1,13 @@
 import { Rowan } from 'rowan';
 import { ViaHandler } from './via';
-import { ViaContext } from './context';
-import { ViaMethod } from './method';
+import { Context } from './context';
+import { Method } from './method';
 import { request, requestPath, requestMethod } from './middleware';
 
-export class Router extends Rowan<ViaContext>{
+export class Router extends Rowan<Context>{
   route(opts: {
     path: string,
-    method: ViaMethod,
+    method: Method,
     handlers: ViaHandler[]
   }) {
     this.use(

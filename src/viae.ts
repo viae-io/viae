@@ -1,6 +1,6 @@
 import { Wire, WireServer } from './wire';
 import { Via, ViaHandler } from './via';
-import { ViaMethod } from './method';
+import { Method } from './method';
 import { PathRequest, requestPath, requestMethod } from './middleware';
 
 export class Viae extends Via {
@@ -16,14 +16,14 @@ export class Viae extends Via {
         this._connections.splice(this._connections.indexOf(wire), 1);
       });
       wire.on("message", (data) => {
-        this.processMessage(data, wire);
+        this.deserialiseMessage(data, wire);
       });
     });    
   }
 
   route(opts: {
     path: string,
-    method: ViaMethod,
+    method: Method,
     handlers: ViaHandler[]
   }) {
     this.use(

@@ -1,7 +1,8 @@
-export enum ViaStatus{
+export enum Status{
   Continue = 100,
+
+  Ok = 200,  
   
-  OK = 200,  
   BadRequest = 400,
   NotFound = 404,
   InternalError = 503,

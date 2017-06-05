@@ -1,4 +1,4 @@
-export enum ViaMethod {  
+export enum Method {  
 
   GET = 1,
   PUT,

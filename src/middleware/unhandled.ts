@@ -1,4 +1,4 @@
-import { ViaProcessor, ViaContext, ViaHandler } from '../via';
+import { ViaProcessor, Context, ViaHandler } from '../via';
 
 export class Unhandled implements ViaProcessor {
 
@@ -8,8 +8,8 @@ export class Unhandled implements ViaProcessor {
   /**
   * @internal 
   */
-  process(ctx: ViaContext, err: any) {
-    /*if (ctx.req != undefined) {
+  process(ctx: any, err: any) {
+    if (ctx.req != undefined) {
       if (ctx.res != undefined) {
         if (ctx.res.status == undefined) {
           if (err == undefined) {
@@ -30,6 +30,6 @@ export class Unhandled implements ViaProcessor {
         }
       }
     }
-    return err;*/
+    return err;
   }
 };

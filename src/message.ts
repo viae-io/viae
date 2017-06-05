@@ -1,19 +1,19 @@
 
 import * as varint from 'varint';
 import { shortId, textToBytes, bytes2Text, bytesToHex, hexToBytes } from './utils';
-import { ViaMethod } from './method';
-import { ViaStatus } from './status';
+import { Method } from './method';
+import { Status } from './status';
 
-export interface ViaMessage {
+export interface Message {
   id?: string;
-  method?: ViaMethod;
+  method?: Method;
   path?: string;   
-  status?: ViaStatus;
+  status?: Status;
   body?: any;
 }
 
-export namespace ViaMessage {
-  export function serialiseBinary(msg: ViaMessage): Uint8Array {
+export namespace Message {
+  export function serialiseBinary(msg: Message): Uint8Array {
     let list = [];
 
     list.push(msg.id ? hexToBytes(msg.id) : shortId());
@@ -69,10 +69,10 @@ export namespace ViaMessage {
     return buffer;
   }
 
-  export function deserialiseBinary(binary: Uint8Array): ViaMessage {
+  export function deserialiseBinary(binary: Uint8Array): Message {
     let off = 0;
     const id = bytesToHex(binary.slice(0, off += 8));
-    const msg: ViaMessage = { id: id };
+    const msg: Message = { id: id };
 
     while (off < binary.length) {
       let enc = varint.decode(binary, off); off += varint.decode.bytes;

@@ -1,4 +1,4 @@
-import { ViaMessage, ViaContext, Interceptor } from '../../src/index';
+import { Message, Context, Interceptor } from '../../src/index';
 import { assert, expect } from 'chai';
 
 export default function interceptorTests() {

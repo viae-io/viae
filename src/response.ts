@@ -1,7 +1,11 @@
-import { ViaStatus } from './status';
+import { Status } from './status';
 
-export interface ViaResponse {  
+type Basic = string | Uint8Array | object;
+type Stream = { $stream: AsyncIterableIterator<Basic>; };
+
+export interface Response {
   id: string;
-  status: ViaStatus;
-  body?: string | Uint8Array | object | 
-}
+  status: Status;
+  body?: Basic | Stream;
+};
+

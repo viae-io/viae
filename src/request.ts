@@ -1,9 +1,12 @@
-import { ViaMessage } from './message';
-import { ViaMethod } from './method';
+import { Message } from './message';
+import { Method } from './method';
 
-export interface ViaRequest {
-  id: string; 
-  method: ViaMethod;
-  path?: string;  
-  body?: string | ArrayBuffer | object;
+type Basic = string | Uint8Array | object;
+type Stream = { $stream: AsyncIterableIterator<Basic>; };
+
+export interface Request {
+  id: string;
+  method: Method;
+  path?: string;
+  body?: Basic | Stream;
 }
