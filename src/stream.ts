@@ -10,13 +10,13 @@ export type Stream = {
   $stream: IterableIterator<string | Uint8Array | object> | AsyncIterableIterator<string | Uint8Array | object>
 };
 
-export interface StreamIterator extends AsyncIterator<string | Uint8Array | object> {
-  unsubscribe();
+export interface StreamIterator extends AsyncIterableIterator<string | Uint8Array | object> {
 }
 
 export interface StreamIterable {
-  subscribe(): StreamIterator;
+  [Symbol.asyncIterator]: StreamIterator;
 }
+
 
 export class StreamIntercept extends Rowan<RequestContext>{
   constructor(iterable: Iterable<any> | AsyncIterable<any>, dispose: () => void) {

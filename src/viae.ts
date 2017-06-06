@@ -21,6 +21,7 @@ export class Viae extends Via {
     });    
   }
 
+
   route(opts: {
     path: string,
     method: Method,

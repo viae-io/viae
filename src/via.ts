@@ -6,7 +6,7 @@ import { Request } from './request';
 import { Response } from './response';
 import { Status } from './status';
 import { Method } from './method';
-import { StreamIntercept, Stream } from './stream';
+import { StreamIntercept, StreamIterator, StreamIterable, Stream } from './stream';
 import { Router } from './router';
 import { shortId, bytesToHex, hexToBytes } from './utils';
 
@@ -18,29 +18,22 @@ export type ViaHandler = Handler<Context>;
 export type ViaProcessor = IProcessor<Context>;
 
 export class Via {
-  private _root = new Rowan<Context>();
-  private _app = new Rowan<Context>();
-  private _before = new Rowan<Context>();
-  private _after = new Rowan<Context>();
-  private _interceptor = new Interceptor();
-  private _unhandled = new Unhandled();
+  protected _app = new Rowan<Context>();
+  protected _interceptor = new Interceptor();
 
   constructor(private _wire?: Wire) {
-    this._root.use(this._before);
-    this._root.use(this._interceptor);
-    this._root.use(this._app);
-    this._root.use(this._unhandled);
+    this._app.use(this._interceptor);
 
     if (_wire) {
       _wire.on("message", x => this.deserialiseMessage(x, this._wire));
     }
   }
 
-  async process(ctx: Context, err?: any) {
-    try {
-      await this._root.process(ctx, err);
-    } catch (_err) {
-      console.log(_err);
+  async process(ctx: Context, _?: any) {
+    try {      
+      await this._app.process(ctx, _);
+    } catch (err) {
+      console.log(err);
     };
   }
 
@@ -51,48 +44,46 @@ export class Via {
       const streamWire = wire;
       const sid = msg.body["$stream"] as string;
       const via = this;
-      const stream = {
-        [Symbol.asyncIterator]: async function* () {
-          let response;
-          response = await via.request(Method.SUBSCRIBE, undefined, undefined, sid, streamWire);
-          if (response.status != 200) { throw Error(response.body); }
-          do {
-            response = await via.request(Method.NEXT, undefined, undefined, sid, streamWire);
-            switch (response.status) {
-              case Status.Next:
-                yield response.body;
-                break;
-              case Status.Done:
-                return;
-              default:
-              case Status.Error:
-                throw Error(response.body || "Unknown Error");
-            }
-          } while (true);
-        }
+
+      const generator = async function* () {
+        let response;
+        response = await via.request(Method.SUBSCRIBE, undefined, undefined, sid, streamWire);
+        if (response.status != 200) { throw Error(response.body); }
+        do {
+          response = await via.request(Method.NEXT, undefined, undefined, sid, streamWire);
+          switch (response.status) {
+            case Status.Next:
+              yield response.body;
+              break;
+            case Status.Done:
+              return;
+            default:
+            case Status.Error:
+              throw Error(response.body || "Unknown Error");
+          }
+        } while (true);
       };
-      msg.body["$stream"] = stream;
+
+      const stream = {
+        [Symbol.asyncIterator]() { return Object.apply(generator(), { foo: 10 }); }
+      } as AsyncIterableIterator<any>;
+
+      msg.body["$stream"] = { [Symbol.asyncIterator]: generator };
     }
 
     this.process(this.createCtx(msg, wire));
   }
 
   protected createCtx(msg: Message, wire: Wire) {
-    if (msg.status !== undefined)
-      return this.createResponseCtx(msg, wire);
-    return this.createRequestCtx(msg, wire);
-  }
+    if (msg.status !== undefined) {
+      const ctx: ResponseContext = {
+        id: msg.id,
+        wire: wire,
+        res: msg as Response,
+      };
+      return ctx;
+    }
 
-  protected createResponseCtx(msg: Message, wire: Wire) {
-    const ctx: ResponseContext = {
-      id: msg.id,
-      wire: wire,
-      res: msg as Response,
-    };
-    return ctx;
-  }
-
-  protected createRequestCtx(msg: Message, wire: Wire) {
     const ctx: RequestContext = {
       id: msg.id,
       wire: wire,
@@ -101,35 +92,23 @@ export class Via {
         if (typeof (body) == "function") {
           body = body();
         }
-        const reply = {
+        const response = {
           id: msg.id,
           status: status,
           body: body
         };
-        this.send(reply, wire);
+        this.send(response, wire);
+        ctx["res"] = response;
         ctx.send = () => { throw Error("Already sent a reply"); };
         ctx.$done = true;
       }
     };
-
     return ctx;
   }
 
-
-
-  /** insert middleware to run after any processing */
-  before(handler: ViaHandler, ...handlers: ViaHandler[]): this {
-    this._before.use(handler, ...handlers);
-    return this;
-  }
   /** insert a handler (or chain) to run during processing*/
   use(handler: ViaHandler, ...handlers: ViaHandler[]): this {
     this._app.use(handler, ...handlers);
-    return this;
-  }
-  /** insert middleware to run before any processing */
-  after(handler: ViaHandler, ...handlers: ViaHandler[]): this {
-    this._after.use(handler, ...handlers);
     return this;
   }
 
