@@ -4,21 +4,15 @@ import { RequestContext } from './context';
 import { Method } from './method';
 import { Message } from './message';
 import { Status } from './status';
+import { Wire } from './wire';
 import { request, requestPath, requestMethod } from './middleware';
 
-export type Stream = {
+export type Streamable = {
   $stream: IterableIterator<string | Uint8Array | object> | AsyncIterableIterator<string | Uint8Array | object>
 };
 
-export interface StreamIterator extends AsyncIterableIterator<string | Uint8Array | object> {
-}
-
-export interface StreamIterable {
-  [Symbol.asyncIterator]: StreamIterator;
-}
-
-
-export class StreamIntercept extends Rowan<RequestContext>{
+/* routes requests for a stream */
+export class StreamRouter extends Rowan<RequestContext> {
   constructor(iterable: Iterable<any> | AsyncIterable<any>, dispose: () => void) {
     super();
 
@@ -62,9 +56,9 @@ export class StreamIntercept extends Rowan<RequestContext>{
     this.use(
       request(),
       requestMethod(Method.UNSUBSCRIBE),
-      (ctx: RequestContext) => {
-        dispose();
+      (ctx: RequestContext) => {        
         ctx.send(undefined, Status.Ok);
+        dispose();
       });
   }
 }

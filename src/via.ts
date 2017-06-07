@@ -6,10 +6,9 @@ import { Request } from './request';
 import { Response } from './response';
 import { Status } from './status';
 import { Method } from './method';
-import { StreamIntercept, StreamIterator, StreamIterable, Stream } from './stream';
+import { StreamRouter, Streamable } from './stream';
 import { Router } from './router';
 import { shortId, bytesToHex, hexToBytes } from './utils';
-
 import { Interceptor, Unhandled, request, requestMethod } from './middleware';
 
 export * from './context';
@@ -30,7 +29,7 @@ export class Via {
   }
 
   async process(ctx: Context, _?: any) {
-    try {      
+    try {
       await this._app.process(ctx, _);
     } catch (err) {
       console.log(err);
@@ -121,7 +120,7 @@ export class Via {
     if (body !== undefined && body["$stream"] !== undefined) {
       let iterable = body["$stream"];
       let sid = bytesToHex(shortId());
-      let stream = new StreamIntercept(iterable, () => dispose());
+      let stream = new StreamRouter(iterable, () => dispose());
       let dispose = this._interceptor.intercept(sid, [stream]);
 
       body["$stream"] = sid;
@@ -138,7 +137,7 @@ export class Via {
   request(
     method: Method,
     path?: string | undefined,
-    body?: string | Uint8Array | object | Stream | undefined,
+    body?: string | Uint8Array | object | Streamable | undefined,
     id?: string | undefined,
     wire: Wire = this._wire): Promise<Response> {
     id = id || bytesToHex(shortId());
@@ -146,6 +145,10 @@ export class Via {
     let reject;
     let resolve;
     let promise = new Promise<Response>((r, x) => { resolve = r, reject = x; });
+
+    if (wire.state != "open"){
+      throw Error("wire is not open");
+    }
 
     var dispose = this._interceptor.intercept(id, [
       (ctx: ResponseContext) => {

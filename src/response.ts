@@ -1,11 +1,10 @@
 import { Status } from './status';
 
-type Basic = string | Uint8Array | object;
-type Stream = { $stream: AsyncIterableIterator<Basic>; };
+export type ResponseBody = string | Uint8Array | object | { $stream: AsyncIterableIterator<string | Uint8Array | object>; }
 
 export interface Response {
   id: string;
   status: Status;
-  body?: Basic | Stream;
+  body?: ResponseBody;
 };
 
