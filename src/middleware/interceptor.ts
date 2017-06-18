@@ -38,7 +38,7 @@ export class Interceptor implements ContextProcessor {
   /**
    * @internal 
    */
-  process(ctx: Context, err: any): Promise<boolean> {
+  async process(ctx: Context, err: any): Promise<boolean> {
     if (err) return;
 
     const id = isRequest(ctx) ? ctx.req.id : isResponse(ctx) ? ctx.res.id : undefined;
@@ -47,8 +47,9 @@ export class Interceptor implements ContextProcessor {
 
     const interceptor = this._interceptors.get(id);
 
-    if (interceptor) {
-      return Rowan.execute(ctx, undefined, interceptor.handlers);
+    if (interceptor) {      
+      await Rowan.execute(ctx, undefined, interceptor.handlers);
+      return false;
     }
   };
 }

@@ -39,6 +39,8 @@ export class Via {
       let sid = bytesToHex(shortId());
       let router = new IterableRouter(iterable, function () { dispose(); });
       let dispose = this.interceptor.intercept(sid, [router]);
+      
+      console.log("intercepting ", sid);;
 
       body["$iterable"] = sid;
     }

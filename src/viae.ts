@@ -41,7 +41,7 @@ export class Viae implements ContextProcessor {
       error = err;
     }
 
-    console.log("done app");
+    console.log(ctx["req"] || ctx["res"]);
 
     delete ctx.$done;
 
