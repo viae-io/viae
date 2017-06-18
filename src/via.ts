@@ -1,4 +1,4 @@
-import { Context, RequestContext, ResponseContext } from './context';
+import { Context, ContextFactory, ContextHandler, RequestContext, ResponseContext } from './context';
 import { Rowan, IRowan, Handler, IProcessor } from 'rowan';
 import { Wire } from './wire';
 import { Message } from './message';
@@ -6,129 +6,44 @@ import { Request } from './request';
 import { Response } from './response';
 import { Status } from './status';
 import { Method } from './method';
-import { StreamRouter, Streamable } from './stream';
-import { Router } from './router';
+import { Body } from './body';
 import { shortId, bytesToHex, hexToBytes } from './utils';
-import { Interceptor, Unhandled, request, requestMethod } from './middleware';
 
-export * from './context';
-
-export type ViaHandler = Handler<Context>;
-export type ViaProcessor = IProcessor<Context>;
+import { Interceptor, Router, IterableRouter } from './middleware';
 
 export class Via {
-  protected _app = new Rowan<Context>();
-  protected _interceptor = new Interceptor();
+  private factory = new ContextFactory(this);
+  private interceptor = new Interceptor();
+  private app = new Rowan<Context>([this.interceptor]);
 
-  constructor(private _wire?: Wire) {
-    this._app.use(this._interceptor);
-
-    if (_wire) {
-      _wire.on("message", x => this.deserialiseMessage(x, this._wire));
-    }
+  constructor(public wire: Wire) {
+    wire.on("message", (raw: ArrayBuffer) => {
+      const message = Message.deserialiseBinary(new Uint8Array(raw));
+      const ctx = this.factory.create(message, this);
+      const _ = this.app.process(ctx);
+    });
   }
 
-  async process(ctx: Context, _?: any) {
-    try {
-      await this._app.process(ctx, _);
-    } catch (err) {
-      console.log(err);
-    };
+  use(handler: ContextHandler) {
+    this.app.use(handler);
   }
 
-  protected deserialiseMessage(data: ArrayBuffer, wire: Wire) {
-    const msg = Message.deserialiseBinary(new Uint8Array(data));
-
-    if (msg.body !== undefined && msg.body["$stream"] !== undefined) {
-      const streamWire = wire;
-      const sid = msg.body["$stream"] as string;
-      const via = this;
-
-      const generator = async function* () {
-        let response;
-        response = await via.request(Method.SUBSCRIBE, undefined, undefined, sid, streamWire);
-        if (response.status != 200) { throw Error(response.body); }
-        do {
-          response = await via.request(Method.NEXT, undefined, undefined, sid, streamWire);
-          switch (response.status) {
-            case Status.Next:
-              yield response.body;
-              break;
-            case Status.Done:
-              return;
-            default:
-            case Status.Error:
-              throw Error(response.body || "Unknown Error");
-          }
-        } while (true);
-      };
-
-      const stream = {
-        [Symbol.asyncIterator]() { return Object.apply(generator(), { foo: 10 }); }
-      } as AsyncIterableIterator<any>;
-
-      msg.body["$stream"] = { [Symbol.asyncIterator]: generator };
-    }
-
-    this.process(this.createCtx(msg, wire));
-  }
-
-  protected createCtx(msg: Message, wire: Wire) {
-    if (msg.status !== undefined) {
-      const ctx: ResponseContext = {
-        id: msg.id,
-        wire: wire,
-        res: msg as Response,
-      };
-      return ctx;
-    }
-
-    const ctx: RequestContext = {
-      id: msg.id,
-      wire: wire,
-      req: msg as Request,
-      send: (body, status) => {
-        if (typeof (body) == "function") {
-          body = body();
-        }
-        const response = {
-          id: msg.id,
-          status: status,
-          body: body
-        };
-        this.send(response, wire);
-        ctx["res"] = response;
-        ctx.send = () => { throw Error("Already sent a reply"); };
-        ctx.$done = true;
-      }
-    };
-    return ctx;
-  }
-
-  /** insert a handler (or chain) to run during processing*/
-  use(handler: ViaHandler, ...handlers: ViaHandler[]): this {
-    this._app.use(handler, ...handlers);
-    return this;
-  }
-
-  send(msg: Message, wire = this._wire) {
-    if (wire == undefined) {
-      return Promise.reject("cannot send message to undefined wire");
-    }
-    const body = msg.body;
-
-    if (body !== undefined && body["$stream"] !== undefined) {
-      let iterable = body["$stream"];
+  /** 
+   * send a message along the wire. 
+   * automatically replaces iterables with a iterable-router instance 
+   **/
+  send(message: Message) {
+    const body = message.body;
+    if (body !== undefined && body["$iterable"] !== undefined) {
+      let iterable = body["$iterable"];
       let sid = bytesToHex(shortId());
-      let stream = new StreamRouter(iterable, () => dispose());
-      let dispose = this._interceptor.intercept(sid, [stream]);
+      let router = new IterableRouter(iterable, function () { dispose(); });
+      let dispose = this.interceptor.intercept(sid, [router]);
 
-      body["$stream"] = sid;
+      body["$iterable"] = sid;
     }
-
-    //console.log("sending", msg);        
-    const bin = Message.serialiseBinary(msg).buffer;
-    wire.send(bin);
+    const bin = Message.serialiseBinary(message).buffer;
+    this.wire.send(bin);
   }
 
   /**
@@ -137,20 +52,14 @@ export class Via {
   request(
     method: Method,
     path?: string | undefined,
-    body?: string | Uint8Array | object | Streamable | undefined,
-    id?: string | undefined,
-    wire: Wire = this._wire): Promise<Response> {
-    id = id || bytesToHex(shortId());
+    body?: Body | undefined,
+    id: string = bytesToHex(shortId())): Promise<Response> {
 
     let reject;
     let resolve;
     let promise = new Promise<Response>((r, x) => { resolve = r, reject = x; });
 
-    if (wire.state != "open"){
-      throw Error("wire is not open");
-    }
-
-    var dispose = this._interceptor.intercept(id, [
+    var dispose = this.interceptor.intercept(id, [
       (ctx: ResponseContext) => {
         if (resolve !== null) {
           resolve(ctx.res);
@@ -167,7 +76,7 @@ export class Via {
         method: method,
         body: body,
         path: path
-      }, wire);
+      });
     } catch (err) {
       dispose();
       reject(err);
@@ -177,3 +86,4 @@ export class Via {
     return promise;
   }
 }
+

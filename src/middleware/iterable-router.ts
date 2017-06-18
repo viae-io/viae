@@ -1,18 +1,14 @@
 import { Rowan } from 'rowan';
-import { ViaHandler } from './via';
-import { RequestContext } from './context';
-import { Method } from './method';
-import { Message } from './message';
-import { Status } from './status';
-import { Wire } from './wire';
-import { request, requestPath, requestMethod } from './middleware';
+import { RequestContext } from '../context';
+import { Method } from '../method';
+import { Message } from '../message';
+import { Status } from '../status';
+import { Wire } from '../wire';
+import { request, requestPath, requestMethod } from '../middleware';
 
-export type Streamable = {
-  $stream: IterableIterator<string | Uint8Array | object> | AsyncIterableIterator<string | Uint8Array | object>
-};
+/* routes requests for a iterable */
 
-/* routes requests for a stream */
-export class StreamRouter extends Rowan<RequestContext> {
+export class IterableRouter extends Rowan<RequestContext> {
   constructor(iterable: Iterable<any> | AsyncIterable<any>, dispose: () => void) {
     super();
 
@@ -22,6 +18,8 @@ export class StreamRouter extends Rowan<RequestContext> {
       requestMethod(Method.SUBSCRIBE),
       (ctx: RequestContext) => {
         try {
+          if (iterator !== undefined)
+          { throw Error("Already subscribed"); }
           if (iterable[Symbol.asyncIterator])
             iterator = iterable[Symbol.asyncIterator]();
           else
@@ -56,7 +54,7 @@ export class StreamRouter extends Rowan<RequestContext> {
     this.use(
       request(),
       requestMethod(Method.UNSUBSCRIBE),
-      (ctx: RequestContext) => {        
+      (ctx: RequestContext) => {
         ctx.send(undefined, Status.Ok);
         dispose();
       });

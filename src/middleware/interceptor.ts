@@ -1,15 +1,15 @@
 import { Context, isResponse, isRequest } from '../context';
-import { ViaProcessor, ViaHandler } from '../via';
+import { ContextProcessor, ContextHandler } from '../context';
 import { Rowan } from 'rowan';
 
 type InterceptConfig = {
   dispose: () => void,
   timestamp: number,
-  handlers: ViaHandler[]
+  handlers: ContextHandler[]
 };
 
 /** used to intercept messages with matching request/response ids */
-export class Interceptor implements ViaProcessor {
+export class Interceptor implements ContextProcessor {
   private _interceptors = new Map<string, InterceptConfig>();
 
   /**
@@ -18,7 +18,7 @@ export class Interceptor implements ViaProcessor {
    * @param handlers: 1 or more handlers 
    * @returns method to remove (dispose) the interception entry. 
    */
-  intercept(id: string, handlers: ViaHandler[]): () => void {
+  intercept(id: string, handlers: ContextHandler[]): () => void {
     if (id == undefined) throw Error("id cannot be undefined");
     if (id.length == 0) throw Error("id cannot be empty");
     if (handlers == undefined) throw Error("handlers cannot be undefined");
@@ -38,7 +38,7 @@ export class Interceptor implements ViaProcessor {
   /**
    * @internal 
    */
-  async process(ctx: Context, err: any) {
+  process(ctx: Context, err: any): Promise<boolean> {
     if (err) return;
 
     const id = isRequest(ctx) ? ctx.req.id : isResponse(ctx) ? ctx.res.id : undefined;
@@ -48,8 +48,7 @@ export class Interceptor implements ViaProcessor {
     const interceptor = this._interceptors.get(id);
 
     if (interceptor) {
-      ctx["$intercepted"] = true;
-      return await Rowan.execute(ctx, undefined, interceptor.handlers);
+      return Rowan.execute(ctx, undefined, interceptor.handlers);
     }
   };
 }

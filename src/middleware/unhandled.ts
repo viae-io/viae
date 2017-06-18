@@ -1,6 +1,6 @@
-import { ViaProcessor, Context, ViaHandler } from '../via';
+import { Context, ContextProcessor, ContextHandler } from '../context';
 
-export class Unhandled implements ViaProcessor {
+export class Unhandled implements ContextProcessor {
 
   constructor(private _opts = { debug: true }) {
   }

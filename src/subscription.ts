@@ -1,14 +1,14 @@
 import { Wire } from './wire';
-import { ViaHandler } from './via';
-import { RequestContext } from './context';
+import { Context, ContextHandler, RequestContext } from './context';
 import { Viae } from './viae';
+import { Via } from './via';
 import { Method } from './method';
 import { requestMethod, requestPath } from './middleware';
 import { LiteEventEmitter } from 'lite-event-emitter';
 import { Rowan } from 'rowan';
 
 export type Subscriber = {
-  wire: Wire,
+  connection: Via,
   id: string,
   [index: string]: any
 };
@@ -28,8 +28,8 @@ export class Subscription extends Rowan<RequestContext> {
   constructor(opts: {
     path: string,
     server: Viae,
-    subscribe?: ViaHandler[],
-    unsubscribe?: ViaHandler[]
+    subscribe?: ContextHandler[],
+    unsubscribe?: ContextHandler[]
   }) {
     super();
     this._path = opts.path;
@@ -38,7 +38,7 @@ export class Subscription extends Rowan<RequestContext> {
       requestMethod(Method.SUBSCRIBE),
       requestPath(opts.path),
       (ctx: SubscriptionContext) => {
-        ctx.sub = { wire: ctx.wire, id: ctx.req.id };
+        ctx.sub = { connection: ctx.connection, id: ctx.req.id };
       },
       ...(opts.subscribe || []),
       (ctx: SubscriptionContext) => {
@@ -93,11 +93,11 @@ export class Subscription extends Rowan<RequestContext> {
   }
   publish<T>(value: T) {
     for (var sub of this._subs) {
-      this._server.send({
+      sub.connection.send({
         id: sub.id,
         body: value,
         status: 100
-      }, sub.wire);
+      });
     }
   }
 }
