@@ -51,7 +51,7 @@ export class Subscription extends Rowan<RequestContext> {
           }
         };
 
-        ctx.wire.on("close", () => {
+        ctx.connection.wire.on("close", () => {
           dispose();
         });
 
@@ -86,8 +86,8 @@ export class Subscription extends Rowan<RequestContext> {
         return false;
       });
   }
-  on(event: "subscribe", cb: (sub: Wire) => void): Function
-  on(event: "unsubscribe", cb: (sub: Wire) => void): Function
+  on(event: "subscribe", cb: (sub: Subscriber) => void): Function
+  on(event: "unsubscribe", cb: (sub: Subscriber) => void): Function
   on(event: string, cb: () => void): () => void {
     return this._events.on(event, cb);
   }

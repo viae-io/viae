@@ -2,13 +2,14 @@ import { Context, ContextProcessor, ContextHandler } from './context';
 import { Wire, WireServer } from './wire';
 import { Via } from './via';
 import { Method } from './method';
-import { Message } from './message'; 
+import { Message } from './message';
 import { Rowan } from 'rowan';
+import { LiteEventEmitter } from 'lite-event-emitter';
 
 import { Interceptor } from './middleware';
 import { request, requestMethod, requestPath } from './middleware';
 
-export class Viae implements ContextProcessor {
+export class Viae extends LiteEventEmitter implements ContextProcessor {
   private _connections = new Array<Via>();
 
   private _interceptor = new Interceptor();
@@ -17,6 +18,7 @@ export class Viae implements ContextProcessor {
   private _app = new Rowan<Context>([this._interceptor, this._before]);
 
   constructor(server: WireServer) {
+    super();
     server.on("connection", (wire: Wire) => {
       let via = new Via(wire);
 
@@ -24,11 +26,11 @@ export class Viae implements ContextProcessor {
 
       wire.on("close", () => {
         this._connections.splice(this._connections.indexOf(via), 1);
-        console.log("Client Disconnected");
       });
 
       this._connections.push(via);
-      console.log("Client Connected");
+
+      this.emit("connection", via);
     });
   }
 
@@ -40,11 +42,7 @@ export class Viae implements ContextProcessor {
     } catch (err) {
       error = err;
     }
-
-    console.log(ctx["req"] || ctx["res"]);
-
     delete ctx.$done;
-
     await this._after.process(ctx, error);
   }
 

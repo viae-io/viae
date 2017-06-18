@@ -13,14 +13,17 @@ ws.on("open", async () => {
     Method.GET,
     "/echo",
     {
-      $iterable: (function* () {
-        yield "hello world";
-        yield [1, 2, 3, 4];
-        yield new Uint8Array([1, 2, 3, 4]);
-        yield { name: "john", age: 50 };
-      })(),
-    }
-  );
+      $iterable: {
+        [Symbol.iterator]: function* () {
+          yield "hello world";
+          yield [1, 2, 3, 4];
+          yield new Uint8Array([1, 2, 3, 4]);
+          yield { name: "john", age: 50 };
+        }
+      }
+    });
+
+
   for await (let item of result.body["$iterable"]) {
     console.log(item);
   }
