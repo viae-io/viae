@@ -1,1 +1,1 @@
-export type Body = string | Uint8Array | object | { $iterable: AsyncIterableIterator<string | Uint8Array | object>; };
+export type Body = { [index: string]: any } | string | Uint8Array | { $iterable: AsyncIterableIterator<string | Uint8Array | object>; };
