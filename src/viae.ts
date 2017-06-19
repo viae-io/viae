@@ -9,7 +9,7 @@ import { LiteEventEmitter } from 'lite-event-emitter';
 import { Interceptor } from './middleware';
 import { request, requestMethod, requestPath } from './middleware';
 
-export class Viae extends LiteEventEmitter implements ContextProcessor {
+export class Viae implements ContextProcessor {
   private _connections = new Array<Via>();
 
   private _interceptor = new Interceptor();
@@ -17,8 +17,9 @@ export class Viae extends LiteEventEmitter implements ContextProcessor {
   private _after = new Rowan<Context>();
   private _app = new Rowan<Context>([this._interceptor, this._before]);
 
+  private _events = new LiteEventEmitter();
+
   constructor(server: WireServer) {
-    super();
     server.on("connection", (wire: Wire) => {
       let via = new Via(wire);
 
@@ -30,11 +31,15 @@ export class Viae extends LiteEventEmitter implements ContextProcessor {
 
       this._connections.push(via);
 
-      this.emit("connection", via);
+      this._events.emit("connection", via);
     });
   }
 
   get connections() { return this._connections; };
+
+  on(event: "connection", cb: (connection: Via) => void) {
+    this._events.on(event, cb);
+  }
 
   async process(ctx: Context, error?: Error) {
     try {

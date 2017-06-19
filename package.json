@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "0.6.0-alpha1",
+  "version": "0.6.0-alpha.1",
   "description": "A bi-directional communication api framework",
   "main": "dist/commonjs/index.js",
   "typings": "dist/commonjs/index.d.ts",
@@ -24,7 +24,8 @@
     "registry": "https://registry.npmjs.org/"
   },
   "keywords": [
-    "api",
+    "async-iterable",
+    "api",    
     "rowan",
     "middleware",
     "request",

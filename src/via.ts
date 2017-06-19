@@ -1,5 +1,6 @@
+import { Rowan } from 'rowan';
+
 import { Context, ContextFactory, ContextHandler, RequestContext, ResponseContext } from './context';
-import { Rowan, IRowan, Handler, IProcessor } from 'rowan';
 import { Wire } from './wire';
 import { Message } from './message';
 import { Request } from './request';
@@ -11,21 +12,28 @@ import { shortId, bytesToHex, hexToBytes } from './utils';
 
 import { Interceptor, Router, IterableRouter } from './middleware';
 
+import { upgradeOutgoingIterable, upgradeIncomingIterable } from './iterable-helpers';
+
 export class Via {
-  private factory = new ContextFactory(this);
-  private interceptor = new Interceptor();
-  private app = new Rowan<Context>([this.interceptor]);
+  private _factory = new ContextFactory(this);
+  private _interceptor = new Interceptor();
+  private _app = new Rowan<Context>([this._interceptor]);
 
   constructor(public wire: Wire) {
     wire.on("message", (raw: ArrayBuffer) => {
       const message = Message.deserialiseBinary(new Uint8Array(raw));
-      const ctx = this.factory.create(message, this);
-      const _ = this.app.process(ctx);
-    });
+      upgradeIncomingIterable(message, this);
+      const ctx = this._factory.create(message, this);
+      const _ = this._app.process(ctx);
+    });  
+  }
+
+  on(event: "close", cb: () => void) {
+    this.wire.on(event, cb);
   }
 
   use(handler: ContextHandler) {
-    this.app.use(handler);
+    this._app.use(handler);
   }
 
   /** 
@@ -33,17 +41,9 @@ export class Via {
    * automatically replaces iterables with a iterable-router instance 
    **/
   send(message: Message) {
-    const body = message.body;
-    if (body !== undefined && body["$iterable"] !== undefined) {
-      let iterable = body["$iterable"];
-      let sid = bytesToHex(shortId());
-      let router = new IterableRouter(iterable, function () { dispose(); });
-      let dispose = this.interceptor.intercept(sid, [router]);
-      
-      console.log("intercepting ", sid);;
 
-      body["$iterable"] = sid;
-    }
+    upgradeOutgoingIterable(message, this._interceptor);
+
     const bin = Message.serialiseBinary(message).buffer;
     this.wire.send(bin);
   }
@@ -61,7 +61,7 @@ export class Via {
     let resolve;
     let promise = new Promise<Response>((r, x) => { resolve = r, reject = x; });
 
-    var dispose = this.interceptor.intercept(id, [
+    var dispose = this._interceptor.intercept(id, [
       (ctx: ResponseContext) => {
         if (resolve !== null) {
           resolve(ctx.res);

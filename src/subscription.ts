@@ -1,4 +1,3 @@
-import { Wire } from './wire';
 import { Context, ContextHandler, RequestContext } from './context';
 import { Viae } from './viae';
 import { Via } from './via';

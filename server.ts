@@ -17,11 +17,10 @@ server.route({
 server.use(new Unhandled());
 
 server.before((ctx) => {
-  console.log("before");
+  
 });
 
 server.after((ctx) => {
-  console.log("after");
 });
 
 
