@@ -26,10 +26,11 @@ export class ContextFactory {
         id: message.id,
         req: message,
         connection: connection,
-        send: (body: Body | undefined, status: Status) => {
+        send: (body: Body | undefined, status: Status = 200) => {
           this.via.send({ id: ctx.id, status: status, body: body });
           delete ctx.send;
           ctx.$done = true;
+          ctx.res = { status: status, body: body };
         }
       };
     }

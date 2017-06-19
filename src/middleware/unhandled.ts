@@ -1,35 +1,22 @@
-import { Context, ContextProcessor, ContextHandler } from '../context';
+import { RequestContext, ContextProcessor } from '../context';
 
-export class Unhandled implements ContextProcessor {
-
-  constructor(private _opts = { debug: true }) {
-  }
-
-  /**
-  * @internal 
-  */
-  process(ctx: any, err: any) {
-    if (ctx.req != undefined) {
-      if (ctx.res != undefined) {
-        if (ctx.res.status == undefined) {
-          if (err == undefined) {
-            ctx.res.status = 404;
-          }
-          else if (typeof (err) == "number") {
-            ctx.res.status = err;
-          }
-          else {
-            ctx.res.status = 500;
-            if (this._opts.debug && err instanceof Error) {
-              ctx.res.body = err.stack;
-            }
-          }
+export function unhandled() {
+  return {
+    process(ctx: RequestContext, err: any) {
+      if (ctx.req != undefined && typeof ctx.send === "function") {
+        let status = 404;
+        let body = undefined;
+        if (typeof err === "number") {
+          status = err;
         }
-        if (ctx.send != undefined) {
-          ctx.send();
+        else if (err instanceof Error) {
+          status = 500;
+          body = err.message;
         }
+        ctx.send(body, status);
+        return true; // clear the error
       }
+      return err;
     }
-    return err;
-  }
-};
+  };
+}

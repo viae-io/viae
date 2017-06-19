@@ -14,7 +14,7 @@ export type ContextProcessor = IProcessor<Context>;
 export interface RequestContext extends Context {
   params?: any;
   req: Request;
-  send(body: any | undefined, status: Status);
+  send(body: any | undefined, status?: Status);
 };
 
 export interface ResponseContext extends Context {

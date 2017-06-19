@@ -9,6 +9,8 @@ import { LiteEventEmitter } from 'lite-event-emitter';
 import { Interceptor } from './middleware';
 import { request, requestMethod, requestPath } from './middleware';
 
+import { ViaePlugin, isPlugin } from './viae-plugin';
+
 export class Viae implements ContextProcessor {
   private _connections = new Array<Via>();
 
@@ -54,8 +56,14 @@ export class Viae implements ContextProcessor {
   before(handler: ContextHandler, ...handlers: ContextHandler[]) {
     this._before.use(handler, ...handlers);
   }
-  use(handler: ContextHandler, ...handlers: ContextHandler[]) {
-    this._app.use(handler, ...handlers);
+  use(plugin: ViaePlugin)
+  use(handler: ContextHandler, ...handlers: ContextHandler[])
+  use(handler: ContextHandler | ViaePlugin, ...handlers: ContextHandler[]) {
+    if (isPlugin(handler)) {
+      handler.plugin(this);
+    } else {
+      this._app.use(handler, ...handlers);
+    }
   }
   after(handler: ContextHandler, ...handlers: ContextHandler[]) {
     this._after.use(handler, ...handlers);

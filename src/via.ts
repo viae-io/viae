@@ -24,8 +24,12 @@ export class Via {
       const message = Message.deserialiseBinary(new Uint8Array(raw));
       upgradeIncomingIterable(message, this);
       const ctx = this._factory.create(message, this);
-      const _ = this._app.process(ctx);
-    });  
+      const _ = this._app.process(ctx)
+        .catch((err) => {
+          console.log("unhandled processing error", err);
+          wire.close();
+        });
+    });
   }
 
   on(event: "close", cb: () => void) {
