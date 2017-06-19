@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "0.6.0-beta.1",
+  "version": "0.6.0-beta.2",
   "description": "A bi-directional communication api framework",
   "main": "dist/commonjs/index.js",
   "typings": "dist/commonjs/index.d.ts",
@@ -13,7 +13,8 @@
     "build:commonjs": "cross-env tsc --project tsconfig.build.json --rootDir src/ --outDir ./dist/commonjs --module commonjs",
     "debug": "npm run clean && cross-env tsc --project tsconfig.json --outDir ./.tmp/ --module commonjs ",
     "test": "nyc node_modules/mocha/bin/_mocha --require source-map-support/register --compilers ts:ts-node/register test/*.ts",
-    "cover": "codecov"
+    "cover": "codecov",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
