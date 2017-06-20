@@ -3,7 +3,29 @@ import "core-js/modules/es7.symbol.async-iterator";
 import * as Ws from 'ws';
 import * as readline from 'readline';
 import { Via, Method, Status } from './src';
+import { Readable } from 'stream';
 
+
+function streamFrom(iterable: AsyncIterable<any>) {
+  const stream = new Readable({ objectMode: true });
+  let iterator;
+
+  stream["_read"] = function (size: number) {
+    if (iterator === undefined)
+      iterator = iterable[Symbol.asyncIterator]();
+
+    iterator.next().then(res => {
+      if (res.done)
+        stream.push(null);
+      else {
+        stream.push(res.value);
+      }
+    }).catch((err) => {
+      stream.emit("error", err);
+    });
+  };
+  return stream;
+}
 
 let ws = new Ws("ws://127.0.0.1:9090");
 let via = new Via(ws);
@@ -24,10 +46,10 @@ ws.on("open", async () => {
     });
 
 
-  for await (let item of result.body["$iterable"]) {
-    console.log(item);
-  }
+  let stream = streamFrom(result.body["$iterable"]);
 
-  ws.close();
+  stream.on("data", console.log);
+  stream.on("end", () => { ws.close(); });
+  
 });
 
