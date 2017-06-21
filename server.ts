@@ -1,37 +1,22 @@
 import "core-js/modules/es7.symbol.async-iterator";
 
 import { Server as WebSocketServer } from 'ws';
-import { Viae, RequestContext, Method } from './src/index';
+import { Viae, RequestContext, Method, Router } from './src/index';
 import { scribe, unhandled } from './src';
 
 let wss = new WebSocketServer({ port: 9090 });
 let server = new Viae(wss);
+let router = new Router({ root: "/", name: "example", doc: "An example router" });
 
-server.route({
+server.use(router);
+
+router.route({
   method: Method.GET,
   path: "/echo",
+  doc: "return the request body back to the client",      
   handlers: [
     (ctx: RequestContext) => {
       ctx.send(ctx.req.body);
-    }]
-});
-
-server.route({
-  method: Method.GET,
-  path: "/power",
-  handlers: [
-    function (ctx: RequestContext) {
-      ctx.send({
-        "$iterable": {
-          [Symbol.asyncIterator]: async function* () {
-            for await (let value of ctx.req.body["$iterable"]) {
-              if (typeof (value) !== "number")
-                throw Error("not a number");
-              yield Math.pow(value, 2);
-            }
-          }
-        }
-      });
     }]
 });
 

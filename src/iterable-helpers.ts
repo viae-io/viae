@@ -14,16 +14,16 @@ export function upgradeIncomingIterable(message: Message, via: Via) {
 
   const generator = async function* () {
     let response;
-    response = await via.request(Method.SUBSCRIBE, undefined, undefined, sid);
+    response = await via.request({ method: Method.SUBSCRIBE, id: sid });
 
     if (response.status != 200) {
       throw Error(response.body);
     }
 
-    dispose = () => { via.request(Method.UNSUBSCRIBE, undefined, undefined, sid); };
+    dispose = () => { via.request({ method: Method.UNSUBSCRIBE, id: sid }); };
 
     do {
-      response = await via.request(Method.NEXT, undefined, undefined, sid);
+      response = await via.request({ method: Method.NEXT, id: sid });
       switch (response.status) {
         case Status.Next:
           yield response.body;
@@ -40,10 +40,6 @@ export function upgradeIncomingIterable(message: Message, via: Via) {
 
   const disposable = function () {
     let iterator = generator();
-    const callDispose = function () {
-      dispose();
-    };
-
     return Object.assign(iterator, {
       dispose: function () {
         dispose();

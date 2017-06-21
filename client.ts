@@ -31,10 +31,10 @@ let ws = new Ws("ws://127.0.0.1:9090");
 let via = new Via(ws);
 
 ws.on("open", async () => {
-  let result = await via.request(
-    Method.GET,
-    "/echo",
-    {
+  let result = await via.request({
+    method: Method.GET,
+    path: "/echo",
+    body: {
       $iterable: {
         [Symbol.iterator]: function* () {
           yield "hello world";
@@ -43,13 +43,11 @@ ws.on("open", async () => {
           yield { name: "john", age: 50 };
         }
       }
-    });
-
+    }
+  });
 
   let stream = streamFrom(result.body["$iterable"]);
 
   stream.on("data", console.log);
   stream.on("end", () => { ws.close(); });
-  
 });
-

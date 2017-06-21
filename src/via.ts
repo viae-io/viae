@@ -56,16 +56,20 @@ export class Via {
    * Send a request. @returns promise to await the response. 
    **/
   request(
-    method: Method,
-    path?: string | undefined,
-    body?: Body | undefined,
-    id: string = bytesToHex(shortId())): Promise<Response> {
+    opts: {
+      method: Method,
+      path?: string,
+      body?: Body,
+      id?: string
+    }
+  ): Promise<Response> {
+    opts.id = opts.id || bytesToHex(shortId());
 
     let reject;
     let resolve;
     let promise = new Promise<Response>((r, x) => { resolve = r, reject = x; });
 
-    var dispose = this._interceptor.intercept(id, [
+    var dispose = this._interceptor.intercept(opts.id, [
       (ctx: ResponseContext) => {
         if (resolve !== null) {
           resolve(ctx.res);
@@ -78,10 +82,10 @@ export class Via {
 
     try {
       this.send({
-        id: id,
-        method: method,
-        body: body,
-        path: path
+        id: opts.id,
+        method: opts.method,
+        body: opts.body,
+        path: opts.path
       });
     } catch (err) {
       dispose();

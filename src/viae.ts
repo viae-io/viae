@@ -68,16 +68,4 @@ export class Viae implements ContextProcessor {
   after(handler: ContextHandler, ...handlers: ContextHandler[]) {
     this._after.use(handler, ...handlers);
   }
-
-  route(opts: {
-    path: string,
-    method: Method,
-    handlers: ContextHandler[]
-  }) {
-    this.use(
-      request(),
-      requestMethod(opts.method),
-      requestPath(opts.path),
-      ...opts.handlers);
-  }
 }
