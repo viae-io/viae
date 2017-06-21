@@ -1,4 +1,4 @@
-import { Message, Context, Unhandled } from '../../src/index';
+import { Message, Context, unhandled } from '../../src/index';
 import { assert, expect } from 'chai';
 
 export default function unhandledTests() {
