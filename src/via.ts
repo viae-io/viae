@@ -9,9 +9,9 @@ import { Status } from './status';
 import { Method } from './method';
 import { Body } from './body';
 import { shortId, bytesToHex, hexToBytes } from './utils';
+import * as msgpack from 'msgpack-lite';
 
 import { Interceptor, Router, IterableRouter } from './middleware';
-
 import { upgradeOutgoingIterable, upgradeIncomingIterable } from './iterable-helpers';
 
 export class Via {
@@ -21,7 +21,7 @@ export class Via {
 
   constructor(public wire: Wire) {
     wire.on("message", (raw: ArrayBuffer) => {
-      const message = Message.deserialiseBinary(new Uint8Array(raw));
+      const message = msgpack.decode(raw);
       upgradeIncomingIterable(message, this);
       const ctx = this._factory.create(message, this);
       const _ = this._app.process(ctx)
@@ -45,10 +45,8 @@ export class Via {
    * automatically replaces iterables with a iterable-router instance 
    **/
   send(message: Message) {
-
     upgradeOutgoingIterable(message, this._interceptor);
-
-    const bin = Message.serialiseBinary(message).buffer;
+    const bin = msgpack.encode(message);
     this.wire.send(bin);
   }
 
@@ -60,7 +58,8 @@ export class Via {
       method: Method,
       path?: string,
       body?: Body,
-      id?: string
+      id?: string,
+      [key: string]: any,
     }
   ): Promise<Response> {
     opts.id = opts.id || bytesToHex(shortId());
@@ -81,12 +80,7 @@ export class Via {
       }]);
 
     try {
-      this.send({
-        id: opts.id,
-        method: opts.method,
-        body: opts.body,
-        path: opts.path
-      });
+      this.send(opts);
     } catch (err) {
       dispose();
       reject(err);

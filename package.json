@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "0.6.0-beta.3",
+  "version": "0.6.0-beta.4",
   "description": "A bi-directional communication api framework",
   "main": "dist/commonjs/index.js",
   "typings": "dist/commonjs/index.d.ts",
@@ -61,10 +61,10 @@
   },
   "dependencies": {
     "lite-event-emitter": "^1.0.2",
+    "msgpack-lite": "^0.1.26",
     "path-to-regexp": "^1.7.0",
     "rowan": "^0.5.1",
-    "tslib": "^1.7.1",
-    "varint": "^5.0.0"
+    "tslib": "^1.7.1"
   },
   "nyc": {
     "include": [
