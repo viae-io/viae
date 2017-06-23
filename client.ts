@@ -36,11 +36,12 @@ ws.on("open", async () => {
     path: "/echo",
     body: {
       $iterable: {
-        [Symbol.iterator]: function* () {
+        [Symbol.asyncIterator]: function* () {
           yield "hello world";
           yield [1, 2, 3, 4];
           yield new Uint8Array([1, 2, 3, 4]);
           yield { name: "john", age: 50 };
+          yield { data: new Uint8Array([1, 2, 3, 4]), meta: { unit: "mm" } };
         }
       }
     }

@@ -6,7 +6,7 @@ import { Method } from './method';
 import { Status } from './status';
 
 export function upgradeIncomingIterable(message: Message, via: Via) {
-  if (message.body === undefined || typeof message.body["$iterable"] !== "string") return;
+  if (message.body == undefined || typeof message.body["$iterable"] !== "string") return;
 
   const sid = message.body["$iterable"] as string;
   const noop = function () { };
@@ -52,7 +52,7 @@ export function upgradeIncomingIterable(message: Message, via: Via) {
 
 export function upgradeOutgoingIterable(message: Message, interceptor: Interceptor) {
   const body = message.body;
-  if (body !== undefined && body["$iterable"] !== undefined) {
+  if (body != undefined && body["$iterable"] !== undefined) {
     let iterable = body["$iterable"];
     let sid = bytesToHex(shortId());
     let router = new IterableRouter(iterable, function () { dispose(); });

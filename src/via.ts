@@ -22,6 +22,7 @@ export class Via {
   constructor(public wire: Wire) {
     wire.on("message", (raw: ArrayBuffer) => {
       const message = msgpack.decode(raw);
+      console.log("recieved", message);
       upgradeIncomingIterable(message, this);
       const ctx = this._factory.create(message, this);
       const _ = this._app.process(ctx)
@@ -45,7 +46,9 @@ export class Via {
    * automatically replaces iterables with a iterable-router instance 
    **/
   send(message: Message) {
+    if (message.body == undefined) delete message.body;
     upgradeOutgoingIterable(message, this._interceptor);
+    console.log("sending", message);
     const bin = msgpack.encode(message);
     this.wire.send(bin);
   }
