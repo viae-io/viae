@@ -5,9 +5,9 @@ export enum Status{
   
   BadRequest = 400,
   NotFound = 404,
-  InternalError = 503,
+  InternalError = 500,
 
   Next = 100,
   Done = 200,
-  Error = 503
+  Error = 500
 }

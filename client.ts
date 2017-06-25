@@ -2,7 +2,7 @@ import "core-js/modules/es7.symbol.async-iterator";
 
 import * as Ws from 'ws';
 import * as readline from 'readline';
-import { Via, Method, Status } from './src';
+import { Via, Method, Status, iterble } from './src';
 import { Readable } from 'stream';
 
 
@@ -30,25 +30,26 @@ function streamFrom(iterable: AsyncIterable<any>) {
 let ws = new Ws("ws://127.0.0.1:9090");
 let via = new Via(ws);
 
+via.use(iterble());
+
 ws.on("open", async () => {
   let result = await via.request({
     method: Method.GET,
     path: "/echo",
     body: {
-      $iterable: {
-        [Symbol.asyncIterator]: function* () {
-          yield "hello world";
-          yield [1, 2, 3, 4];
-          yield new Uint8Array([1, 2, 3, 4]);
-          yield { name: "john", age: 50 };
-          yield { data: new Uint8Array([1, 2, 3, 4]), meta: { unit: "mm" } };
-        }
+      foo: "bar",
+      [Symbol.asyncIterator]: function* () {
+        yield "hello world";
+        yield [1, 2, 3, 4];
+        yield { name: "john", age: 50 };
+        yield { data: new Uint8Array([1, 2, 3, 4]), meta: { unit: "mm" } };
       }
     }
   });
 
-  let stream = streamFrom(result.body["$iterable"]);
+  for await (let item of result.body[Symbol.asyncIterator]()){
+    console.log(item);    
+  }
 
-  stream.on("data", console.log);
-  stream.on("end", () => { ws.close(); });
+  ws.close();
 });

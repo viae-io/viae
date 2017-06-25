@@ -13,7 +13,8 @@ export function unhandled() {
           status = 500;
           body = err.message;
         }
-        ctx.send(body, status);
+        ctx.send({ body: body, status: status });
+        
         return true; // clear the error
       }
       return err;

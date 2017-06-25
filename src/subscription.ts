@@ -55,7 +55,7 @@ export class Subscription extends Rowan<RequestContext> {
         });
 
         this._subs.push(sub);
-        ctx.send(undefined, 200);
+        ctx.send({ status: 200 });
         this._events.emit("subscribe", sub);
         return false;
       });
@@ -66,7 +66,7 @@ export class Subscription extends Rowan<RequestContext> {
       (ctx: SubscriptionContext) => {
         const sub = this._subs.find(x => x.wire == ctx.wire);
         if (sub == undefined) {
-          return ctx.send(undefined, 400);
+          return ctx.send({ status: 400 });
         }
         ctx.sub = sub;
       },
@@ -80,7 +80,7 @@ export class Subscription extends Rowan<RequestContext> {
           this._subs.splice(index, 1);
         }
 
-        ctx.send(undefined, 200);
+        ctx.send({ status: 200 });
 
         return false;
       });

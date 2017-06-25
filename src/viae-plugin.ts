@@ -1,7 +1,8 @@
 import { Viae } from './viae';
+import { Via } from './via';
 
 export type ViaePlugin = {
-  plugin(viae: Viae): void
+  plugin(target: Viae | Via): void
 };
 
 export function isPlugin(item: any): item is ViaePlugin {

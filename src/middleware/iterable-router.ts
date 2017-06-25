@@ -24,9 +24,10 @@ export class IterableRouter extends Rowan<RequestContext> {
             iterator = iterable[Symbol.asyncIterator]();
           else
             iterator = iterable[Symbol.iterator]();
-          ctx.send(undefined, Status.Ok);
+
+          ctx.send({ status: Status.Ok });
         } catch (err) {
-          ctx.send(err.message, Status.Error);
+          ctx.send({ body: err.message, status: Status.Error });
         }
       });
 
@@ -45,7 +46,8 @@ export class IterableRouter extends Rowan<RequestContext> {
           body = err.message;
           status = Status.Error;
         }
-        ctx.send(body, status);
+
+        ctx.send(body != undefined ? { body: body, status: status } : { status: status });
         if (status != Status.Next) {
           dispose();
         }
@@ -55,7 +57,7 @@ export class IterableRouter extends Rowan<RequestContext> {
       request(),
       requestMethod(Method.UNSUBSCRIBE),
       (ctx: RequestContext) => {
-        ctx.send(undefined, Status.Ok);
+        ctx.send({ status: Status.Ok });
         dispose();
       });
   }
