@@ -1,7 +1,7 @@
 {
   "name": "viae",
-  "version": "0.6.0-beta.5",
-  "description": "A bi-directional communication api framework",
+  "version": "0.6.0-beta.6",
+  "description": "bi-directional communication api-framework",
   "main": "dist/commonjs/index.js",
   "typings": "dist/commonjs/index.d.ts",
   "scripts": {
@@ -25,16 +25,14 @@
     "registry": "https://registry.npmjs.org/"
   },
   "keywords": [
-    "async-iterable",
     "api",
-    "rowan",
     "middleware",
     "request",
     "response",
     "websocket",
-    "ws",
-    "stream",
-    "iot"
+    "async-iterable",
+    "rowan",
+    "ws"
   ],
   "author": "Meirion Hughes <crakinshot@yahoo.com>",
   "license": "MIT",
