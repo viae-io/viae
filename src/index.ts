@@ -10,7 +10,7 @@ export * from './status';
 export * from './subscription';
 export * from './via';
 export * from './viae';
-export * from './viae-plugin';
+export * from './plugin';
 export * from './wire';
 
 export * from './plugins';

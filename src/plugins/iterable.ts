@@ -1,4 +1,4 @@
-import { ViaePlugin } from '../viae-plugin';
+import { Plugin } from '../plugin';
 import { Viae } from '../viae';
 import { Via } from '../via';
 import { Method } from '../method';

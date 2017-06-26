@@ -9,7 +9,7 @@ import { Request } from './request';
 import { Response } from './response';
 import { Status } from './status';
 import { Method } from './method';
-import { ViaePlugin, isPlugin } from './viae-plugin';
+import { Plugin, isPlugin } from './plugin';
 import { shortId, bytesToHex, hexToBytes } from './utils';
 
 import { Interceptor, Router } from './middleware';
@@ -44,9 +44,9 @@ export class Via {
       this._ev.on(event, cb);
     }
   }
-  use(plugin: ViaePlugin)
+  use(plugin: Plugin)
   use(handler: ContextHandler, ...handlers: ContextHandler[])
-  use(handler: ContextHandler | ViaePlugin, ...handlers: ContextHandler[]) {
+  use(handler: ContextHandler | Plugin, ...handlers: ContextHandler[]) {
     if (isPlugin(handler)) {
       handler.plugin(this);
     } else {
