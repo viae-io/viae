@@ -2,7 +2,7 @@ import "core-js/modules/es7.symbol.async-iterator";
 
 import { Server as WebSocketServer } from 'ws';
 import { Viae, RequestContext, Method, Router } from './src/index';
-import { scribe, unhandled, iterble } from './src';
+import { scribe, unhandled, iterable } from './src';
 
 let wss = new WebSocketServer({ port: 9090 });
 let server = new Viae(wss);
@@ -22,7 +22,7 @@ router.route({
 
 server.use(unhandled());
 server.use(scribe());
-server.use(iterble());
+server.use(iterable());
 
 console.log("Server Running on 9090....");
 

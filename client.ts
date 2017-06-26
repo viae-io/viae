@@ -2,7 +2,7 @@ import "core-js/modules/es7.symbol.async-iterator";
 
 import * as Ws from 'ws';
 import * as readline from 'readline';
-import { Via, Method, Status, iterble } from './src';
+import { Via, Method, Status, iterable } from './src';
 import { Readable } from 'stream';
 
 
@@ -30,7 +30,7 @@ function streamFrom(iterable: AsyncIterable<any>) {
 let ws = new Ws("ws://127.0.0.1:9090");
 let via = new Via(ws);
 
-via.use(iterble());
+via.use(iterable());
 
 ws.on("open", async () => {
   let result = await via.request({

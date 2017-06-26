@@ -4,7 +4,6 @@ import { Method } from '../method';
 import { Status } from '../status';
 import { Wire } from '../wire';
 import { Via } from '../via';
-import { Body } from '../body';
 
 
 export class ContextFactory {

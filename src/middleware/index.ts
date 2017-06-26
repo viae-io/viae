@@ -7,5 +7,4 @@ export * from './response';
 
 export * from './router';
 export * from './interceptor';
-export * from './iterable-router';
 

@@ -3,7 +3,12 @@ export enum Method {
   PUT,
   POST,
   DELETE,
-  SUBSCRIBE,  
-  NEXT,  
+
+  NEXT,
+
+  SUBSCRIBE, 
   UNSUBSCRIBE,
+
+  REGISTER,
+  UNREGISTER
 }

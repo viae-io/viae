@@ -9,11 +9,10 @@ import { Request } from './request';
 import { Response } from './response';
 import { Status } from './status';
 import { Method } from './method';
-import { Body } from './body';
 import { ViaePlugin, isPlugin } from './viae-plugin';
 import { shortId, bytesToHex, hexToBytes } from './utils';
 
-import { Interceptor, Router, IterableRouter } from './middleware';
+import { Interceptor, Router } from './middleware';
 
 export class Via {
   private _factory = new ContextFactory(this);
@@ -24,7 +23,7 @@ export class Via {
   constructor(public wire: Wire) {
     wire.on("message", (raw: ArrayBuffer) => {
       const message = msgpack.decode(raw);
-      this._ev.emit("message", message);    
+      this._ev.emit("message", message);
       const ctx = this._factory.create(message, this);
       const _ = this._app.process(ctx)
         .catch((err) => {
@@ -55,11 +54,10 @@ export class Via {
     }
   }
   /** 
-   * send a message along the wire. 
-   * automatically replaces iterables with a iterable-router instance 
+   * send a message along the wire.    
    **/
   send(message: Message, opts?: object) {
-    this._ev.emit("send", message, opts);   
+    this._ev.emit("send", message, opts);
     const bin = msgpack.encode(message);
     this.wire.send(bin);
   }
@@ -73,30 +71,27 @@ export class Via {
   ): Promise<Response> {
     message.id = message.id || bytesToHex(shortId());
 
-    let reject;
-    let resolve;
-    let promise = new Promise<Response>((r, x) => { resolve = r, reject = x; });
+    return new Promise<Response>(
+      (resolve, reject) => {
+        const dispose = this._interceptor.intercept(message.id, [
+          (ctx: ResponseContext) => {
+            if (resolve !== null) {
+              resolve(ctx.res);
+              resolve = reject = null;
+            }
+            dispose();
+            ctx.$done = true;
+            return false;
+          }]);
 
-    var dispose = this._interceptor.intercept(message.id, [
-      (ctx: ResponseContext) => {
-        if (resolve !== null) {
-          resolve(ctx.res);
+        try {
+          this.send(message, opts);
+        } catch (err) {
+          dispose();
+          reject(err);
           resolve = reject = null;
         }
-        dispose();
-        ctx.$done = true;
-        return false;
-      }]);
-
-    try {
-      this.send(message, opts);
-    } catch (err) {
-      dispose();
-      reject(err);
-      resolve = reject = null;
-    }
-
-    return promise;
+      });
   }
 }
 

@@ -21,7 +21,7 @@ export class Viae implements ContextProcessor {
 
   private _events = new LiteEventEmitter();
 
-  constructor(server: WireServer) {
+  constructor(server: WireServer, ...plugins: ViaePlugin[]) {
     server.on("connection", (wire: Wire) => {
       let via = new Via(wire);
 
@@ -35,6 +35,10 @@ export class Viae implements ContextProcessor {
 
       this._events.emit("connection", via);
     });
+
+    for (let extension of plugins) {
+      extension.plugin(this);
+    }
   }
 
   get connections() { return this._connections; };

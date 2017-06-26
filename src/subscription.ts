@@ -87,7 +87,7 @@ export class Subscription extends Rowan<RequestContext> {
   }
   on(event: "subscribe", cb: (sub: Subscriber) => void): Function
   on(event: "unsubscribe", cb: (sub: Subscriber) => void): Function
-  on(event: string, cb: () => void): () => void {
+  on(event: string, cb: (sub: Subscriber) => void): () => void {
     return this._events.on(event, cb);
   }
   publish<T>(value: T) {
