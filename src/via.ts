@@ -33,7 +33,7 @@ export class Via {
     });
   }
   on(event: "message", cb: (msg: Message) => void)
-  on(event: "send", cb: (msg: Message, opts: object) => void)
+  on(event: "send", cb: (msg: Message) => void)
   on(event: "close", cb: () => void)
   on(event: "error", cb: (err: Error) => void)
   on(event: any, cb: any) {
@@ -53,11 +53,12 @@ export class Via {
       this._app.use(handler, ...handlers);
     }
   }
+
   /** 
    * send a message along the wire.    
    **/
-  send(message: Message, opts?: object) {
-    this._ev.emit("send", message, opts);
+  send(message: Message) {
+    this._ev.emit("send", message);
     const bin = msgpack.encode(message);
     this.wire.send(bin);
   }
@@ -67,8 +68,9 @@ export class Via {
    **/
   request(
     message: Message & { method: Method },
-    opts?: object
+    opts: { keepAlive?: boolean, handlers?: ContextHandler[] } = { keepAlive: false, handlers: [] }
   ): Promise<Response> {
+
     message.id = message.id || bytesToHex(shortId());
 
     return new Promise<Response>(
@@ -79,13 +81,18 @@ export class Via {
               resolve(ctx.res);
               resolve = reject = null;
             }
-            dispose();
+            if (!opts && !opts.keepAlive) {
+              dispose();
+            }
+          },
+          ...opts.handlers,
+          (ctx: ResponseContext) => {
             ctx.$done = true;
             return false;
           }]);
 
         try {
-          this.send(message, opts);
+          this.send(message);
         } catch (err) {
           dispose();
           reject(err);

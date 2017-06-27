@@ -100,3 +100,5 @@ export class Subscription extends Rowan<RequestContext> {
     }
   }
 }
+
+export function subscribe()

@@ -25,13 +25,13 @@ export class ContextFactory {
         id: message.id,
         req: message,
         connection: connection,
-        send: (msg: Message, opts: object) => {
+        send: (msg: Message) => {
           
           let _msg = ctx.res;          
           Object.assign(_msg, msg);
           _msg.status = _msg.status || 200;
           _msg.id = ctx.id;
-          this.via.send(_msg, opts);
+          this.via.send(_msg);
           delete ctx.send;
           ctx.$done = true;
           ctx.res = _msg;
