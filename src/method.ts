@@ -10,5 +10,7 @@ export enum Method {
   UNSUBSCRIBE,
 
   REGISTER,
-  UNREGISTER
+  UNREGISTER,
+
+  PING
 }
