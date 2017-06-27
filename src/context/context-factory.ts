@@ -25,9 +25,8 @@ export class ContextFactory {
         id: message.id,
         req: message,
         connection: connection,
-        send: (msg: Message) => {
-          
-          let _msg = ctx.res;          
+        send: (msg: Message) => {          
+          let _msg = ctx.res || {};      
           Object.assign(_msg, msg);
           _msg.status = _msg.status || 200;
           _msg.id = ctx.id;
