@@ -18,7 +18,6 @@ export type SubscriptionContext = RequestContext & {
 
 export class Subscription extends Rowan<RequestContext> {
   protected _path: string;
-  protected _server: Viae;
   protected _subs: Subscriber[] = [];
   protected _events = new LiteEventEmitter();
 
@@ -26,13 +25,11 @@ export class Subscription extends Rowan<RequestContext> {
 
   constructor(opts: {
     path: string,
-    server: Viae,
     subscribe?: ContextHandler[],
     unsubscribe?: ContextHandler[]
   }) {
     super();
     this._path = opts.path;
-    this._server = opts.server;
     this.use(
       requestMethod(Method.SUBSCRIBE),
       requestPath(opts.path),
