@@ -100,5 +100,10 @@ export class Via {
         }
       });
   }
+
+
+  subscribe(opts: { path: string }) {
+
+  }
 }
 

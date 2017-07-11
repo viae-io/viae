@@ -10,32 +10,45 @@ import { Wire } from '../wire';
 import { bytesToHex, shortId } from '../utils';
 import { request, requestPath, requestMethod, Interceptor } from '../middleware';
 
-export function iterable() {
-  return {
-    plugin(target: Viae | Via) {
-      let upgrade = (via: Via) => {
-        via.on("send", (msg) => {
-          if (msg.body != undefined && msg.body[Symbol.asyncIterator] != undefined) {
-            upgradeOutgoingIterable(msg, via["_interceptor"]);
-          }
-        });
+/** 
+ * Allows sending and recieving (pull-based) Iterable sequences 
+ * 
+ * usage:
+ * 
+ * client: via.use(new Iterable());
+ * server: viae.use(new Iterable());
+ **/
+export class Itable {
 
-        via.on("message", (msg) => {
-          if (msg.body != undefined && msg.body["$iterator"] !== undefined) {
-            upgradeIncomingIterable(msg, via);
-          }
-        });
-      };
-
-      if (target instanceof Viae) {
-        const viae = target;
-        viae.on("connection", upgrade);
-      } else {
-        const via = target;
-        upgrade(via);
-      }
+  constructor(){
+    if(Symbol.asyncIterator === undefined){
+      throw Error("Symbol.asyncIterator is not defined");
     }
-  };
+  }
+
+  plugin(target: Viae | Via) {
+    let upgrade = (via: Via) => {
+      via.on("send", (msg) => {
+        if (msg.body != undefined && msg.body[Symbol.asyncIterator] != undefined) {
+          upgradeOutgoingIterable(msg, via["_interceptor"]);
+        }
+      });
+
+      via.on("message", (msg) => {
+        if (msg.body != undefined && msg.body["$iterator"] !== undefined) {
+          upgradeIncomingIterable(msg, via);
+        }
+      });
+    };
+
+    if (target instanceof Viae) {
+      const viae = target;
+      viae.on("connection", upgrade);
+    } else {
+      const via = target;
+      upgrade(via);
+    }
+  }
 }
 
 function upgradeIncomingIterable(message: Message, via: Via) {
@@ -63,7 +76,7 @@ function upgradeIncomingIterable(message: Message, via: Via) {
         case Status.Next:
           yield response.body;
           break;
-        case Status.Done:
+        case Status.OK:
           dispose = noop;
           return;
         default:
@@ -75,7 +88,7 @@ function upgradeIncomingIterable(message: Message, via: Via) {
 
   const disposable = function () {
     let iterator = generator();
-    return Object.assign(iterator, {      
+    return Object.assign(iterator, {
       dispose: function () {
         dispose();
       }
@@ -115,7 +128,7 @@ class IterableRouter extends Rowan<RequestContext> {
           else
             iterator = iterable[Symbol.iterator]();
 
-          ctx.send({ status: Status.Ok });
+          ctx.send({ status: Status.OK });
         } catch (err) {
           ctx.send({ body: err.message, status: Status.Error });
         }
@@ -131,7 +144,7 @@ class IterableRouter extends Rowan<RequestContext> {
         try {
           let result = await iterator.next();
           body = result.value;
-          status = result.done ? Status.Done : Status.Next;
+          status = result.done ? Status.OK : Status.Next;
         } catch (err) {
           body = err.message;
           status = Status.Error;
@@ -147,7 +160,7 @@ class IterableRouter extends Rowan<RequestContext> {
       request(),
       requestMethod(Method.UNSUBSCRIBE),
       (ctx: RequestContext) => {
-        ctx.send({ status: Status.Ok });
+        ctx.send({ status: Status.OK });
         dispose();
       });
   }

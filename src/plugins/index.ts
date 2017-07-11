@@ -1,2 +1,2 @@
 export * from './scribe';
-export * from './iterable';
+export * from './itable';

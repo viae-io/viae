@@ -1,21 +1,28 @@
+import { LiteEventEmitter } from 'lite-event-emitter';
+import { Rowan } from 'rowan';
+
 import { Context, ContextHandler, RequestContext } from './context';
 import { Viae } from './viae';
 import { Via } from './via';
 import { Method } from './method';
-import { requestMethod, requestPath } from './middleware';
-import { LiteEventEmitter } from 'lite-event-emitter';
-import { Rowan } from 'rowan';
+import { Request } from './request';
+import { Status } from './status';
+
+import { request, requestMethod, requestPath } from './middleware';
 
 export type Subscriber = {
-  connection: Via,
-  id: string,
-  [index: string]: any
-};
+  id: string;
+  connection: Via;
+  params?: any;
+  req: Request;
+  [index: string]: any;
+}
 
-export type SubscriptionContext = RequestContext & {
-  sub: Subscriber
-};
+export type SubscriptionContext = RequestContext;
 
+/** 
+ * A push-based pub/sub route processor 
+ **/
 export class Subscription extends Rowan<RequestContext> {
   protected _path: string;
   protected _subs: Subscriber[] = [];
@@ -31,17 +38,13 @@ export class Subscription extends Rowan<RequestContext> {
     super();
     this._path = opts.path;
     this.use(
+      request(),
       requestMethod(Method.SUBSCRIBE),
       requestPath(opts.path),
-      (ctx: SubscriptionContext) => {
-        ctx.sub = { connection: ctx.connection, id: ctx.req.id };
-      },
       ...(opts.subscribe || []),
       (ctx: SubscriptionContext) => {
-        const sub = ctx.sub;
-
         let dispose = () => {
-          let index = this._subs.findIndex(x => x.wire == ctx.wire);
+          let index = this._subs.findIndex(x => x.connection == ctx.connection);
           if (index > -1) {
             this._subs.splice(index, 1);
           }
@@ -51,20 +54,26 @@ export class Subscription extends Rowan<RequestContext> {
           dispose();
         });
 
-        this._subs.push(sub);
+        this._subs.push(ctx);
         ctx.send({ status: 200 });
-        this._events.emit("subscribe", sub);
+        this._events.emit("subscribe", ctx);
         return false;
       });
 
     this.use(
+      request(),
       requestMethod(Method.UNSUBSCRIBE),
       requestPath(opts.path),
       (ctx: SubscriptionContext) => {
-        const sub = this._subs.find(x => x.wire == ctx.wire);
+        const sub = this._subs.find(
+          x =>
+            x.connection == ctx.connection &&
+            x.path == ctx.path);
+
         if (sub == undefined) {
           return ctx.send({ status: 400 });
         }
+
         ctx.sub = sub;
       },
       ...(opts.unsubscribe || []),
@@ -72,6 +81,7 @@ export class Subscription extends Rowan<RequestContext> {
         const sub = ctx.sub;
 
         let index = this._subs.findIndex(x => x == sub);
+       
         if (index > -1) {
           let sub = this._subs[index];
           this._subs.splice(index, 1);
@@ -87,12 +97,12 @@ export class Subscription extends Rowan<RequestContext> {
   on(event: string, cb: (sub: Subscriber) => void): () => void {
     return this._events.on(event, cb);
   }
-  publish<T>(value: T) {
-    for (var sub of this._subs) {
+  publish<T>(value: T, filter = function (sub: Subscriber) { return true; }) {
+    for (var sub of this._subs.filter(filter)) {
       sub.connection.send({
         id: sub.id,
         body: value,
-        status: 100
+        status: Status.Next
       });
     }
   }

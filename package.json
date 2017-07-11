@@ -54,14 +54,15 @@
     "rimraf": "^2.5.4",
     "ts-node": "^2.0.0",
     "tslint": "^4.3.1",
-    "typescript": "^2.3.4",
+    "typescript": "2.4",
     "ws": "^3.0.0"
   },
   "dependencies": {
     "lite-event-emitter": "^1.0.2",
     "msgpack-lite": "^0.1.26",
     "path-to-regexp": "^1.7.0",
-    "rowan": "^0.5.1",
+    "performance-now": "^2.1.0",
+    "rowan": "0.7",
     "tslib": "^1.7.1"
   },
   "nyc": {

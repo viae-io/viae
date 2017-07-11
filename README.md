@@ -13,17 +13,9 @@ An bi-directional communication api framework with async-iterable support.
 
 ## Install
 
+_you must have node.js >= 8.x installed_ 
+
 * `npm install viae`
-
-## Prerequisites 
-
-You must run on a system that supports `Symbol.asyncIterator`.
-
-`Symbol.asyncIterator` can be polyfilled via `core-js` by importing and running polyfill before using `viae`
-
-```ts
-import "core-js/modules/es7.symbol.async-iterator";
-```
 
 ## Usage
 

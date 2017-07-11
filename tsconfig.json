@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
-    "target": "es2015",
+    "target": "es2017",
     "module": "commonjs",
     "moduleResolution": "node",
     "noEmitOnError": true,
     "newLine": "LF",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "allowSyntheticDefaultImports": false,
     "importHelpers": true,
     "removeComments": true,
     "sourceMap": true,

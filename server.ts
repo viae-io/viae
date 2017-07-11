@@ -1,14 +1,15 @@
 import "core-js/modules/es7.symbol.async-iterator";
 
 import { Server as WebSocketServer } from 'ws';
-import { Viae, RequestContext, Method, Router } from './src/index';
-import { Scribe, unhandled, iterable } from './src';
+import { Viae, RequestContext, Method, Router, Subscription, Subscriber } from './src';
+import { Scribe, Itable, unhandled } from './src';
 
 let wss = new WebSocketServer({ port: 9090 });
 let server = new Viae(wss);
 let router = new Router({ root: "/", name: "example", doc: "An example router" });
 
 server.use(new Scribe());
+server.use(new Itable());
 
 server.use(router);
 
@@ -22,9 +23,16 @@ router.route({
     }]
 });
 
+let sub = new Subscription({ path: "foo/bar/:id" });
+
+server.use(sub);
+
 server.use(unhandled());
 
-server.use(iterable());
-
 console.log("Server Running on 9090....");
+
+setInterval(() => {
+  sub.publish("hello john", (x)=>x.params["id"] == "john");
+}, 200);
+
 
