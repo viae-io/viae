@@ -3,8 +3,6 @@ import { ResponseContext } from '../context';
 import { Method } from '../method';
 import { Request } from '../request';
 
-import now = require('performance-now');
-
 export interface ScribePostContext extends ResponseContext {
   /* start time (hrtime) */
   $start: [number, number];
@@ -32,12 +30,12 @@ export class Scribe {
 
   plugin(viae: Viae) {
     viae.before((ctx) => {
-      ctx["$start"] = now();
+      ctx["$start"] = process.hrtime();
     });
     viae.after((ctx) => {
       let start = ctx["$start"];
-      let end = now() - start;
-      ctx["$span"] = end;
+      let end = process.hrtime(ctx["$start"]);
+      ctx["$span"] = end[1] /1000000;
 
       this.log(ctx);
     });

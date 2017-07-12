@@ -11,12 +11,15 @@ import { bytesToHex, shortId } from '../utils';
 import { request, requestPath, requestMethod, Interceptor } from '../middleware';
 
 /** 
- * Allows sending and recieving (pull-based) Iterable sequences 
+ * Allows sending and recieving (pull-based) Iterable sequences
  * 
- * usage:
+ * usage: 
+ * send: a body with [Symbol.asyncIterator] implemented 
+ * recieve: for await(let item of body)
  * 
- * client: via.use(new Iterable());
- * server: viae.use(new Iterable());
+ * install: 
+ *   client: via.use(new Itable());
+ *   server: viae.use(new Itable());
  **/
 export class Itable {
 
