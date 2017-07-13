@@ -1,7 +1,7 @@
 import { Rowan } from 'rowan';
 import { Context, ContextHandler } from '../context';
 import { Method } from '../method';
-import { request, requestPath, requestMethod } from '../middleware';
+import { request } from '../middleware';
 
 export class Router extends Rowan<Context> implements RouterOptions {
   /** route root path (not currently used) */
@@ -23,9 +23,7 @@ export class Router extends Rowan<Context> implements RouterOptions {
     doc?: string
   }) {
     this.use(
-      request(),
-      requestMethod(opts.method),
-      requestPath(opts.path),
+      request(opts.method, opts.path),
       ...opts.handlers);
   }
 }

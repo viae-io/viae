@@ -8,7 +8,7 @@ import { Method } from './method';
 import { Request } from './request';
 import { Status } from './status';
 
-import { request, requestMethod, requestPath } from './middleware';
+import { request } from './middleware';
 
 export type Subscriber = {
   id: string;
@@ -38,9 +38,7 @@ export class Subscription extends Rowan<RequestContext> {
     super();
     this._path = opts.path;
     this.use(
-      request(),
-      requestMethod(Method.SUBSCRIBE),
-      requestPath(opts.path),
+      request(Method.SUBSCRIBE, opts.path),
       ...(opts.subscribe || []),
       (ctx: SubscriptionContext) => {
         let dispose = () => {
@@ -61,9 +59,7 @@ export class Subscription extends Rowan<RequestContext> {
       });
 
     this.use(
-      request(),
-      requestMethod(Method.UNSUBSCRIBE),
-      requestPath(opts.path),
+     request(Method.UNSUBSCRIBE, opts.path),
       (ctx: SubscriptionContext) => {
         const sub = this._subs.find(
           x =>

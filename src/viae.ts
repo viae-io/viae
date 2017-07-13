@@ -7,8 +7,6 @@ import { Rowan } from 'rowan';
 import { LiteEventEmitter } from 'lite-event-emitter';
 
 import { Interceptor } from './middleware';
-import { request, requestMethod, requestPath } from './middleware';
-
 import { Plugin, isPlugin } from './plugin';
 
 export class Viae implements ContextProcessor {

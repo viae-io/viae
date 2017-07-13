@@ -8,7 +8,7 @@ import { Rowan } from 'rowan';
 import { RequestContext } from '../context';
 import { Wire } from '../wire';
 import { bytesToHex, shortId } from '../utils';
-import { request, requestPath, requestMethod, Interceptor } from '../middleware';
+import { request, Interceptor } from '../middleware';
 
 /** 
  * Allows sending and recieving (pull-based) Iterable sequences
@@ -121,7 +121,7 @@ class IterableRouter extends Rowan<RequestContext> {
     let iterator: Iterator<any>;
 
     this.use(
-      requestMethod(Method.SUBSCRIBE),
+      request(Method.SUBSCRIBE),
       (ctx: RequestContext) => {
         try {
           if (iterator !== undefined)
@@ -138,8 +138,7 @@ class IterableRouter extends Rowan<RequestContext> {
       });
 
     this.use(
-      request(),
-      requestMethod(Method.NEXT),
+      request(Method.NEXT),
       async (ctx: RequestContext) => {
         let body: any;
         let status: Status;
@@ -160,8 +159,7 @@ class IterableRouter extends Rowan<RequestContext> {
       });
 
     this.use(
-      request(),
-      requestMethod(Method.UNSUBSCRIBE),
+      request(Method.UNSUBSCRIBE),
       (ctx: RequestContext) => {
         ctx.send({ status: Status.OK });
         dispose();
