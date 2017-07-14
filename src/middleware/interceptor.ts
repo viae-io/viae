@@ -8,7 +8,10 @@ type InterceptConfig = {
   handlers: ContextHandler[]
 };
 
-/** used to intercept messages with matching request/response ids */
+/** 
+ * used to intercept messages with matching request/response ids and terminate further processing
+ * does NOT intercept if there is a processing error
+ **/
 export class Interceptor implements ContextProcessor {
   private _interceptors = new Map<string, InterceptConfig>();
 
@@ -38,18 +41,17 @@ export class Interceptor implements ContextProcessor {
   /**
    * @internal 
    */
-  async process(ctx: Context, err: any): Promise<boolean> {
-    if (err) return;
+  process(ctx: Context, err: any): Promise<boolean> {
+    if (err) return undefined;
 
-    const id = isRequest(ctx) ? ctx.req.id : isResponse(ctx) ? ctx.res.id : undefined;
+    const id = ctx.req!= undefined ? ctx.req.id : ctx.res != undefined ? ctx.res.id : undefined;
 
-    if (!id) return;
+    if (!id) return undefined;
 
     const interceptor = this._interceptors.get(id);
 
     if (interceptor) {      
-      await Rowan.execute(ctx, undefined, interceptor.handlers);
-      return false;
+      return Rowan.execute(ctx, undefined, interceptor.handlers).then(function(){ return Promise.resolve(false)});
     }
   };
 }
