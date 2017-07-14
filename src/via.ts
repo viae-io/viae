@@ -15,12 +15,29 @@ import { shortId, bytesToHex, hexToBytes } from './utils';
 import { Interceptor, Router } from './middleware';
 
 export class Via {
-  private _factory = new ContextFactory(this);
-  private _interceptor = new Interceptor();
-  private _app = new Rowan<Context>([this._interceptor]);
+  private _factory;
+  private _interceptor;
+  private _app: Rowan<Context>;
   private _ev = new LiteEventEmitter();
 
-  constructor(public wire: Wire) {
+  constructor(
+
+    public wire: Wire,
+
+    opts = {
+      interceptor: new Interceptor(),
+      factory: new ContextFactory(),
+      plugins: [] as Plugin[]
+    }) {
+
+    this._interceptor = opts.interceptor;
+    this._factory = opts.factory;
+    this._app = new Rowan<Context>([this._interceptor]);
+
+    //for (let extension of opts.plugins) {
+    //  extension.plugin(this);
+    //}
+
     wire.on("message", (raw: ArrayBuffer) => {
       const message = msgpack.decode(new Uint8Array(raw));
       this._ev.emit("message", message);
@@ -99,11 +116,6 @@ export class Via {
           resolve = reject = null;
         }
       });
-  }
-
-
-  subscribe(opts: { path: string }) {
-
   }
 }
 

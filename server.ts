@@ -5,34 +5,45 @@ import { Viae, RequestContext, Method, Router, Subscription, Subscriber } from '
 import { Scribe, Itable, unhandled } from './src';
 
 let wss = new WebSocketServer({ port: 9090 });
-let server = new Viae(wss);
-let router = new Router({ root: "/", name: "example", doc: "An example router" });
-
-server.use(new Scribe());
-server.use(new Itable());
-
-server.use(router);
+let server = new Viae(wss, new Scribe(), new Itable());
+let router = new Router({ root: "/base", name: "example", doc: "An example router" });
 
 router.route({
   method: Method.GET,
   path: "/echo",
-  doc: "return the request body back to the client",
   handlers: [
-    (ctx: RequestContext) => {
-      ctx.send({ body: ctx.req.body });
-    }]
+    (ctx) => {
+      const req = ctx.req;
+      const con = ctx.connection;
+      const auth = con.auth;
+
+      if (auth == "john") {
+        ctx.send({ body: req.body, status: 200 });
+      }
+      else {
+        ctx.send({ status: 403 });
+      }
+    }
+  ]
 });
 
-let sub = new Subscription({ path: "foo/bar/:id" });
+router.route({
+  method: Method.POST,
+  path: "/auth",
+  handlers: [
+    (ctx) => {
+      const req = ctx.req;
+      const con = ctx.connection;
 
-server.use(sub);
+      con["auth"] = req.body;
 
+      ctx.send({ status: 200 });
+    }
+  ]
+});
+
+server.use(router);
 server.use(unhandled());
 
 console.log("Server Running on 9090....");
-
-setInterval(() => {
-  sub.publish("hello john", (x)=>x.params["id"] == "john");
-}, 200);
-
 

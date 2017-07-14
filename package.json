@@ -11,7 +11,7 @@
     "build:es2015": "tsc --project tsconfig.build.json --rootDir src/ --outDir ./dist/es2017 --module es2015",
     "build:commonjs": "tsc --project tsconfig.build.json --rootDir src/ --outDir ./dist/commonjs --module commonjs",
     "debug": "npm run clean && cross-env tsc --project tsconfig.json --outDir ./.tmp/ --module commonjs ",
-    "test": "nyc node_modules/mocha/bin/_mocha --require source-map-support/register --compilers ts:ts-node/register test/*.ts",
+    "test": "nyc node_modules/mocha/bin/_mocha --require source-map-support/register --compilers ts:ts-node/register test/unit/**/*.ts",
     "cover": "codecov",
     "prepublishOnly": "npm run build"
   },
@@ -40,9 +40,9 @@
   },
   "homepage": "https://github.com/MeirionHughes/viae#readme",
   "devDependencies": {
-    "@types/chai": "^3.5.0",
-    "@types/mocha": "^2.2.40",
-    "@types/node": "^6.0.59",
+    "@types/chai": "^4.0.1",
+    "@types/mocha": "^2.2.41",
+    "@types/node": "^8.0.13",
     "chai": "^3.5.0",
     "codecov": "^1.0.1",
     "concurrently": "^3.4.0",
@@ -51,7 +51,7 @@
     "mocha": "^3.2.0",
     "nyc": "^10.1.2",
     "rimraf": "^2.6.1",
-    "ts-node": "^2.0.0",
+    "ts-node": "^3.2.0",
     "tslint": "^4.3.1",
     "typescript": "2.4",
     "ws": "^3.0.0"

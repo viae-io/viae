@@ -22,7 +22,7 @@ export class Viae implements ContextProcessor {
   constructor(server: WireServer, ...plugins: Plugin[]) {
     server.on("connection", (wire: Wire) => {
       let via = new Via(wire);
-
+    
       via.use(this);
 
       wire.on("close", () => {
@@ -39,7 +39,7 @@ export class Viae implements ContextProcessor {
     }
   }
 
-  get connections() { return this._connections; };
+  get connections() { return this._connections.slice(0); };
 
   on(event: "connection", cb: (connection: Via) => void) {
     this._events.on(event, cb);

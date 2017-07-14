@@ -13,7 +13,7 @@ export type ContextProcessor = Processor<Context>;
 
 export interface Context extends RowanContext {
   id: string;
-  connection: Via;  
+  connection: Via;
   [index: string]: any;
 }
 
@@ -23,7 +23,7 @@ export interface ResponseContext extends Context {
 
 export interface RequestContext extends ResponseContext {
   params?: any;
-  req: Request;  
+  req: Request;
   send(msg: Message);
 };
 
@@ -44,11 +44,8 @@ export function isRequestMessage(msg: Message): msg is Request {
 }
 
 export class ContextFactory {
-  constructor(private via: Via) {
-  }
-
   create(message: Message, connection: Via): Context {
-    if (isResponseMessage(message)) {
+    if (message.status != undefined) {
       return {
         id: message.id,
         res: message,
@@ -56,7 +53,8 @@ export class ContextFactory {
       } as ResponseContext;
     }
     else {
-      let ctx: RequestContext = {
+      const $noop = function(){};
+      const ctx: RequestContext = {
         id: message.id as string,
         req: message as Request,
         res: {
@@ -64,15 +62,25 @@ export class ContextFactory {
           status: 200,
         },
         connection: connection,
-        send: (msg: Message) => {          
+        send: (msg: Message) => {
           let _msg = ctx.res;
           Object.assign(_msg, msg);
           _msg.status = _msg.status;
           _msg.id = ctx.id;
-          this.via.send(_msg);
-          delete ctx.send;
+          connection.send(_msg);
+
+          ctx.send = $noop;
+          ctx.sendStatus = $noop;
+          ctx.sendBody = $noop;
+
           ctx.$done = true;
           ctx.res = _msg;
+        },
+        sendStatus: (status: Status) => {
+          ctx.send({ status: status });          
+        },
+        sendBody: (body: any, status = Status.OK) => {          
+          ctx.send({ body: body});          
         }
       }
 
