@@ -13,7 +13,7 @@ import { Plugin, isPlugin } from './plugin';
 
 export class Viae implements ContextProcessor {
   private _connections = new Array<Via>();
-  
+
   private _interceptor = new Interceptor();
   private _before = new Rowan<Context>();
   private _after = new Rowan<Context>();
@@ -47,14 +47,15 @@ export class Viae implements ContextProcessor {
     this._events.on(event, cb);
   }
 
-  async process(ctx: Context, error?: Error) {
-    try {
-      await this._app.process(ctx, error);
-    } catch (err) {
-      error = err;
-    }
-    delete ctx.$done;
-    await this._after.process(ctx, error);
+  process(ctx: Context, error?: Error): Promise<void> {
+    return this._app.process(ctx, error)
+      .catch((err) => {
+        return Promise.resolve(error = err);
+      })
+      .then(_ => {
+        delete ctx.$done;
+        return this._after.process(ctx, error);
+      });
   }
 
   before(handler: ContextHandler, ...handlers: ContextHandler[]) {
