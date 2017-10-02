@@ -1,9 +1,8 @@
 # Viae
 
-An bi-directional communication api framework with async-iterable support. 
+A bi-directional communication framework
 
-
-![363886-200](https://cloud.githubusercontent.com/assets/3584509/22102513/a04d0904-de2f-11e6-9591-ebfa2516ea07.png)
+![logopng](https://user-images.githubusercontent.com/3584509/31079620-2603bc88-a77e-11e7-92c8-7ac73c165b0b.png)
 
 [![NPM version][npm-image]][npm-url]
 [![NPM downloads][npm-downloads]][npm-url]

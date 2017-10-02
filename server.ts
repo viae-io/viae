@@ -1,5 +1,3 @@
-import "core-js/modules/es7.symbol.async-iterator";
-
 import { Server as WebSocketServer } from 'ws';
 import { Viae, RequestContext, Method, Router, Subscription, Subscriber } from './src';
 import { Scribe, Itable, unhandled } from './src';

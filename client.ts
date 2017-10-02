@@ -3,8 +3,11 @@ import "core-js/modules/es7.symbol.async-iterator";
 import * as Ws from 'ws';
 import * as readline from 'readline';
 import { Via, Method, Status, Itable } from './src';
+import {WebSocketWire} from 'viae-ws';
 
-let ws = new Ws("ws://127.0.0.1:9090");
+let ws = new WebSocketWire(Ws);
+
+ws.connect("ws://127.0.0.1:9090");
 
 ws.on("open", async () => {
   let via = new Via(ws);
