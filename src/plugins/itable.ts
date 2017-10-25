@@ -23,8 +23,8 @@ import { request, Interceptor } from '../middleware';
  **/
 export class Itable {
 
-  constructor(){
-    if(Symbol.asyncIterator === undefined){
+  constructor() {
+    if (Symbol.asyncIterator === undefined) {
       throw Error("Symbol.asyncIterator is not defined");
     }
   }
@@ -124,8 +124,7 @@ class IterableRouter extends Rowan<RequestContext> {
       request(Method.SUBSCRIBE),
       (ctx: RequestContext) => {
         try {
-          if (iterator !== undefined)
-          { throw Error("Already subscribed"); }
+          if (iterator !== undefined) { throw Error("Already subscribed"); }
           if (iterable[Symbol.asyncIterator])
             iterator = iterable[Symbol.asyncIterator]();
           else
