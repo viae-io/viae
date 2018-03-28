@@ -12,7 +12,7 @@ export interface ScribePostContext extends Context {
 
   /* the request  */
   req?: Request;
-  
+
   /* the response */
   res?: Response;
 
@@ -41,11 +41,9 @@ export class Scribe {
     viae.after((ctx) => {
       let start = ctx["$start"];
       let end = process.hrtime(ctx["$start"]);
-      ctx["$span"] = end[1] / 1000000;
+      ctx["$span"] = end[0] * 1000 + end[1] / 1000000;
 
       this.log(ctx);
     });
   }
 }
-
-
