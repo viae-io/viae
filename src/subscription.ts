@@ -59,7 +59,7 @@ export class Subscription extends Rowan<RequestContext> {
       });
 
     this.use(
-     request(Method.UNSUBSCRIBE, opts.path),
+      request(Method.UNSUBSCRIBE, opts.path),
       (ctx: SubscriptionContext) => {
         const sub = this._subs.find(
           x =>
@@ -77,7 +77,7 @@ export class Subscription extends Rowan<RequestContext> {
         const sub = ctx.sub;
 
         let index = this._subs.findIndex(x => x == sub);
-       
+
         if (index > -1) {
           let sub = this._subs[index];
           this._subs.splice(index, 1);
@@ -88,18 +88,24 @@ export class Subscription extends Rowan<RequestContext> {
         return false;
       });
   }
+  on(event: "error", cb: (err: Error, sub: Subscriber) => void): Function
   on(event: "subscribe", cb: (sub: Subscriber) => void): Function
   on(event: "unsubscribe", cb: (sub: Subscriber) => void): Function
-  on(event: string, cb: (sub: Subscriber) => void): () => void {
+  on(event: string, cb: (...args: any[]) => void): () => void {
     return this._events.on(event, cb);
   }
   publish<T>(value: T, filter = function (sub: Subscriber) { return true; }) {
     for (var sub of this._subs.filter(filter)) {
-      sub.connection.send({
-        id: sub.id,
-        body: value,
-        status: Status.Next
-      });
+      try {
+        sub.connection.send({
+          id: sub.id,
+          body: value,
+          status: Status.Next
+        });
+      }
+      catch (err) {
+        this._events.emit("error", err, sub);
+      }
     }
   }
 }
