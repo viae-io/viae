@@ -50,16 +50,16 @@
     "mocha": "^3.2.0",
     "nyc": "^11.0.3",
     "rimraf": "^2.6.1",
+    "source-map-support": "^0.4.15",
     "ts-node": "^3.2.0",
     "tslint": "^4.3.1",
     "typescript": "^2.4.2",
-    "source-map-support": "^0.4.15",
     "ws": "^3.0.0"
   },
   "dependencies": {
     "msgpack-lite": "~0.1.26",
     "path-to-regexp": "^1.7.0",
-    "rowan": "~0.7.0"
+    "rowan": "^1.0.0-beta.1"
   },
   "nyc": {
     "include": [
