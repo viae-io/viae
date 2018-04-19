@@ -22,7 +22,7 @@ import { request, Interceptor } from '../middleware';
  *   server: viae.use(new Itable());
  **/
 export class Itable {
-
+  
   constructor(){
     if(Symbol.asyncIterator === undefined){
       throw Error("Symbol.asyncIterator is not defined");
