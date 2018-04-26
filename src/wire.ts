@@ -1,7 +1,7 @@
 /**
  * A basic interface defining a binary bi-directional communication wire.  
  */
-export default interface IWire {
+export interface Wire {
   readonly state: "opening" | "open" | "closing" | "closed";
 
   send(data: ArrayBuffer): Promise<void>;

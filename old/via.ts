@@ -11,7 +11,6 @@ import { Status } from './status';
 import { Method } from './method';
 import { Plugin, isPlugin } from './plugin';
 import { shortId, bytesToHex, hexToBytes } from './utils';
-
 import { Interceptor, Router } from './middleware';
 
 export class Via {
@@ -21,7 +20,6 @@ export class Via {
   private _ev = new LiteEventEmitter();
 
   constructor(
-
     public wire: Wire,
 
     opts = {
@@ -90,6 +88,8 @@ export class Via {
 
     message.id = message.id || bytesToHex(shortId());
 
+    const disposeOnIntercept = (!opts && !opts.keepAlive);
+
     return new Promise<Response>(
       (resolve, reject) => {
         const dispose = this._interceptor.intercept(message.id, [
@@ -98,15 +98,11 @@ export class Via {
               resolve(ctx.res);
               resolve = reject = null;
             }
-            if (!opts && !opts.keepAlive) {
+            if (disposeOnIntercept) {
               dispose();
             }
           },
-          ...opts.handlers,
-          (ctx: ResponseContext) => {
-            ctx.$done = true;
-            return false;
-          }]);
+          ...opts.handlers]);
 
         try {
           this.send(message);
@@ -118,4 +114,3 @@ export class Via {
       });
   }
 }
-
