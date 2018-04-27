@@ -1,22 +1,22 @@
-import { Context, ContextProcessor, ContextHandler } from '../context';
-import { Rowan } from 'rowan';
+import { Context } from '../context';
+import { Rowan, Processor, Middleware } from 'rowan';
 
-type InterceptConfig = {
+type InterceptConfig<Ctx extends Context = Context> = {
   dispose: () => void,
   timestamp: number,
-  middleware: ContextProcessor[]
+  middleware: Middleware<Ctx>[]
 };
 
-export type InterceptOptions = {
+export type InterceptOptions<Ctx extends Context = Context> = {
   id: string;
-  handlers: (ContextHandler | ContextProcessor)[];
+  handlers: Processor<Ctx>[];
   terminate?: true;
 };
 
 /** 
  * used to intercept messages with matching message ids and terminate further processing
  **/
-export class Interceptor implements ContextProcessor {
+export default class Interceptor<Ctx extends Context = Context> implements Middleware<Ctx> {
   private _interceptors = new Map<string, InterceptConfig>();
 
   /**

@@ -38,6 +38,7 @@ export class Via {
 
     wire.on("message", (raw: ArrayBuffer) => {
       const message = msgpack.decode(new Uint8Array(raw));
+ 
       this._ev.emit("message", message);
       const ctx = this._factory.create(message, this);
       const _ = this._app.process(ctx)

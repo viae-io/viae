@@ -1,18 +1,5 @@
 
-export function shortId(): [number, number, number, number, number, number, number, number] {
-  var time = Date.now();
 
-  return [
-    Math.round(Math.random() * 255),
-    Math.round(Math.random() * 255),
-    Math.round(Math.random() * 255),
-    Math.round(Math.random() * 255),
-    (time >> 0) & 0xFF,
-    (time >> 8) & 0xFF,
-    Math.round((time / Math.random()) & 0xFF),
-    Math.round((time / Math.random()) & 0xFF),
-  ];
-};
 
 export function textToBytes(s: string): Uint8Array {
   var ua = new Uint8Array(s.length);

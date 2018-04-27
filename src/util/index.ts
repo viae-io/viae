@@ -49,3 +49,19 @@ export function bytesToHex(bytes: Uint8Array | number[], start: number = 0, end:
   }
   return hex.join("");
 }
+
+/* basic id*/
+export function shortId(): [number, number, number, number, number, number, number, number] {
+  var time = Date.now();
+
+  return [
+    Math.round(Math.random() * 255),
+    Math.round(Math.random() * 255),
+    Math.round(Math.random() * 255),
+    Math.round(Math.random() * 255),
+    (time >> 0) & 0xFF,
+    (time >> 8) & 0xFF,
+    Math.round((time / Math.random()) & 0xFF),
+    Math.round((time / Math.random()) & 0xFF),
+  ];
+};

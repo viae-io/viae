@@ -4,13 +4,13 @@ import { textToBytes, flatten, bytesToText } from './util';
 /** message header */
 export interface MessageHeader {
   /* required: id */
-  id: string;
+  id?: string;
 
   path?: string;
   method?: string;
   status?: Status;
 
-  encoding?: "msgpack" | "json";
+  encoding?: "none" | "msgpack" | "json";
 
   [index: string]: any;
 }
@@ -18,9 +18,9 @@ export interface MessageHeader {
 /**
  * message
  */
-export interface Message<TBody = Uint8Array> {
-  head: MessageHeader;
-  body?: TBody;
+export interface Message<MessageBody = any> {
+  head?: MessageHeader;
+  body?: MessageBody;
 }
 
 export function encode(message: Message<Uint8Array>): ArrayBuffer {
@@ -38,7 +38,7 @@ export function encode(message: Message<Uint8Array>): ArrayBuffer {
   return tmp.buffer as ArrayBuffer;
 }
 
-export function decode(buffer: ArrayBuffer): Message {
+export function decode(buffer: ArrayBuffer): Message<Uint8Array> {
   const raw = new Uint8Array(buffer);
   if (raw.length < 4) throw Error("Message binary length invalid");
   let length = new Uint32Array(raw.slice(0, 4).buffer, 0, 1)[0];

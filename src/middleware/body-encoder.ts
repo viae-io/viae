@@ -8,16 +8,21 @@ import { Context } from "../context";
  */
 export default class BodyEncoder<Ctx extends Context = Context> implements Middleware<Context> {
   process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
+    if (!ctx.out.body) return next();
+    
     switch (ctx.out.head.encoding) {
-      default:
-      case "msgpack":
-        ctx.out.head.encoding = "msgpack";
-        ctx.out.body = msgpack.encode(ctx.out.body);
+      case "none":
         break;
       case "json":
         ctx.out.body = textToBytes(JSON.stringify(ctx.out.body));
         break;
+      case "msgpack":
+      default:
+        ctx.out.head.encoding = "msgpack";
+        ctx.out.body = msgpack.encode(ctx.out.body);
+        break;
     }
+
     return next();
   }
 }

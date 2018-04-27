@@ -24,4 +24,8 @@ export default class Viae<Ctx extends Context = Context> extends Rowan<Context> 
       this._ev.emit("connection", via);
     });
   }
+
+  on(event: "connection", cb: (connection: Via<Ctx>) => void) {
+    this._ev.on(event, cb);
+  }
 }

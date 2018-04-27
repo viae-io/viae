@@ -8,6 +8,8 @@ import { Context } from "../context";
  */
 export default class BodyDecoder<Ctx extends Context = Context> implements Middleware<Context> {
   process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
+    if (!ctx.out.body) return next();
+
     switch (ctx.in.head.encoding) {
       case "msgpack":
         ctx.in.body = msgpack.decode(ctx.in.body);
