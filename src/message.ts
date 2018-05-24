@@ -1,16 +1,17 @@
 import { Status } from "./status";
-import { textToBytes, flatten, bytesToText } from './util';
+import { textToBytes, flatten, bytesToText, bytesToHex, hexToBytes } from './util';
+import * as varint from 'varint';
 
 /** message header */
 export interface MessageHeader {
-  /* required: id */
-  id?: string;
-
+  /* request: resource path */
   path?: string;
+  /* request: method */
   method?: string;
+  /* response: status code */
   status?: Status;
-
-  encoding?: "none" | "msgpack" | "json";
+  /* encoding used on body */
+  encoding?: string;
 
   [index: string]: any;
 }
@@ -19,37 +20,45 @@ export interface MessageHeader {
  * message
  */
 export interface Message<MessageBody = any> {
+  /* required: id */
+  id: string;
+  /* header */
   head?: MessageHeader;
+  /* body */
   body?: MessageBody;
 }
 
 export function encode(message: Message<Uint8Array>): ArrayBuffer {
-  let json = JSON.stringify(message.head);
-  let head = textToBytes(json);
+  let id = textToBytes(message.id);
+  let head = textToBytes(JSON.stringify(message.head));
   let body = message.body;
-  let length = json.length + (body ? body.length : 0) + 4;
-  let tmp = new Uint8Array(length);
 
-  tmp.set(new Uint8Array(new Uint32Array([json.length]).buffer, 0, 1));
-  tmp.set(head, 4);
-  if (body) {
-    tmp.set(body, 4 + head.length);
-  }
-  return tmp.buffer as ArrayBuffer;
+  let parts = [
+    varint.encode(id.length),
+    id,
+    varint.encode(head.length),
+    head,
+    ...(body) ? [body] : []];
+  let binary = flatten(parts);
+
+  return binary.buffer as ArrayBuffer;
 }
 
 export function decode(buffer: ArrayBuffer): Message<Uint8Array> {
   const raw = new Uint8Array(buffer);
-  if (raw.length < 4) throw Error("Message binary length invalid");
-  let length = new Uint32Array(raw.slice(0, 4).buffer, 0, 1)[0];
-  if (raw.length < 4 + length) throw Error("Message binary length invalid");
+  let offset = 0;
 
-  let msg: Message = { head: JSON.parse(bytesToText(raw, 4, 4 + length)) };
+  let idLength = varint.decode(raw, offset); offset += varint.decode.bytes;
+  let idBytes = raw.subarray(offset, offset + idLength); offset += idLength;
+  let headLength = varint.decode(raw, offset); offset += varint.decode.bytes;
+  let headBytes = raw.subarray(offset, offset + headLength); offset += headLength;
+  let bodyBytes = (offset < raw.length) ? raw.subarray(offset) : null;
 
-  if (length + 4 < raw.length) {
-    msg.body = new Uint8Array(raw.buffer, 4 + length + raw.byteOffset);
-  }
+  let msg: Message = {
+    id: bytesToText(idBytes),
+  };
+  if (headBytes.length > 0) msg.head = JSON.parse(bytesToText(headBytes));
+  if (bodyBytes) msg.body = bodyBytes;
 
   return msg;
 }
-

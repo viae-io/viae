@@ -9,7 +9,8 @@ import BodyDecoder from "./middleware/body-decoder";
 import BodyEncoder from "./middleware/body-encoder";
 import Interceptor from "./middleware/interceptor";
 import Send from "./middleware/send";
-import { bytesToHex, shortId } from "./util";
+import { bytesToHex } from "./util";
+import { v4 as uuid } from 'uuid';
 
 /**
  * Via
@@ -18,43 +19,45 @@ import { bytesToHex, shortId } from "./util";
 export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   private _ev = new EventEmitter();
   private _interceptor = new Interceptor();
+  private Ctx: ContextConstructor;
 
   /* outgoing message pipeline */
   readonly out: Rowan<Context> = new Rowan<Context>();
 
-  constructor(public readonly wire: Wire, private _Ctx: ContextConstructor = DefaultContext) {
+  constructor(public readonly wire: Wire, opts?: { Ctx?: ContextConstructor, uuid?: () => string }) {
     super();
 
+    this.Ctx = (opts ? opts.Ctx : undefined) || DefaultContext;
+    
     const incoming = this;
     const outgoing = this.out;
 
     /** Configure Outgoing Pipeline */
     outgoing.use(new After([
-      /* Serialise ctx.out.body to Binary */
       new BodyEncoder(),
-      /* Send ctx.out*/
-      new Send()
-    ]));
+      new Send()]));
 
-    /** Add the Outgoing Pipeline (Response) */
+    /** Add the Response (Outgoing) Pipeline */
     incoming.use(new After([new If((ctx) => ctx.out != undefined, [outgoing])]));
 
     /** Catch Unhandled Errors during the Incoming Pipeline */
     incoming.use(new Catch(async (ctx: Ctx & HasError) => { this._ev.emit("error", ctx); }));
 
-    /** Decode Body */
+    /** Decode */
     incoming.use(new BodyDecoder());
 
     /** Intercept */
     incoming.use(this._interceptor = new Interceptor());
 
-    /** Extra Middleware Executes Here */
+    /** Extra Middleware Executes Hereafter */
+
 
     /** Hook onto the wire */
     wire.on("message", (data: ArrayBuffer) => {
       const msg = decode(data);
-      const ctx = new this._Ctx({ connection: this, in: msg);
-      this.process(ctx as Ctx).catch(e => this._ev.emit("fatal", e));
+      const ctx = new this.Ctx({ connection: this, in: msg });
+
+      this.process(ctx as Ctx).catch(e => this._ev.emit("error", e));
     });
 
     /** Hook into wire */
@@ -70,11 +73,45 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     });
   }
 
-  async send(msg: Message<any>, opts?: ViaSendOptions) {   
-    if (!msg.head) msg.head = {};
-    if (!msg.head.id) msg.head.id = bytesToHex(shortId());
+  async send(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
+    if (!msg.id) msg.id = uuid();
+    if (opts && opts.encoding) {
+      msg.head = msg.head || {};
+      msg.head.encoding = opts.encoding;
+    }
+    await this.out.process(new this.Ctx({ connection: this, out: msg as Message<any> }));
+  }
 
-    await this.out.process(new this._Ctx({ connection: this, out: msg }));
+  async request(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
+    if (!msg.id) msg.id = uuid();
+    if (opts && opts.encoding) {
+      msg.head = msg.head || {};
+      msg.head.encoding = opts.encoding;
+    }
+
+    let reject, resolve, promise = new Promise<void>((r, x) => { resolve = r; reject = x; });
+    let clock;
+
+    let dispose = this._interceptor.intercept({
+      id: msg.id,
+      handlers: [async (ctx, next) => {
+        resolve(ctx.in);
+      }]
+    });
+
+    clock = setTimeout(() => { reject("Request Timeout"); }, 5000);
+
+    try {
+      await this.out.process(new this.Ctx({ connection: this, out: msg as Message<any> }));
+      return await promise;
+    }
+    catch (err) {
+      throw err;
+    }
+    finally {
+      clearTimeout(clock);
+      dispose();
+    }
   }
 
   on(event: "close", cb: () => void)

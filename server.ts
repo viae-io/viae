@@ -1,4 +1,4 @@
-import { Viae } from './src';
+import { Viae, Context } from './src';
 import { Server as WebSocketServer } from 'ws';
 import { Wire } from './src';
 
@@ -12,8 +12,13 @@ viae.on("connection", (via) => {
   });
 });
 
-viae.use(async (ctx) => {
-  console.log("Got", ctx.req);
+
+viae.use(async (ctx, next) => {
+  console.log(ctx.in.id);
+  ctx.out = {
+    id: ctx.in.id,
+    head: { status: 200 }
+  };
 });
 
 server.on("error", (error) => {

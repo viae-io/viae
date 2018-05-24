@@ -8,7 +8,7 @@ import { Context } from "../context";
  */
 export default class BodyDecoder<Ctx extends Context = Context> implements Middleware<Context> {
   process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
-    if (!ctx.out.body) return next();
+    if (!ctx.in || !ctx.in.head || !ctx.in.body) return next();
 
     switch (ctx.in.head.encoding) {
       case "msgpack":
@@ -17,6 +17,7 @@ export default class BodyDecoder<Ctx extends Context = Context> implements Middl
       case "json":
         ctx.in.body = JSON.parse(bytesToText(ctx.in.body));
         break;
+
     }
     return next();
   }

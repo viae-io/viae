@@ -8,15 +8,26 @@ let via = new Via(wire as any);
 via.on("open", async () => {
   console.log("opened");
 
-  await via.send({
-    head: {
-      path: "/",
-      method: "GET",
-      id: undefined
-    }
+  via.use((ctx, next) => {
+    console.log(ctx.in.id);
+    return next();
   });
-});
 
+  try {
+    let response = await via.request({
+      head: {
+        method: "GET",
+        path: "/"
+      },
+    });
+    console.log(response);
+  } catch (err) {
+    console.log(err);
+  }
+
+  /* closing wire */
+  wire.close();
+});
 
 via.on("error", (err) => {
   console.log(err);

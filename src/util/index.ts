@@ -8,10 +8,10 @@ export function flatten(list: Array<ArrayLike<number>>): Uint8Array {
   let buffer = new Uint8Array(count);
   let offset = 0;
 
-  list.forEach(x => {
-    buffer.set(x, offset);
-    offset += x.length;
-  });
+  for (let item of list) {
+    buffer.set(item, offset);
+    offset += item.length;
+  }
 
   return buffer;
 }
@@ -23,16 +23,13 @@ export function isHex(s: string): boolean {
 export function textToBytes(s: string): Uint8Array {
   const ua = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) {
-    ua[i] = s.charCodeAt(i);
+    ua[i] = s.charCodeAt(i) & 0xFF;
   }
   return ua;
 };
 export function bytesToText(ua: Uint8Array | number[], start: number = 0, end: number = ua.length): string {
-  let s = '';
-  for (let i = start; i < end; i++) {
-    s += String.fromCharCode(ua[i]);
-  }
-  return s;
+  const _ua = ua.slice(start, end);
+  return String.fromCharCode.apply(null, _ua);
 };
 export function hexToBytes(hex: string): Array<number> {
   let bytes: Array<number> = [];
@@ -50,18 +47,9 @@ export function bytesToHex(bytes: Uint8Array | number[], start: number = 0, end:
   return hex.join("");
 }
 
-/* basic id*/
-export function shortId(): [number, number, number, number, number, number, number, number] {
-  var time = Date.now();
-
-  return [
-    Math.round(Math.random() * 255),
-    Math.round(Math.random() * 255),
-    Math.round(Math.random() * 255),
-    Math.round(Math.random() * 255),
-    (time >> 0) & 0xFF,
-    (time >> 8) & 0xFF,
-    Math.round((time / Math.random()) & 0xFF),
-    Math.round((time / Math.random()) & 0xFF),
-  ];
-};
+export function intToBytes(value: number): Uint8Array {
+  return new Uint8Array(new Uint32Array([value]).buffer);
+}
+export function numberToBytes(value: number): Uint8Array {
+  return new Uint8Array(new Uint32Array([value]).buffer);
+}

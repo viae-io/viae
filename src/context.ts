@@ -3,6 +3,8 @@ import Via from "./via";
 import { Message, MessageHeader, encode, decode } from "./message";
 import { Status } from "./status";
 
+
+
 export interface Context {
   id: string;
   connection: Via<Context>;
@@ -11,9 +13,12 @@ export interface Context {
   out?: Message<any>;
 
   req?: Request<any>;
+  res?: Response<any>;
 
   isReq(inbound?: boolean): this is RequestContext;
   isRes(inbound?: boolean): this is ResponseContext;
+
+  [key: string]: any;
 }
 
 export interface ContextConstructor<Ctx extends Context = Context> {
@@ -58,10 +63,13 @@ export class DefaultContext implements Context {
   }
 
   private defaultResponse(req: Message<any>): Response {
-    return {
-      head: { id: req.head.id },
-      status: 404
-    };
+    if (req) {
+      return {
+        id: req.head.id,
+        head: {},
+        status: 404
+      };
+    }
   }
 }
 
@@ -82,4 +90,4 @@ export interface ResponseContext extends Context {
   res: Response;
 }
 
-export interface ErredContext extends Context, HasError {}
+export interface ErredContext extends Context, HasError { }

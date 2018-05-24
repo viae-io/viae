@@ -10,14 +10,15 @@ type InterceptConfig<Ctx extends Context = Context> = {
 export type InterceptOptions<Ctx extends Context = Context> = {
   id: string;
   handlers: Processor<Ctx>[];
-  terminate?: true;
 };
 
 /** 
  * used to intercept messages with matching message ids and terminate further processing
  **/
 export default class Interceptor<Ctx extends Context = Context> implements Middleware<Ctx> {
+
   private _interceptors = new Map<string, InterceptConfig>();
+
 
   /**
    * intercept any message with a matching id
@@ -26,7 +27,7 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
    * @returns method to remove (dispose) the interception entry.`
    */
   intercept(opt: InterceptOptions): () => void {
-    const { id, handlers, terminate } = opt;
+    const { id, handlers} = opt;
 
     if (id == undefined) throw Error("id cannot be undefined");
     if (id.length == 0) throw Error("id cannot be empty");
@@ -36,10 +37,6 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
     let dispose = () => this._interceptors.delete(id);
 
     let middleware = handlers.map(x => Rowan.convertToMiddleware(x));
-
-    if (terminate) {
-      middleware.push({ process: () => Promise.resolve() });
-    }
 
     //if (this._interceptors.has(id)) {
     // TODO: figure out what to do if an interceptor exists already
@@ -59,22 +56,31 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
    * if an interceptor is not found, next is called and its result returned. 
   */
   async process(ctx: Context, next): Promise<void> {
-    const id = ctx.id;
+    const id = ctx.in.id;
 
-    if (!id) return undefined;
+    if (this._interceptors.has(id)) {
+      const interceptor = this._interceptors.get(id);
 
-    const interceptor = this._interceptors.get(id);
-
-    if (interceptor) {
-      return Rowan.process(interceptor.middleware, ctx, next);
+      if (interceptor) {
+        return Rowan.process(interceptor.middleware, ctx, next);
+      }
     }
-
     return next();
   };
 
   dispose() {
     for (let [key, value] of this._interceptors.entries()) {
       value.dispose();
+    }
+  }
+
+  private _checkTimeout() {
+    let now = Date.now();
+    for (let [key, value] of this._interceptors.entries()) {
+      let span = now - value.timestamp;
+      if (span > 5000) {
+        value.dispose();
+      }
     }
   }
 }
