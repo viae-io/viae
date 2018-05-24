@@ -3,8 +3,8 @@ import { EventEmitter } from "events";
 
 import { Wire } from "./wire";
 
-import { Message, decode } from './message';
-import { Context, ContextConstructor, DefaultContext, ErredContext, Response, Request } from "./context";
+import { Message, Response, Request, decode, isRequest } from './message';
+import { Context, ContextConstructor, DefaultContext, ErredContext, } from "./context";
 import BodyDecoder from "./middleware/body-decoder";
 import BodyEncoder from "./middleware/body-encoder";
 import Interceptor from "./middleware/interceptor";
@@ -24,11 +24,12 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   /* outgoing message pipeline */
   readonly out: Rowan<Context> = new Rowan<Context>();
 
+
   constructor(public readonly wire: Wire, opts?: { Ctx?: ContextConstructor, uuid?: () => string }) {
     super();
 
     this.Ctx = (opts ? opts.Ctx : undefined) || DefaultContext;
-    
+
     const incoming = this;
     const outgoing = this.out;
 
@@ -73,6 +74,9 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     });
   }
 
+  /**
+   * Add a message to the outgoing pipe
+   **/
   async send(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
     if (!msg.id) msg.id = uuid();
     if (opts && opts.encoding) {
@@ -82,11 +86,16 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     await this.out.process(new this.Ctx({ connection: this, out: msg as Message<any> }));
   }
 
+  /**
+   * Send a request message and await for the response 
+   * @param msg 
+   * @param opts 
+   */
   async request(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
     if (!msg.id) msg.id = uuid();
-    if (opts && opts.encoding) {
-      msg.head = msg.head || {};
-      msg.head.encoding = opts.encoding;
+
+    if (!isRequest(msg)) {
+      throw Error("Message is not a Request");
     }
 
     let reject, resolve, promise = new Promise<void>((r, x) => { resolve = r; reject = x; });
@@ -99,10 +108,10 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
       }]
     });
 
-    clock = setTimeout(() => { reject("Request Timeout"); }, 5000);
+    clock = setTimeout(() => { reject("Request Timeout"); }, (opts ? opts.timeout : undefined) || 10000);
 
     try {
-      await this.out.process(new this.Ctx({ connection: this, out: msg as Message<any> }));
+      await this.send(msg, opts);
       return await promise;
     }
     catch (err) {
@@ -114,6 +123,10 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     }
   }
 
+  intercept(id: string, handlers: Processor<Ctx>[]){
+    return this._interceptor.intercept({id: id, handlers: handlers});
+  }
+
   on(event: "close", cb: () => void)
   on(event: "open", cb: () => void)
   on(event: "error", cb: (ctx: Ctx & HasError) => void)
@@ -123,5 +136,6 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
 }
 
 export type ViaSendOptions = {
-  encoding?: "none" | "msgpack" | "json"
+  encoding?: "none" | "msgpack" | "json",
+  timeout?: number
 };

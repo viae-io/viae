@@ -17,7 +17,7 @@ export default class BodyEncoder<Ctx extends Context = Context> implements Middl
         ctx.out.body = textToBytes(JSON.stringify(ctx.out.body));
         break;
       case "msgpack":
-      default:
+      default:      
         ctx.out.head.encoding = "msgpack";
         ctx.out.body = msgpack.encode(ctx.out.body);
         break;

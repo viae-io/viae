@@ -1,6 +1,7 @@
 import { Viae, Context } from './src';
 import { Server as WebSocketServer } from 'ws';
 import { Wire } from './src';
+import { Router } from './src/middleware';
 
 let server = new WebSocketServer({ port: 8080, host: "localhost" });
 let viae = new Viae(server);
@@ -12,15 +13,22 @@ viae.on("connection", (via) => {
   });
 });
 
+let router = new Router({ root: "/" });
 
-viae.use(async (ctx, next) => {
-  console.log(ctx.in.id);
-  ctx.out = {
-    id: ctx.in.id,
-    head: { status: 200 }
-  };
+router.route({
+  method: "GET",
+  path: "/api",
+  process: [async (ctx, next) => {
+    ctx.out = {
+      id: ctx.in.id,
+      head: { status: 200 },
+      body: "hello world"
+    };
+  }]
 });
 
-server.on("error", (error) => {
+viae.use(router);
+
+server.on("error", (error) => {  
   console.log("connection error");
 });

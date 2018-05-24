@@ -20,8 +20,8 @@ export default class Viae<Ctx extends Context = Context> extends Rowan<Context> 
         this._connections.splice(this._connections.indexOf(via), 1);
       });
 
-      via.on("error", () => {
-        console.log("via error - killing");
+      via.on("error", (err) => {
+        console.log("connection error", err);
         wire.close();
       });
 

@@ -57,8 +57,29 @@ export function decode(buffer: ArrayBuffer): Message<Uint8Array> {
   let msg: Message = {
     id: bytesToText(idBytes),
   };
+
   if (headBytes.length > 0) msg.head = JSON.parse(bytesToText(headBytes));
   if (bodyBytes) msg.body = bodyBytes;
 
   return msg;
+}
+
+export interface Response<Body = any> extends Message<Body> {
+  head: {
+    status: Status;
+  };
+}
+
+export interface Request<Body = any> extends Message<Body> {
+  head: {
+    path: string;
+    method: string;
+  };
+}
+
+export function isRequest<T>(message: Partial<Message<T>>): message is Request<T> {
+  return message.head != undefined &&
+    message.head.method != undefined &&
+    message.head.path != undefined &&
+    message.head.status == undefined;
 }

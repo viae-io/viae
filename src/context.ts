@@ -1,9 +1,8 @@
 import { IRowan, Middleware, Handler, AutoHandler, Rowan, HasError } from "rowan";
 import Via from "./via";
-import { Message, MessageHeader, encode, decode } from "./message";
+import { Message, MessageHeader, Request, Response, encode, decode } from "./message";
 import { Status } from "./status";
-
-
+import Interceptor from "./middleware/interceptor";
 
 export interface Context {
   id: string;
@@ -15,8 +14,16 @@ export interface Context {
   req?: Request<any>;
   res?: Response<any>;
 
-  isReq(inbound?: boolean): this is RequestContext;
-  isRes(inbound?: boolean): this is ResponseContext;
+  /*checks to see if inbound message is a request */
+  isReq(outbound?: boolean): this is RequestContext;
+
+  /*checks to see if inbound message is a response */
+  isRes(outbound?: boolean): this is ResponseContext;
+
+  send?(msg: { id?: string, head: MessageHeader & { status: number }, body?: any });
+
+  /** access to the connection in */
+  interceptor?: Interceptor;
 
   [key: string]: any;
 }
@@ -47,7 +54,9 @@ export class DefaultContext implements Context {
     this.out = init.out;
     this.in = init.in;
 
-    //create request or response proxies to in/out
+    if (this.isReq()) {
+      this.out = this.defaultResponse(this.in);
+    }
   }
 
   isReq(inbound = true): this is RequestContext {
@@ -65,22 +74,20 @@ export class DefaultContext implements Context {
   private defaultResponse(req: Message<any>): Response {
     if (req) {
       return {
-        id: req.head.id,
-        head: {},
-        status: 404
+        id: req.id,
+        head: {
+          status: 401
+        }
       };
     }
   }
+  send(msg: Response) {
+    msg.id = msg.id || this.id;
+    this.out = msg;
+  }
 }
 
-export interface Response<Body = any> extends Message<Body> {
-  status: Status;
-}
 
-export interface Request<Body = any> extends Message<Body> {
-  path: string;
-  method: string;
-}
 
 export interface RequestContext extends ResponseContext {
   req: Request;

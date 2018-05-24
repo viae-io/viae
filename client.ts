@@ -17,7 +17,7 @@ via.on("open", async () => {
     let response = await via.request({
       head: {
         method: "GET",
-        path: "/"
+        path: "/api"
       },
     });
     console.log(response);
