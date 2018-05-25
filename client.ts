@@ -21,6 +21,10 @@ via.on("open", async () => {
       },
     });
     console.log(response);
+
+    for await (let item of response.body){
+      console.log(item);
+    }
   } catch (err) {
     console.log(err);
   }

@@ -22,13 +22,19 @@ router.route({
     ctx.out = {
       id: ctx.in.id,
       head: { status: 200 },
-      body: "hello world"
+      body: {
+        [Symbol.asyncIterator]: async function* () {
+          yield 1;
+          yield 2;
+          yield 3;
+        }
+      }
     };
   }]
 });
 
 viae.use(router);
 
-server.on("error", (error) => {  
+server.on("error", (error) => {
   console.log("connection error");
 });

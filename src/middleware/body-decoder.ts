@@ -17,7 +17,6 @@ export default class BodyDecoder<Ctx extends Context = Context> implements Middl
       case "json":
         ctx.in.body = JSON.parse(bytesToText(ctx.in.body));
         break;
-
     }
     return next();
   }

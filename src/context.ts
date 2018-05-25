@@ -1,6 +1,6 @@
 import { IRowan, Middleware, Handler, AutoHandler, Rowan, HasError } from "rowan";
 import Via from "./via";
-import { Message, MessageHeader, Request, Response, encode, decode } from "./message";
+import { Message, MessageHeader, Request, Response} from "./message";
 import { Status } from "./status";
 import Interceptor from "./middleware/interceptor";
 
@@ -19,11 +19,6 @@ export interface Context {
 
   /*checks to see if inbound message is a response */
   isRes(outbound?: boolean): this is ResponseContext;
-
-  send?(msg: { id?: string, head: MessageHeader & { status: number }, body?: any });
-
-  /** access to the connection in */
-  interceptor?: Interceptor;
 
   [key: string]: any;
 }

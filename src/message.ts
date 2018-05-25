@@ -28,7 +28,8 @@ export interface Message<MessageBody = any> {
   body?: MessageBody;
 }
 
-export function encode(message: Message<Uint8Array>): ArrayBuffer {
+/* writes the id, head and body buffer into an ArrayBuffer */
+export function enframeMessage(message: Message<Uint8Array>): ArrayBuffer {
   let id = textToBytes(message.id);
   let head = textToBytes(JSON.stringify(message.head));
   let body = message.body;
@@ -44,7 +45,8 @@ export function encode(message: Message<Uint8Array>): ArrayBuffer {
   return binary.buffer as ArrayBuffer;
 }
 
-export function decode(buffer: ArrayBuffer): Message<Uint8Array> {
+/* reads a message from an ArrayBuffer */
+export function deframeMessage(buffer: ArrayBuffer): Message<Uint8Array> {
   const raw = new Uint8Array(buffer);
   let offset = 0;
 
@@ -80,6 +82,6 @@ export interface Request<Body = any> extends Message<Body> {
 export function isRequest<T>(message: Partial<Message<T>>): message is Request<T> {
   return message.head != undefined &&
     message.head.method != undefined &&
-    message.head.path != undefined &&
+    //message.head.path != undefined &&
     message.head.status == undefined;
 }

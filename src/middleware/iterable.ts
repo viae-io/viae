@@ -1,7 +1,8 @@
-import { Rowan, If } from "rowan";
+import { Rowan, If, Middleware } from "rowan";
 import { RequestContext, Context } from "../context";
 import { request } from "./router";
 import { v4 as uuid } from 'uuid';
+import { Message } from "..";
 
 /** 
  * A single use router that can iterate an iterator
@@ -55,11 +56,11 @@ export class IterableRouter extends Rowan<RequestContext> {
   }
 }
 
-export class UpgradeOutgoingIterable {
+export class UpgradeOutgoingIterable implements Middleware<Context> {
   process(ctx: Context, next: () => Promise<void>) {
     const head = ctx.out.head;
     const body = ctx.out.body;
-    if (body != undefined && body[Symbol.asyncIterator] != undefined && (head.iterable || true)) {
+    if (body != undefined && body[Symbol.asyncIterator] != undefined && ((head ? head.iterable : true) || true)) {
       let iterable = body;
       let sid = uuid();
       let router = new IterableRouter(iterable, function () { dispose(); });
@@ -67,60 +68,51 @@ export class UpgradeOutgoingIterable {
 
       head["iterable"] = sid;
     }
+    return next();
   }
 }
 
-export class UpgradeIncomingIterable {
+export class UpgradeIncomingIterable implements Middleware<Context> {
   process(ctx: Context, next: () => Promise<void>) {
 
-    
-
-
-    /* if (message.body == undefined) return;
-  if (typeof message.body["$iterator"] !== "string") return;
-
-  const sid = message.body["$iterator"] as string;
-  const noop = function () { };
-  let dispose = noop;
-
-  const generator = async function* () {
-    let response;
-    response = await via.request({ method: Method.SUBSCRIBE, id: sid });
-
-    if (response.status != 200) {
-      throw Error(response.body);
+    if (!ctx.in.body || typeof ctx.in.head["iterable"] !== "string") {
+      return next();
     }
 
-    dispose = () => { via.request({ method: Method.UNSUBSCRIBE, id: sid }); };
+    const sid = ctx.in.head["iterable"] as string;
+    const connection = ctx.connection;
 
-    do {
-      response = await via.request({ method: Method.NEXT, id: sid });
-      switch (response.status) {
-        case Status.Next:
-          yield response.body;
-          break;
-        case Status.OK:
-          dispose = noop;
-          return;
-        default:
-        case Status.Error:
-          throw Error(response.body || "Unknown Error");
-      }
-    } while (true);
-  };
+    ctx.in.body[Symbol.asyncIterator] = function (): AsyncIterator<any> {
+      let response: Message;
+      let subscribed = false;
 
-  const disposable = function () {
-    let iterator = generator();
-    return Object.assign(iterator, {
-      dispose: function () {
-        dispose();
-      }
-    });
-  };
+      return {
+        next: async function (): Promise<IteratorResult<any>> {
+          if (!subscribed) {
+            response = await connection.request({ id: sid, head: { method: "SUBSCRIBE" } });
+            if (response.head.status != 200) {
+              throw Error(response.body);
+            }
+            response = await connection.request({ id: sid, head: { method: "NEXT" } });
 
-  delete message.body["$iterator"];
-  message.body[Symbol.asyncIterator] = disposable;
-  */
-   
+            switch (response.head.status) {
+              case 206:
+                return { value: response.body, done: false };
+              case 200:
+                return { value: undefined, done: true }
+              default:
+              case 500:
+                throw Error(response.body || "Unknown Error");
+            }
+          }
+        },
+        return: async function () {
+          response = await connection.request({ id: sid, head: { method: "UNSUBSCRIBE" } });
+          return { value: undefined, done: true };
+        }
+      };
+    };
+
+    return next();
   }
 }
