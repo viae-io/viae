@@ -9,6 +9,7 @@ export default class Send<Ctx extends Context = Context> implements Middleware<C
   process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
     let out = ctx.out;
     if (out) {
+      console.log("SENDING: ", out);
       let raw = enframeMessage(out);
       ctx.connection.wire.send(raw);
     }   

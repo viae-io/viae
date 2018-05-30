@@ -22,9 +22,16 @@ via.on("open", async () => {
     });
     console.log(response);
 
-    for await (let item of response.body){
-      console.log(item);
-    }
+    response  = await via.request({
+      head: {
+        method: "PUT",
+        path: "/api",
+      },
+      body: response.body
+    });
+
+    console.log(response);
+
   } catch (err) {
     console.log(err);
   }

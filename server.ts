@@ -33,6 +33,19 @@ router.route({
   }]
 });
 
+router.route({
+  method: "PUT",
+  path: "/api",
+  process: [async (ctx, next) => {
+    console.log("moo", ctx.in);
+    for await (let item of ctx.in.body) {
+      console.log(item);
+    }
+    
+    ctx.send({head: {status: 200}});
+  }]
+});
+
 viae.use(router);
 
 server.on("error", (error) => {
