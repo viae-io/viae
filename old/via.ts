@@ -95,12 +95,12 @@ export class Via {
       (resolve, reject) => {
         const dispose = this._interceptor.intercept(message.id, [
           (ctx: ResponseContext) => {
+            if (disposeOnIntercept) {
+              dispose();
+            }            
             if (resolve !== null) {
               resolve(ctx.res);
               resolve = reject = null;
-            }
-            if (disposeOnIntercept) {
-              dispose();
             }
           },
           ...opts.handlers]);

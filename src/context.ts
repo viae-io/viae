@@ -67,17 +67,12 @@ export class DefaultContext implements Context {
   }
 
   private defaultResponse(req: Message<any>): Response {
-    if (req) {
-      return {
-        id: req.id,
-        head: {
-          status: 401
-        }
-      };
-    }
+    //if (req) {
+      return undefined;
+    //}
   }
   send(msg: Response) {
-    msg.id = msg.id || this.id;
+    msg.id = typeof msg.id === "string" ? msg.id : this.in.id;
     this.out = msg;
   }
 }

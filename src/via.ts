@@ -32,6 +32,14 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     this.Ctx = (opts ? opts.Ctx : undefined) || DefaultContext;
 
     this
+      .use((ctx, next) => {
+        if (ctx.in.head.status) {
+          console.log(`${ctx.in.id} ${ctx.in.head.status}`);
+        } else {
+          console.log(`${ctx.in.id} ${ctx.in.head.method} ${ctx.in.head.path}`);
+        }
+        return next();
+      })
       .use(new After([
         this.out
           .use(new After([
@@ -112,6 +120,11 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     }
   }
 
+  /**
+   * intercept an id-specific message 
+   * @param id 
+   * @param handlers 
+   */
   intercept(id: string, handlers: Processor<Ctx>[]) {
     return this._interceptor.intercept({ id: id, handlers: handlers });
   }

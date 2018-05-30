@@ -82,6 +82,10 @@ export interface Request<Body = any> extends Message<Body> {
 export function isRequest<T>(message: Partial<Message<T>>): message is Request<T> {
   return message.head != undefined &&
     message.head.method != undefined &&
-    //message.head.path != undefined &&
     message.head.status == undefined;
+}
+
+export function isResponse<T>(message: Partial<Message<T>>): message is Request<T> {
+  return message.head != undefined &&
+    message.head.status != undefined;
 }

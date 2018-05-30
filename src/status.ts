@@ -1,11 +1,10 @@
 export enum Status {
   // Informational 
 
-  Next = 100,
-
   // Success 
 
-  OK = 200,
+  Okay = 200,
+  OkayPartial = 206,
 
   // Client Error 
 

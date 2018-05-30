@@ -33,7 +33,7 @@ export class IterableRouter extends Rowan<RequestContext> {
         ctx.send({ head: { status: 200 } });
       }]));
 
-    this.use(new If(request("GET"), [
+    this.use(new If(request("NEXT"), [
       async (ctx, next) => {
         let body: any;
         let status: number;
@@ -89,24 +89,27 @@ export class UpgradeIncomingIterable implements Middleware<Context> {
       return {
         next: async function (): Promise<IteratorResult<any>> {
           if (!subscribed) {
+            subscribed = true;
             response = await connection.request({ id: sid, head: { method: "SUBSCRIBE" } });
             if (response.head.status != 200) {
               throw Error(response.body);
             }
-            response = await connection.request({ id: sid, head: { method: "NEXT" } });
+          }
 
-            switch (response.head.status) {
-              case 206:
-                return { value: response.body, done: false };
-              case 200:
-                return { value: undefined, done: true }
-              default:
-              case 500:
-                throw Error(response.body || "Unknown Error");
-            }
+          response = await connection.request({ id: sid, head: { method: "NEXT" } });
+
+          switch (response.head.status) {
+            case 206:
+              return { value: response.body, done: false };
+            case 200:
+              return { value: undefined, done: true };
+            default:
+            case 500:
+              throw Error(response.body || "Unknown Error");
           }
         },
         return: async function () {
+  
           response = await connection.request({ id: sid, head: { method: "UNSUBSCRIBE" } });
           return { value: undefined, done: true };
         }
