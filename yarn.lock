@@ -2166,7 +2166,7 @@ rimraf@~2.1.4:
   optionalDependencies:
     graceful-fs "~1"
 
-rowan@^1.0.0-beta.4:
+rowan@1.0.0-beta.4:
   version "1.0.0-beta.4"
   resolved "https://registry.yarnpkg.com/rowan/-/rowan-1.0.0-beta.4.tgz#31448b497b8fccdcc90607d194caff862f29a4be"
 

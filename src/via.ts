@@ -4,7 +4,7 @@ import { EventEmitter } from "events";
 import { Wire } from "./wire";
 
 import { Message, Response, Request, deframeMessage, isRequest } from './message';
-import { Context, ContextConstructor, DefaultContext, ErredContext, } from "./context";
+import { Context, ContextConstructor, DefaultContext, } from "./context";
 import BodyDecoder from "./middleware/body-decoder";
 import BodyEncoder from "./middleware/body-encoder";
 import Interceptor from "./middleware/interceptor";
@@ -23,6 +23,10 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   private Ctx: ContextConstructor;
 
   /* outgoing message pipeline */
+  readonly before: Rowan<Context> = new Rowan<Context>([
+    
+  ]);
+  /* outgoing message pipeline */
   readonly out: Rowan<Context> = new Rowan<Context>();
 
   constructor(public readonly wire: Wire, opts?: { Ctx?: ContextConstructor, uuid?: () => string }) {
@@ -31,7 +35,6 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     this.Ctx = (opts ? opts.Ctx : undefined) || DefaultContext;
 
     this
-      .use(new Catch(async (err: Error, ctx: Ctx) => { this._ev.emit("error", err, ctx); }))
       .use(new After([
         this.out
           .use(new AfterIf((ctx) => !!ctx.out, [
@@ -40,9 +43,11 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
             new Send
           ]))
       ]))
+      .use(new Catch(async (err: Error, ctx: Ctx) => { this._ev.emit("error", err, ctx); }))
       .use(new BodyDecoder())
       .use(new UpgradeIncomingIterable())
       .use(this._interceptor);
+     
 
     /** Hook onto the wire events*/
     wire.on("message", (data: ArrayBuffer) => {
@@ -64,7 +69,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   }
 
   /**
-   * Add a message to the outgoing pipe
+   * Add a message to the outgoing pipeline
    **/
   async send(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
     if (!msg.id) msg.id = uuid();
@@ -76,7 +81,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   }
 
   /**
-   * Send a request message and await for the response 
+   * Send a request message, add an one-off interceptor for the response. Returns promise to first response. 
    * @param msg 
    * @param opts 
    */

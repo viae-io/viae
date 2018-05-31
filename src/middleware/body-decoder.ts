@@ -8,7 +8,7 @@ import { Context } from "../context";
  */
 export default class BodyDecoder<Ctx extends Context = Context> implements Middleware<Context> {
   process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
-    if (!ctx.in || !ctx.in.head || !ctx.in.body) return next();
+    if (ctx["decoded"] === true || !ctx.in || !ctx.in.head || !ctx.in.body) return next();
 
     switch (ctx.in.head.encoding) {
       case "msgpack":
@@ -18,6 +18,9 @@ export default class BodyDecoder<Ctx extends Context = Context> implements Middl
         ctx.in.body = JSON.parse(bytesToText(ctx.in.body));
         break;
     }
+
+    ctx["decoded"] = true;
+    
     return next();
   }
 }

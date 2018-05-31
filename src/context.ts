@@ -1,4 +1,4 @@
-import { IRowan, Middleware, Handler, AutoHandler, Rowan, HasError } from "rowan";
+import { IRowan, Middleware, Handler, AutoHandler, Rowan } from "rowan";
 import Via from "./via";
 import { Message, MessageHeader, Request, Response} from "./message";
 import { Status } from "./status";
@@ -89,5 +89,3 @@ export interface RequestContext extends ResponseContext {
 export interface ResponseContext extends Context {
   res: Response;
 }
-
-export interface ErredContext extends Context, HasError { }

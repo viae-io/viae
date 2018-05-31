@@ -8,11 +8,6 @@ let via = new Via(wire as any);
 via.on("open", async () => {
   console.log("opened");
 
-  via.use((ctx, next) => {
-    console.log(ctx.in.id);
-    return next();
-  });
-
   try {
     let response = await via.request({
       head: {
@@ -20,7 +15,6 @@ via.on("open", async () => {
         path: "/api"
       },
     });
-    console.log(response);
 
     response  = await via.request({
       head: {
@@ -29,8 +23,6 @@ via.on("open", async () => {
       },
       body: response.body
     });
-
-    console.log(response);
 
   } catch (err) {
     console.log(err);

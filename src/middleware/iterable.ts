@@ -85,17 +85,15 @@ export class UpgradeIncomingIterable implements Middleware<Context> {
       let subscribed = false;     
 
       return {
-        next: async function (): Promise<IteratorResult<any>> {
-          
+        next: async function (): Promise<IteratorResult<any>> {          
           if (!subscribed) {
             subscribed = true;
-            console.log("SUBSCRIBE -", sid);
             response = await connection.request({ id: sid, head: { method: "SUBSCRIBE" } });
             if (response.head.status != 200) {
               throw Error(response.body);
             }
           }
-          console.log("NEXT -", sid);
+
           response = await connection.request({ id: sid, head: { method: "NEXT" } });
 
           switch (response.head.status) {
