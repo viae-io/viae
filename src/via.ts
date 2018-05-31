@@ -1,4 +1,4 @@
-import { Rowan, Middleware, IRowan, After, If, Catch, Processor, HasError } from "rowan";
+import { Rowan, Middleware, IRowan, After, AfterIf, If, Catch, Processor } from "rowan";
 import { EventEmitter } from "events";
 
 import { Wire } from "./wire";
@@ -25,32 +25,24 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   /* outgoing message pipeline */
   readonly out: Rowan<Context> = new Rowan<Context>();
 
-
   constructor(public readonly wire: Wire, opts?: { Ctx?: ContextConstructor, uuid?: () => string }) {
     super();
 
     this.Ctx = (opts ? opts.Ctx : undefined) || DefaultContext;
 
     this
-      .use((ctx, next) => {
-        if (ctx.in.head.status) {
-          console.log(`${ctx.in.id} ${ctx.in.head.status}`);
-        } else {
-          console.log(`${ctx.in.id} ${ctx.in.head.method} ${ctx.in.head.path}`);
-        }
-        return next();
-      })
+      .use(new Catch(async (err: Error, ctx: Ctx) => { this._ev.emit("error", err, ctx); }))
       .use(new After([
         this.out
-          .use(new After([
-            new If((ctx) => ctx.out != undefined, [
-              new UpgradeOutgoingIterable(),
-              new BodyEncoder(),
-              new Send()])]))]))
-      .use(new Catch(async (ctx: Ctx & HasError) => { this._ev.emit("error", ctx); }))
+          .use(new AfterIf((ctx) => !!ctx.out, [
+            new UpgradeOutgoingIterable(),
+            new BodyEncoder(),
+            new Send
+          ]))
+      ]))
       .use(new BodyDecoder())
       .use(new UpgradeIncomingIterable())
-      .use(this._interceptor = new Interceptor());
+      .use(this._interceptor);
 
     /** Hook onto the wire events*/
     wire.on("message", (data: ArrayBuffer) => {
@@ -131,7 +123,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
 
   on(event: "close", cb: () => void)
   on(event: "open", cb: () => void)
-  on(event: "error", cb: (ctx: Ctx & HasError) => void)
+  on(event: "error", cb: (err: Error, ctx: Ctx ) => void)
   on(event: string, cb: (...args: any[]) => void) {
     this._ev.on(event, cb);
   }

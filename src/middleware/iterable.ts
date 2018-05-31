@@ -1,17 +1,37 @@
 import { Rowan, If, Middleware } from "rowan";
 import { RequestContext, Context } from "../context";
-import { request } from "./router";
+import { request } from "./request";
 import { v4 as uuid } from 'uuid';
 import { Message } from "..";
 
 /** 
- * A single use router that can iterate an iterator
+ * Pull-Based Router for an async iterable, intended to be used by an interceptor
  **/
-export class IterableRouter extends Rowan<RequestContext> {
+export class IteratorRouter extends Rowan<RequestContext> {
   constructor(iterable: Iterable<any> | AsyncIterable<any>, dispose: () => void) {
     super();
 
     let iterator: Iterator<any>;
+
+    this.use(new If(request("NEXT"), [
+      async (ctx, next) => {
+        let body: any;
+        let status: number;
+        try {
+          let result = await iterator.next();
+          body = result.value;
+          status = result.done ? 200 : 206;
+        } catch (err) {
+          body = err.message;
+          status = 500;
+        }
+
+        ctx.send(body != undefined ? { head: { status: status }, body: body } : { head: { status: status } });
+        if (status != 206) {
+          dispose();
+        }
+      }
+    ]));
 
     this.use(new If(request("SUBSCRIBE"), [
       async (ctx, next) => {
@@ -31,28 +51,7 @@ export class IterableRouter extends Rowan<RequestContext> {
       async (ctx, next) => {
         await iterator.return();
         ctx.send({ head: { status: 200 } });
-      }]));
-
-    this.use(new If(request("NEXT"), [
-      async (ctx, next) => {
-        let body: any;
-        let status: number;
-
-        try {
-          let result = await iterator.next();
-          body = result.value;
-          status = result.done ? 200 : 206;
-        } catch (err) {
-          body = err.message;
-          status = 500;
-        }
-
-        ctx.send(body != undefined ? { head: { status: status }, body: body } : { head: { status: status } });
-        if (status != 206) {
-          dispose();
-        }
-      }
-    ]));
+      }]));    
   }
 }
 
@@ -63,7 +62,7 @@ export class UpgradeOutgoingIterable implements Middleware<Context> {
     if (body != undefined && body[Symbol.asyncIterator] != undefined && ((head ? head.iterable : true) || true)) {
       let iterable = body;
       let sid = uuid();
-      let router = new IterableRouter(iterable, function () { dispose(); });
+      let router = new IteratorRouter(iterable, function () { dispose(); });
       let dispose = ctx.connection.intercept(sid, [router]);
 
       head["iterable"] = sid;
@@ -74,8 +73,7 @@ export class UpgradeOutgoingIterable implements Middleware<Context> {
 
 export class UpgradeIncomingIterable implements Middleware<Context> {
   process(ctx: Context, next: () => Promise<void>) {
-
-    if (!ctx.in.body || typeof ctx.in.head["iterable"] !== "string") {
+    if (!ctx.in || !ctx.in.body || typeof ctx.in.head["iterable"] !== "string") {
       return next();
     }
 
@@ -84,10 +82,7 @@ export class UpgradeIncomingIterable implements Middleware<Context> {
     
     ctx.in.body[Symbol.asyncIterator] = function (): AsyncIterator<any> {
       let response: Message;
-      let subscribed = false;
-
-      console.log("Created Iterator");
-      
+      let subscribed = false;     
 
       return {
         next: async function (): Promise<IteratorResult<any>> {
@@ -113,8 +108,7 @@ export class UpgradeIncomingIterable implements Middleware<Context> {
               throw Error(response.body || "Unknown Error");
           }
         },
-        return: async function () {
-  
+        return: async function () {  
           response = await connection.request({ id: sid, head: { method: "UNSUBSCRIBE" } });
           return { value: undefined, done: true };
         }
