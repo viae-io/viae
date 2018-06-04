@@ -1,6 +1,6 @@
 import { IRowan, Middleware, Handler, AutoHandler, Rowan } from "rowan";
 import Via from "./via";
-import { Message, MessageHeader, Request, Response} from "./message";
+import { Message, MessageHeader, Request, Response } from "./message";
 import { Status } from "./status";
 import Interceptor from "./middleware/interceptor";
 
@@ -35,14 +35,6 @@ export class DefaultContext implements Context {
   in?: Message<any>;
   out?: Message<any>;
 
-  get req() {
-    return (this.in || this.out) as Request;
-  }
-
-  get res() {
-    return (this.out || this.in) as Response;
-  }
-
   constructor(init: { connection: Via<Context>; in?: Message<any>, out?: Message<any> }) {
     this.connection = init.connection;
 
@@ -70,17 +62,16 @@ export class DefaultContext implements Context {
     if (req) {
       return {
         id: req.id,
-        head: {status: 401}
+        head: { status: 401 }
       };
     }
   }
-  send(msg: Response) {
+
+  send(msg: Message) {
     msg.id = typeof msg.id === "string" ? msg.id : this.in.id;
     this.out = msg;
   }
 }
-
-
 
 export interface RequestContext extends ResponseContext {
   req: Request;

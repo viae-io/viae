@@ -8,9 +8,9 @@ export function request(method?: string, path?: string) {
     let keys = [];
     var exp = pathToRegexp(path, keys);
     return (ctx: Context) => {
-      if (ctx.req == undefined || ctx.req.head == undefined || ctx.req.head.method !== method)
+      if (ctx.in == undefined || ctx.in.head == undefined || ctx.in.head.method !== method)
         return false;
-      let match = (ctx.req.head.path) ? exp.exec(ctx.req.head.path) : null;
+      let match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;
       if (match == null) {
         return false;
       }
@@ -25,10 +25,10 @@ export function request(method?: string, path?: string) {
   }
   else if (method != undefined) {
     return (ctx: Context) => {
-      return ctx.req != undefined && ctx.req.head != undefined && ctx.req.head.method === method;
+      return ctx.in != undefined && ctx.in.head != undefined && ctx.in.head.method === method;
     };
   }
   return (ctx: Context) => {
-    return ctx.req != undefined;
+    return ctx.in != undefined;
   };
 }
