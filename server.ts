@@ -2,9 +2,24 @@ import { Viae, Context } from './src';
 import { Server as WebSocketServer } from 'ws';
 import { Wire } from './src';
 import { Router } from './src/middleware';
+import * as ora from 'ora';
 
 let server = new WebSocketServer({ port: 8080, host: "localhost" });
 let viae = new Viae(server);
+
+const spinner = ora('Profiling...').start();
+let messages = 0;
+
+setInterval(() => {
+  spinner.color = "green";
+  spinner.text = 'Profiling... mps: ' +  Math.round(messages / 2);
+  messages = 0;
+}, 2000);
+
+viae.before(async (ctx, next) => {
+  await next();
+  messages += 1;
+});
 
 viae.on("connection", (via) => {
   console.log("client connected");
@@ -37,12 +52,13 @@ router.route({
   method: "PUT",
   path: "/api",
   process: [async (ctx, next) => {
-    console.log("moo", ctx.in);
+
+    const boo = [];
     for await (let item of ctx.in.body) {
-      console.log(item);
+      boo.push(item);
     }
-    
-    ctx.send({head: {status: 200}});
+
+    ctx.send({ head: { status: 200 } });
   }]
 });
 

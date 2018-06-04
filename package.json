@@ -51,6 +51,7 @@
     "cross-env": "^3.2.4",
     "mocha": "^3.2.0",
     "nyc": "^11.0.3",
+    "ora": "^2.1.0",
     "rimraf": "^2.6.1",
     "source-map-support": "^0.4.15",
     "ts-node": "^3.2.0",

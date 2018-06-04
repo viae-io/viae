@@ -8,25 +8,30 @@ let via = new Via(wire as any);
 via.on("open", async () => {
   console.log("opened");
 
-  try {
-    let response = await via.request({
-      head: {
-        method: "GET",
-        path: "/api"
-      },
-    });
 
-    response  = await via.request({
-      head: {
-        method: "PUT",
-        path: "/api",
-      },
-      body: response.body
-    });
+  try {
+    for (let i = 0; i < 1000000; i++) {
+
+      let response = await via.request({
+        head: {
+          method: "GET",
+          path: "/api"
+        },
+      });
+
+      await via.request({
+        head: {
+          method: "PUT",
+          path: "/api",
+        },
+        body: response.body
+      });
+    }
 
   } catch (err) {
     console.log(err);
   }
+
 
   /* closing wire */
   wire.close();

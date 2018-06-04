@@ -35,7 +35,7 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
 
     const dispose = () => {
       this._interceptors.delete(id);
-    }
+    };
 
     const middleware = handlers.map(x => Rowan.convertToMiddleware(x));
 

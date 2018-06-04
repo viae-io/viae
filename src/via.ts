@@ -20,34 +20,32 @@ import { UpgradeOutgoingIterable, UpgradeIncomingIterable } from "./middleware/i
 export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   private _ev = new EventEmitter();
   private _interceptor = new Interceptor();
+  private _before: Rowan<Context> = new Rowan<Context>();
   private Ctx: ContextConstructor;
 
   /* outgoing message pipeline */
-  readonly before: Rowan<Context> = new Rowan<Context>([
-    
-  ]);
-  /* outgoing message pipeline */
+  
   readonly out: Rowan<Context> = new Rowan<Context>();
 
   constructor(public readonly wire: Wire, opts?: { Ctx?: ContextConstructor, uuid?: () => string }) {
     super();
 
     this.Ctx = (opts ? opts.Ctx : undefined) || DefaultContext;
-
     this
+      .use(this._before)
       .use(new After([
         this.out
           .use(new AfterIf((ctx) => !!ctx.out, [
             new UpgradeOutgoingIterable(),
             new BodyEncoder(),
-            new Send
+            new Send()
           ]))
       ]))
       .use(new Catch(async (err: Error, ctx: Ctx) => { this._ev.emit("error", err, ctx); }))
       .use(new BodyDecoder())
       .use(new UpgradeIncomingIterable())
       .use(this._interceptor);
-     
+
 
     /** Hook onto the wire events*/
     wire.on("message", (data: ArrayBuffer) => {
@@ -126,9 +124,14 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     return this._interceptor.intercept({ id: id, handlers: handlers });
   }
 
+  before(processor: Processor<Ctx>){
+    this._before.use(processor);
+    return this;
+  }
+
   on(event: "close", cb: () => void)
   on(event: "open", cb: () => void)
-  on(event: "error", cb: (err: Error, ctx: Ctx ) => void)
+  on(event: "error", cb: (err: Error, ctx: Ctx) => void)
   on(event: string, cb: (...args: any[]) => void) {
     this._ev.on(event, cb);
   }
