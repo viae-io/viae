@@ -3,15 +3,16 @@ import { EventEmitter } from "events";
 
 import { Wire } from "./wire";
 
-import { Message, Response, Request, deframeMessage, isRequest } from './message';
+import { Message, isRequest } from './message';
 import { Context, ContextConstructor, DefaultContext, } from "./context";
 import BodyDecoder from "./middleware/body-decoder";
 import BodyEncoder from "./middleware/body-encoder";
 import Interceptor from "./middleware/interceptor";
 import Send from "./middleware/send";
-import { bytesToHex } from "./util";
+
 import { v4 as uuid } from 'uuid';
 import { UpgradeOutgoingIterable, UpgradeIncomingIterable } from "./middleware/iterable";
+import { MessageSerialiser } from "./message-encoder";
 
 /**
  * Via
@@ -20,6 +21,7 @@ import { UpgradeOutgoingIterable, UpgradeIncomingIterable } from "./middleware/i
 export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   private _ev = new EventEmitter();
   private _interceptor = new Interceptor();
+  private _encoder = new MessageSerialiser();
   private _before: Rowan<Context> = new Rowan<Context>();
   private Ctx: ContextConstructor;
 
@@ -38,7 +40,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
           .use(new AfterIf((ctx) => !!ctx.out, [
             new UpgradeOutgoingIterable(),
             new BodyEncoder(),
-            new Send()
+            new Send(this._encoder)
           ]))
       ]))
       .use(new Catch(async (err: Error, ctx: Ctx) => { this._ev.emit("error", err, ctx); }))
@@ -49,9 +51,8 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
 
     /** Hook onto the wire events*/
     wire.on("message", (data: ArrayBuffer) => {
-      const msg = deframeMessage(data);
+      const msg = this._encoder.decode(new Uint8Array(data, 0));
       const ctx = new this.Ctx({ connection: this, in: msg });
-
       this.process(ctx as Ctx).catch(e => this._ev.emit("error", e));
     });
     wire.on("open", () => {

@@ -19,51 +19,13 @@ export interface MessageHeader {
 /**
  * message
  */
-export interface Message<MessageBody = any> {
+export interface Message<T = any> {
   /* required: id */
   id: string;
   /* header */
   head?: MessageHeader;
-  /* body */
-  body?: MessageBody;
-}
-
-/* writes the id, head and body buffer into an ArrayBuffer */
-export function enframeMessage(message: Message<Uint8Array>): ArrayBuffer {
-  let id = textToBytes(message.id);
-  let head = textToBytes(JSON.stringify(message.head));
-  let body = message.body;
-
-  let parts = [
-    varint.encode(id.length),
-    id,
-    varint.encode(head.length),
-    head,
-    ...(body) ? [body] : []];
-  let binary = flatten(parts);
-
-  return binary.buffer as ArrayBuffer;
-}
-
-/* reads a message from an ArrayBuffer */
-export function deframeMessage(buffer: ArrayBuffer): Message<Uint8Array> {
-  const raw = new Uint8Array(buffer);
-  let offset = 0;
-
-  let idLength = varint.decode(raw, offset); offset += varint.decode.bytes;
-  let idBytes = raw.subarray(offset, offset + idLength); offset += idLength;
-  let headLength = varint.decode(raw, offset); offset += varint.decode.bytes;
-  let headBytes = raw.subarray(offset, offset + headLength); offset += headLength;
-  let bodyBytes = (offset < raw.length) ? raw.subarray(offset) : null;
-
-  let msg: Message = {
-    id: bytesToText(idBytes),
-  };
-
-  if (headBytes.length > 0) msg.head = JSON.parse(bytesToText(headBytes));
-  if (bodyBytes) msg.body = bodyBytes;
-
-  return msg;
+  /* data */
+  data?: T;
 }
 
 export interface Response<Body = any> extends Message<Body> {

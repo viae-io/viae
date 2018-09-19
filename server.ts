@@ -12,7 +12,7 @@ let messages = 0;
 
 setInterval(() => {
   spinner.color = "green";
-  spinner.text = 'Profiling... mps: ' +  Math.round(messages / 2);
+  spinner.text = 'Profiling... mps: ' + Math.round(messages / 2);
   messages = 0;
 }, 2000);
 
@@ -32,12 +32,12 @@ let router = new Router({ root: "/" });
 
 router.route({
   method: "GET",
-  path: "/api",
+  path: "/echo",
   process: [async (ctx, next) => {
     ctx.out = {
       id: ctx.in.id,
       head: { status: 200 },
-      body: {
+      data: {
         [Symbol.asyncIterator]: async function* () {
           yield 1;
           yield 2;
@@ -45,20 +45,6 @@ router.route({
         }
       }
     };
-  }]
-});
-
-router.route({
-  method: "PUT",
-  path: "/api",
-  process: [async (ctx, next) => {
-
-    const boo = [];
-    for await (let item of ctx.in.body) {
-      boo.push(item);
-    }
-
-    ctx.send({ head: { status: 200 } });
   }]
 });
 
