@@ -64,7 +64,7 @@ export class UpgradeOutgoingIterable implements Middleware<Context> {
       let sid = uuid();
       let router = new IteratorRouter(iterable, function () { dispose(); });
       let dispose = ctx.connection.intercept(sid, [router]);
-
+    
       head["iterable"] = sid;
     }
     return next();

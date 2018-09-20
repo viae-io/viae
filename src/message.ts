@@ -1,6 +1,5 @@
 import { Status } from "./status";
-import { textToBytes, flatten, bytesToText, bytesToHex, hexToBytes } from './util';
-import * as varint from 'varint';
+
 
 /** message header */
 export interface MessageHeader {

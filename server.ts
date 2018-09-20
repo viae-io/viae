@@ -12,8 +12,8 @@ let messages = 0;
 
 setInterval(() => {
   spinner.color = "green";
-  spinner.text = 'Profiling... mps: ' + Math.round(messages / 2);
-  messages = 0;
+  spinner.text = 'Profiling... tps: ' + Math.round(messages / 2);
+  messages = 0;  
 }, 2000);
 
 viae.before(async (ctx, next) => {
@@ -33,17 +33,11 @@ let router = new Router({ root: "/" });
 router.route({
   method: "GET",
   path: "/echo",
-  process: [async (ctx, next) => {
+  process: [async (ctx: Context) => {
     ctx.out = {
       id: ctx.in.id,
       head: { status: 200 },
-      data: {
-        [Symbol.asyncIterator]: async function* () {
-          yield 1;
-          yield 2;
-          yield 3;
-        }
-      }
+      data: ctx.in.data
     };
   }]
 });

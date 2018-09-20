@@ -4,7 +4,7 @@
 export interface Wire {
   readonly state: "opening" | "open" | "closing" | "closed";
 
-  send(data: ArrayBuffer): Promise<void>;
+  send(data: ArrayBuffer | ArrayBufferView): Promise<void>;
   close(): Promise<void>;
 
   on(event: "message", cb: (data: ArrayBuffer) => void): void;

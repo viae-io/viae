@@ -39,5 +39,4 @@ export default class Viae<Ctx extends Context = Context> extends Rowan<Context> 
     this._before.use(processor);
     return this;
   }
-
 }

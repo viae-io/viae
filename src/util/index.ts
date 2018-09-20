@@ -1,7 +1,7 @@
 /** Collapse list of binary parts into single buffer;*/
 export function flatten(list: Array<ArrayLike<number>>): Uint8Array {
 
-  let count = list.reduce((a, b) => {
+  let count = list.reduce(function (a, b) {
     return a + (b.length);
   }, 0);
 
@@ -12,12 +12,7 @@ export function flatten(list: Array<ArrayLike<number>>): Uint8Array {
     buffer.set(item, offset);
     offset += item.length;
   }
-
   return buffer;
-}
-
-export function isHex(s: string): boolean {
-  return /^[0-9A-F]*$/i.test(s);
 }
 
 export function textToBytes(s: string): Uint8Array {
@@ -27,29 +22,20 @@ export function textToBytes(s: string): Uint8Array {
   }
   return ua;
 };
+
 export function bytesToText(ua: Uint8Array | number[], start: number = 0, end: number = ua.length): string {
   const _ua = ua.slice(start, end);
   return String.fromCharCode.apply(null, _ua);
 };
-export function hexToBytes(hex: string): Array<number> {
-  let bytes: Array<number> = [];
-  for (let c = 0; c < hex.length; c += 2) {
-    bytes.push(parseInt(hex.substr(c, 2), 16));
+
+export function toUint8Array(value: ArrayBuffer | ArrayBufferView) {
+  if (isArrayBufferView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  } else {
+    return new Uint8Array(value, 0);
   }
-  return bytes;
-}
-export function bytesToHex(bytes: Uint8Array | number[], start: number = 0, end: number = bytes.length): string {
-  let hex: Array<string> = [];
-  for (let i = start; i < end; i++) {
-    hex.push((bytes[i] >>> 4).toString(16));
-    hex.push((bytes[i] & 0xF).toString(16));
-  }
-  return hex.join("");
 }
 
-export function intToBytes(value: number): Uint8Array {
-  return new Uint8Array(new Uint32Array([value]).buffer);
-}
-export function numberToBytes(value: number): Uint8Array {
-  return new Uint8Array(new Uint32Array([value]).buffer);
-}
+function isArrayBufferView(value): value is ArrayBufferView {
+  return value.buffer != undefined;
+} 

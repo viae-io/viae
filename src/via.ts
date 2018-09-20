@@ -13,6 +13,8 @@ import Send from "./middleware/send";
 import { v4 as uuid } from 'uuid';
 import { UpgradeOutgoingIterable, UpgradeIncomingIterable } from "./middleware/iterable";
 import { MessageSerialiser } from "./message-encoder";
+import { Logger, ConsoleLogger } from "./log";
+import { toUint8Array } from "./util";
 
 /**
  * Via
@@ -20,19 +22,22 @@ import { MessageSerialiser } from "./message-encoder";
  */
 export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   private _ev = new EventEmitter();
+  private _log: Logger;
   private _interceptor = new Interceptor();
   private _encoder = new MessageSerialiser();
   private _before: Rowan<Context> = new Rowan<Context>();
   private Ctx: ContextConstructor;
 
   /* outgoing message pipeline */
-  
+
   readonly out: Rowan<Context> = new Rowan<Context>();
 
-  constructor(public readonly wire: Wire, opts?: { Ctx?: ContextConstructor, uuid?: () => string }) {
+  constructor(public readonly wire: Wire, opts?: { Ctx?: ContextConstructor, uuid?: () => string, log?: Logger }, ) {
     super();
 
     this.Ctx = (opts ? opts.Ctx : undefined) || DefaultContext;
+    this._log = (opts ? opts.log : undefined) || new ConsoleLogger();
+
     this
       .use(this._before)
       .use(new After([
@@ -48,10 +53,9 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
       .use(new UpgradeIncomingIterable())
       .use(this._interceptor);
 
-
     /** Hook onto the wire events*/
-    wire.on("message", (data: ArrayBuffer) => {
-      const msg = this._encoder.decode(new Uint8Array(data, 0));
+    wire.on("message", (data: ArrayBuffer | ArrayBufferView) => {
+      const msg = this._encoder.decode(toUint8Array(data));
       const ctx = new this.Ctx({ connection: this, in: msg });
       this.process(ctx as Ctx).catch(e => this._ev.emit("error", e));
     });
@@ -70,7 +74,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   /**
    * Add a message to the outgoing pipeline
    **/
-  async send(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
+  private async _send(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
     if (!msg.id) msg.id = uuid();
     if (opts && opts.encoding) {
       msg.head = msg.head || {};
@@ -85,7 +89,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
    * @param opts 
    */
   async request(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
-    if (!msg.id) msg.id = uuid();
+    if (!msg.id) msg.id = uuid().replace('-', '');
 
     if (!isRequest(msg)) {
       throw Error("Message is not a Request");
@@ -104,7 +108,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     clock = setTimeout(() => { reject("Request Timeout"); }, (opts ? opts.timeout : undefined) || 10000);
 
     try {
-      await this.send(msg, opts);
+      await this._send(msg, opts);
       return await promise;
     }
     catch (err) {
@@ -118,14 +122,18 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
 
   /**
    * intercept an id-specific message 
-   * @param id 
-   * @param handlers 
+   * @param id message id to intercept
+   * @param handlers processors to call on interception
    */
   intercept(id: string, handlers: Processor<Ctx>[]) {
     return this._interceptor.intercept({ id: id, handlers: handlers });
   }
 
-  before(processor: Processor<Ctx>){
+  /**
+   * processors to use before any  in-built (inbound)processing
+   * @param processor 
+   */
+  before(processor: Processor<Ctx>) {
     this._before.use(processor);
     return this;
   }

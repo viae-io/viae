@@ -8,19 +8,22 @@ import { Context } from "../context";
  */
 export default class BodyDecoder<Ctx extends Context = Context> implements Middleware<Context> {
   process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
-    if (ctx["decoded"] === true || !ctx.in || !ctx.in.head || !ctx.in.data) return next();
+    if (ctx["__decoded"] === true || !ctx.in || !ctx.in.head || !ctx.in.data) return next();
 
     switch (ctx.in.head.encoding) {
       case "msgpack":
         ctx.in.data = msgpack.decode(ctx.in.data);
+        ctx["__decoded"] = true;
         break;
       case "json":
         ctx.in.data = JSON.parse(bytesToText(ctx.in.data));
+        ctx["__decoded"] = true;
+        break;
+      case undefined:
+      case "none":
+        ctx["__decoded"] = true;
         break;
     }
-
-    ctx["decoded"] = true;
-    
     return next();
   }
 }
