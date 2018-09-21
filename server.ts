@@ -3,47 +3,52 @@ import { Server as WebSocketServer } from 'ws';
 import { Wire } from './src';
 import { Router } from './src/middleware';
 import * as ora from 'ora';
+import { App } from './src/app';
+import { Controller, Get, Data, Param } from './src/decorators';
+import { Middleware } from 'rowan';
+
 
 let server = new WebSocketServer({ port: 8080, host: "localhost" });
 let viae = new Viae(server);
 
-const spinner = ora('Profiling...').start();
+/*const spinner = ora('Profiling...').start();
 let messages = 0;
 
 setInterval(() => {
   spinner.color = "green";
-  spinner.text = 'Profiling... tps: ' + Math.round(messages / 2);
-  messages = 0;  
+  spinner.text = 'Profiling... tps: ' + Math.round(messages);
+  messages = 0;
 }, 2000);
 
-viae.before(async (ctx, next) => {
+/*viae.before(async (ctx, next) => {
   await next();
   messages += 1;
-});
-
-viae.on("connection", (via) => {
-  console.log("client connected");
-  via.on("close", () => {
-    console.log("client disconnected");
-  });
-});
-
-let router = new Router({ root: "/" });
-
-router.route({
-  method: "GET",
-  path: "/echo",
-  process: [async (ctx: Context) => {
-    ctx.out = {
-      id: ctx.in.id,
-      head: { status: 200 },
-      data: ctx.in.data
-    };
-  }]
-});
-
-viae.use(router);
+});*/
 
 server.on("error", (error) => {
   console.log("connection error");
 });
+
+@Controller('echo')
+class ProjectController {
+  @Get(":id")
+  echo(@Data() name: string, @Param("id") id: string) {
+    return "hello " + name;
+  }
+}
+
+viae.use(new App({
+  controllers: [new ProjectController()]
+}));
+
+function printTree(process: Middleware<any>, offset = 0) {
+  console.log( process.constructor.name);
+  if (process["middleware"]) {
+    for (let item of process["middleware"]) {
+      printTree(item, offset += 1);
+    }
+  }
+}
+
+printTree(viae);
+

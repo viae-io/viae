@@ -12,22 +12,15 @@ function isIterable(a: any): a is AsyncIterable<any> {
 via.on("open", async () => {
   console.log("opened");
   try {
-    let i = 0;
-    while (i < 1000) {
+    for (let i = 0; i < 100000; i++) {
       let res = await via.request({
         head: {
           method: "GET",
-          path: "/echo"
+          path: "/echo/123",
         },
-        data: {
-          [Symbol.asyncIterator]: async function* () {
-            yield "hello";
-            yield "world";
-          }
-        }
-      });      
+        data: "John"
+      });
     }
-
   } catch (err) {
     console.log(err);
   }
