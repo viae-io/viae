@@ -1,13 +1,15 @@
 import "reflect-metadata";
 
-export function Get(path?: string) {
+
+function methodDecorator(method: string, path: string, opts?: { end?: boolean }) {
   return function (target: any, propertyKey: string | symbol, parameterDesc: TypedPropertyDescriptor<Function>) {
     let router: any = Reflect.getMetadata("__router", target) || {};
     let routes = router.routes || [];
     let route = routes[propertyKey] || {};
 
-    route.method = "GET";
-    route.path = path || "";
+    route.method = method;
+    route.path = path;
+    route.opts = opts || { end: true }
     routes[propertyKey] = route;
     router["routes"] = routes;
 
@@ -15,49 +17,24 @@ export function Get(path?: string) {
   };
 }
 
-export function Put(path?: string) {
-  return function (target: any, propertyKey: string | symbol, parameterDesc: TypedPropertyDescriptor<Function>) {
-    let router: any = Reflect.getMetadata("__router", target) || {};
-    let routes = router.routes || [];
-    let route = routes[propertyKey] || {};
-
-    route.method = "PUT";
-    route.path = path || "";
-    routes[propertyKey] = route;
-    router["routes"] = routes;
-
-    Reflect.defineMetadata("__router", router, target);
-  };
+export function All(path?: string, opts?: { end?: boolean }) {
+  return methodDecorator(undefined, path || "", opts);
 }
 
-export function Post(path?: string) {
-  return function (target: any, propertyKey: string | symbol, parameterDesc: TypedPropertyDescriptor<Function>) {
-    let router: any = Reflect.getMetadata("__router", target) || {};
-    let routes = router.routes || [];
-    let route = routes[propertyKey] || {};
-
-    route.method = "POST";
-    route.path = path || "";
-    routes[propertyKey] = route;
-    router["routes"] = routes;
-
-    Reflect.defineMetadata("__router", router, target);
-  };
+export function Get(path?: string, opts?: { end?: boolean }) {
+  return methodDecorator("GET", path || "", opts);
 }
 
-export function Delete(path?: string) {
-  return function (target: any, propertyKey: string | symbol, parameterDesc: TypedPropertyDescriptor<Function>) {
-    let router: any = Reflect.getMetadata("__router", target) || {};
-    let routes = router.routes || [];
-    let route = routes[propertyKey] || {};
+export function Put(path?: string, opts?: { end?: boolean }) {
+  return methodDecorator("PUT", path || "", opts);
+}
 
-    route.method = "DELETE";
-    route.path = path || "";
-    routes[propertyKey] = route;
-    router["routes"] = routes;
+export function Post(path?: string, opts?: { end?: boolean }) {
+  return methodDecorator("POST", path || "", opts);
+}
 
-    Reflect.defineMetadata("__router", router, target);
-  };
+export function Delete(path?: string, opts?: { end?: boolean }) {
+  return methodDecorator("DELETE", path || "/", opts);
 }
 
 export function Data() {
@@ -67,7 +44,7 @@ export function Data() {
     let route = routes[propertyKey] || {};
 
     route.args = route.args || [];
-    route.args[index] = {type: "data"};
+    route.args[index] = { type: "data" };
 
     routes[propertyKey] = route;
     router["routes"] = routes;
@@ -83,7 +60,23 @@ export function Ctx() {
     let route = routes[propertyKey] || {};
 
     route.args = route.args || [];
-    route.args[index] = {type: "ctx"};
+    route.args[index] = { type: "ctx" };
+
+    routes[propertyKey] = route;
+    router["routes"] = routes;
+
+    Reflect.defineMetadata("__router", router, target);
+  };
+}
+
+export function Next() {
+  return function (target: any, propertyKey: string | symbol, index: number) {
+    let router: any = Reflect.getMetadata("__router", target) || {};
+    let routes = router.routes || [];
+    let route = routes[propertyKey] || {};
+
+    route.args = route.args || [];
+    route.args[index] = { type: "next" };
 
     routes[propertyKey] = route;
     router["routes"] = routes;
@@ -99,7 +92,7 @@ export function Param(key: string) {
     let route = routes[propertyKey] || {};
 
     route.args = route.args || [];
-    route.args[index] = {type: "param", opt: key};
+    route.args[index] = { type: "param", opt: key };
 
     routes[propertyKey] = route;
     router["routes"] = routes;
@@ -111,7 +104,7 @@ export function Param(key: string) {
 export function Controller(root?: string) {
   return function (target: any): any {
     let router: any = Reflect.getMetadata("__router", target.prototype) || {};
-    router.root = root || "/";
+    router.root = root || "";
     Reflect.defineMetadata("__router", router, target.prototype);
   };
 }

@@ -40,6 +40,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
 
     this
       .use(this._before)
+      .use(new Catch(async (err: Error, ctx: Ctx) => { this._ev.emit("error", err, ctx); }))
       .use(new After([
         this.out
           .use(new AfterIf((ctx) => !!ctx.out, [
@@ -52,6 +53,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
       .use(new BodyDecoder())
       .use(new UpgradeIncomingIterable())
       .use(this._interceptor);
+      //.use stuff
 
     /** Hook onto the wire events*/
     wire.on("message", (data: ArrayBuffer | ArrayBufferView) => {
