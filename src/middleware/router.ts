@@ -112,7 +112,7 @@ export class Router implements Middleware<Context>, RouterOptions {
 
         let match = null;
 
-        if (path == ctx.in.head.path ) {
+        if (path == ctx.in.head.path) {
           match = [path];
         }
         else {
@@ -167,6 +167,8 @@ export class Router implements Middleware<Context>, RouterOptions {
                 switch (x.type) {
                   case "data":
                     return ctx.in.data;
+                  case "raw":
+                    return ctx.in.raw;
                   case "ctx":
                     return ctx;
                   case "next":
@@ -180,7 +182,6 @@ export class Router implements Middleware<Context>, RouterOptions {
               try {
                 let result = await func(...args);
                 if (result) {
-
                   ctx.out.head.status = 200;
                   ctx.out.data = result;
                 }

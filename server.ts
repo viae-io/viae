@@ -1,7 +1,7 @@
 import { Viae } from './src';
 import { Server as WebSocketServer } from 'ws';
 import { App } from './src/app';
-import { Controller, Get, Data, Param, All, Next } from './src/decorators';
+import { Controller, Get, Data, Param, All, Next, Ctx, Raw } from './src/decorators';
 import { Middleware } from 'rowan';
 
 let server = new WebSocketServer({ port: 8080, host: "localhost" });
@@ -13,20 +13,11 @@ server.on("error", (error) => {
 
 @Controller('echo')
 class ProjectController {
-
-  @All("", { end: false })
-  async findAll(@Next() next) {
-    await next();
-  }
-
   @Get()
-  echo() {
-    return "Hello ";
-  }
-
-  @Get(":name/:id")
-  echoId(@Param("id") id: string, @Param("name") name: string) {
-    return `Hello ${name} (${id})`;
+  echo(@Ctx() ctx) {
+    ctx.out.head.encoding = ctx.in.head.encoding;
+    ctx.out.head.status = 200;
+    ctx.out.raw = ctx.in.raw;
   }
 }
 

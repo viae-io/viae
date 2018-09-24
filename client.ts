@@ -15,11 +15,10 @@ via.on("open", async () => {
     console.log((await via.request({
       head: {
         method: "GET",
-        path: "/echo/john/123",
+        path: "/echo",
       },
+      data: "hello",
     })).data);
-
-
   } catch (err) {
     console.log(err);
   }
