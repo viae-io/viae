@@ -16,7 +16,6 @@ class ProjectController {
 
   @All("", { end: false })
   async findAll(@Next() next) {
-    console.log("HO HO HO");
     await next();
   }
 
@@ -24,9 +23,10 @@ class ProjectController {
   echo() {
     return "Hello ";
   }
-  @Get(":id", { end: false })
-  echoId(@Param("id") id: string) {
-    return "Hello " + id;
+
+  @Get(":name/:id")
+  echoId(@Param("id") id: string, @Param("name") name: string) {
+    return `Hello ${name} (${id})`;
   }
 }
 

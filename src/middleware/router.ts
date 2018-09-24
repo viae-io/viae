@@ -196,7 +196,6 @@ export class Router implements Middleware<Context>, RouterOptions {
       }
     }
     return router;
-
   }
 }
 

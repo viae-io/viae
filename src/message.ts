@@ -18,12 +18,20 @@ export interface MessageHeader {
 /**
  * message
  */
-export interface Message<T = any> {
+export interface Frame {
   /* required: id */
   id: string;
   /* header */
   head?: MessageHeader;
-  /* data */
+  /* raw data payload */
+  raw?: Uint8Array;
+}
+
+/**
+ * message
+ */
+export interface Message<T = any> extends Frame {
+  /* decoded data */
   data?: T;
 }
 

@@ -1,9 +1,9 @@
 import { textToBytes, flatten, bytesToText} from './util';
 import * as varint from 'varint';
-import { Message } from './message';
+import { Frame } from './message';
 
 export class MessageSerialiser {
-  encode(frame: Message): Uint8Array {
+  encode(frame: Frame): Uint8Array {
     let parts = [];
     let bytes;
 
@@ -21,8 +21,8 @@ export class MessageSerialiser {
       parts.push(varint.encode(bytes.length));
       parts.push(bytes);
     }
-    if (frame.data) {
-      bytes = frame.data;
+    if (frame.raw) {
+      bytes = frame.raw;
       parts.push([(5 << 3) | 2]);
       parts.push(varint.encode(bytes.length));
       parts.push(bytes);
@@ -30,8 +30,8 @@ export class MessageSerialiser {
     return flatten(parts);
   }
 
-  decode(buffer: Uint8Array): Message {
-    const frame: Partial<Message> = {};
+  decode(buffer: Uint8Array): Frame {
+    const frame: Partial<Frame> = {};
     const fields = this.decodeFields(buffer);
 
     for (let field in fields) {
@@ -43,11 +43,11 @@ export class MessageSerialiser {
           frame.head = JSON.parse(bytesToText(fields[field]));
           break;
         case "5":
-          frame.data = fields[field];
+          frame.raw = fields[field];
           break;
       }
     }
-    return frame as Message;
+    return frame as Frame;
   }
 
   private decodeFields(buffer: Uint8Array) {

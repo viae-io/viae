@@ -15,14 +15,7 @@ via.on("open", async () => {
     console.log((await via.request({
       head: {
         method: "GET",
-        path: "/echo",
-      },
-    })).data);
-
-    console.log((await via.request({
-      head: {
-        method: "GET",
-        path: "/echo/john/foo",
+        path: "/echo/john/123",
       },
     })).data);
 

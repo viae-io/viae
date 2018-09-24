@@ -4,7 +4,7 @@ import { textToBytes } from '../util';
 import { Context } from "../context";
 
 /**
- * Encodes the outgoing message body
+ * Encodes the outgoing message data
  */
 export default class BodyEncoder<Ctx extends Context = Context> implements Middleware<Context> {
   process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
@@ -14,15 +14,16 @@ export default class BodyEncoder<Ctx extends Context = Context> implements Middl
       case undefined:
       case "msgpack":
         ctx.out.head.encoding = "msgpack";
-        ctx.out.data = msgpack.encode(ctx.out.data);
+        ctx.out.raw = msgpack.encode(ctx.out.data);
         ctx["__encoded"] = true;
         break;
       case "json":
         ctx.out.head.encoding = "json";
-        ctx.out.data = textToBytes(JSON.stringify(ctx.out.data));
+        ctx.out.raw = textToBytes(JSON.stringify(ctx.out.data));
         ctx["__encoded"] = true;
         break;
-      case "none":
+      case "none": 
+        ctx.out.raw = ctx.out.data;
         ctx["__encoded"] = true;
         break;
       default:

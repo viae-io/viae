@@ -1,6 +1,5 @@
 import "reflect-metadata";
 
-
 function methodDecorator(method: string, path: string, opts?: { end?: boolean }) {
   return function (target: any, propertyKey: string | symbol, parameterDesc: TypedPropertyDescriptor<Function>) {
     let router: any = Reflect.getMetadata("__router", target) || {};

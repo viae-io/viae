@@ -5,8 +5,8 @@ import { Wire } from "./wire";
 
 import { Message, isRequest } from './message';
 import { Context, ContextConstructor, DefaultContext, } from "./context";
-import BodyDecoder from "./middleware/body-decoder";
-import BodyEncoder from "./middleware/body-encoder";
+import BodyDecoder from "./middleware/data-decoder";
+import BodyEncoder from "./middleware/data-encoder";
 import Interceptor from "./middleware/interceptor";
 import Send from "./middleware/send";
 
