@@ -34,6 +34,7 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
     if (handlers.length == 0) throw Error("handlers length cannot be zero");
 
     const dispose = () => {
+      //console.log("disposed interceptor for", id);
       this._interceptors.delete(id);
     };
 
@@ -69,6 +70,7 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
   };
 
   dispose() {
+
     for (let [key, value] of this._interceptors.entries()) {
       value.dispose();
     }

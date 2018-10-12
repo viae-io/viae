@@ -77,6 +77,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   private async _onMessage(data: ArrayBuffer | ArrayBufferView) {
     const msg = this._encoder.decode(toUint8Array(data));
     const ctx = new this.Ctx({ connection: this, in: msg });
+    //console.log("RECIEVED", msg);
     await this.process(ctx as Ctx).catch(e => this._ev.emit("error", e));
   }
 

@@ -56,6 +56,22 @@ export function Data() {
   };
 }
 
+export function Head() {
+  return function (target: any, propertyKey: string | symbol, index: number) {
+    let router: any = Reflect.getMetadata("__router", target) || {};
+    let routes = router.routes || [];
+    let route = routes[propertyKey] || {};
+
+    route.args = route.args || [];
+    route.args[index] = { type: "head" };
+
+    routes[propertyKey] = route;
+    router["routes"] = routes;
+
+    Reflect.defineMetadata("__router", router, target);
+  };
+}
+
 export function Raw() {
   return function (target: any, propertyKey: string | symbol, index: number) {
     let router: any = Reflect.getMetadata("__router", target) || {};

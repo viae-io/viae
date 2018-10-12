@@ -167,6 +167,8 @@ export class Router implements Middleware<Context>, RouterOptions {
                 switch (x.type) {
                   case "data":
                     return ctx.in.data;
+                  case "head":
+                    return ctx.in.head;
                   case "raw":
                     return ctx.in.raw;
                   case "ctx":

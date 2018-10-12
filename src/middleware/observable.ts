@@ -1,10 +1,9 @@
-import { Observable, isObservable, Subscription, Observer } from 'rxjs';
+import { Observable, isObservable, Subscription, Observer, asyncScheduler } from 'rxjs';
+import { observeOn } from 'rxjs/operators';
 import { Context, RequestContext, ResponseContext } from '../context';
 import { Rowan, If, Middleware } from "rowan";
 import { request } from "./request";
 import { v4 as uuid } from 'uuid';
-import { Message } from "..";
-import { connect } from 'net';
 
 export class ObservableSender extends Rowan<RequestContext> {
   constructor(observable: Observable<any>, dispose: () => void) {
@@ -13,26 +12,26 @@ export class ObservableSender extends Rowan<RequestContext> {
     let sub: Subscription;
     let sid;
 
-    this.use(async (ctx, next) => {
-      console.log(ctx.in);
-      return next();
-    });
-
     this.use(new If(request("SUBSCRIBE"), [
       async (ctx, next) => {
         if (sub != null) { throw Error("Already observing"); }
         let sid = ctx.in.id;
         let wire = ctx.connection;
 
-        sub = observable.subscribe(
-          (next) => {
-            wire.send({id: sid,  head: { status: 206 }, data: next });
+        //Remove default response. 
+        delete ctx.out;
+
+        sub = observable.pipe(observeOn(asyncScheduler)).subscribe(
+          async (next) => {
+            await wire.send({ id: sid,  head: { status: 206 }, data: next });
           },
-          (err) => {
-            wire.send({ id: sid, head: { status: 500 }, data: err });
+          async (err) => {            
+            await wire.send({ id: sid, head: { status: 500 }, data: err });
+            dispose();
           },
-          () => {
-            wire.send({ id: sid, head: { status: 200 } });
+          async () => {            
+            await wire.send({ id: sid, head: { status: 200 } });
+            dispose();
           });
 
         observable = null;
@@ -41,9 +40,12 @@ export class ObservableSender extends Rowan<RequestContext> {
 
     this.use(new If(request("UNSUBSCRIBE"), [
       async (ctx, next) => {
-        if (!sub || !sid) return next();
-        sub.unsubscribe();
-        dispose();
+        if (sub){
+          sub.unsubscribe();
+        }
+        if(dispose){
+          dispose();
+        }
         ctx.send({ head: { status: 200 } });
       }]));
   }
@@ -77,7 +79,7 @@ export class UpgradeIncomingObservable implements Middleware<Context> {
     if (!ctx.in || !ctx.in.head || typeof ctx.in.head["observable"] !== "string") {
       return next();
     }
-
+    
     const sid = ctx.in.head["observable"] as string;
     const connection = ctx.connection;
 
