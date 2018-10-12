@@ -36,6 +36,10 @@ export function Delete(path?: string, opts?: { end?: boolean }) {
   return methodDecorator("DELETE", path || "/", opts);
 }
 
+export function Subscribe(path?: string, opts?: { end?: boolean }) {
+  return methodDecorator("SUBSCRIBE", path || "/", opts);
+}
+
 export function Data() {
   return function (target: any, propertyKey: string | symbol, index: number) {
     let router: any = Reflect.getMetadata("__router", target) || {};

@@ -13,6 +13,12 @@ export class IteratorRouter extends Rowan<RequestContext> {
 
     let iterator: Iterator<any>;
 
+    let clock = setTimeout(() => {
+      if (!iterator) {
+        dispose();
+      };
+    }, 5000);
+
     this.use(new If(request("NEXT"), [
       async (ctx, next) => {
         let data: any;
@@ -35,6 +41,7 @@ export class IteratorRouter extends Rowan<RequestContext> {
 
     this.use(new If(request("SUBSCRIBE"), [
       async (ctx, next) => {
+        clearTimeout(clock);
         try {
           if (iterator !== undefined) { throw Error("Already subscribed"); }
           if (iterable[Symbol.asyncIterator])
@@ -51,7 +58,7 @@ export class IteratorRouter extends Rowan<RequestContext> {
       async (ctx, next) => {
         await iterator.return();
         ctx.send({ head: { status: 200 } });
-      }]));    
+      }]));
   }
 }
 
@@ -64,7 +71,7 @@ export class UpgradeOutgoingIterable implements Middleware<Context> {
       let sid = uuid();
       let router = new IteratorRouter(iterable, function () { dispose(); });
       let dispose = ctx.connection.intercept(sid, [router]);
-    
+
       head["iterable"] = sid;
     }
     return next();
@@ -79,13 +86,13 @@ export class UpgradeIncomingIterable implements Middleware<Context> {
 
     const sid = ctx.in.head["iterable"] as string;
     const connection = ctx.connection;
-    
+
     ctx.in.data[Symbol.asyncIterator] = function (): AsyncIterator<any> {
       let response: Message;
-      let subscribed = false;     
+      let subscribed = false;
 
       return {
-        next: async function (): Promise<IteratorResult<any>> {          
+        next: async function (): Promise<IteratorResult<any>> {
           if (!subscribed) {
             subscribed = true;
             response = await connection.request({ id: sid, head: { method: "SUBSCRIBE" } });
@@ -106,7 +113,7 @@ export class UpgradeIncomingIterable implements Middleware<Context> {
               throw Error(response.data || "Unknown Error");
           }
         },
-        return: async function () {  
+        return: async function () {
           response = await connection.request({ id: sid, head: { method: "UNSUBSCRIBE" } });
           return { value: undefined, done: true };
         }

@@ -13,8 +13,9 @@ import Send from "./middleware/send";
 import { v4 as uuid } from 'uuid';
 import { UpgradeOutgoingIterable, UpgradeIncomingIterable } from "./middleware/iterable";
 import { MessageSerialiser } from "./message-encoder";
-import { Logger, ConsoleLogger } from "./log";
+import { ILogger, ConsoleLogger } from "./log";
 import { toUint8Array } from "./util";
+import { UpgradeOutgoingObservable, UpgradeIncomingObservable } from "./middleware/observable";
 
 /**
  * Via
@@ -22,7 +23,7 @@ import { toUint8Array } from "./util";
  */
 export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   private _ev = new EventEmitter();
-  private _log: Logger;
+  private _log: ILogger;
   private _interceptor = new Interceptor();
   private _encoder = new MessageSerialiser();
   private _before: Rowan<Context> = new Rowan<Context>();
@@ -32,7 +33,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
 
   readonly out: Rowan<Context> = new Rowan<Context>();
 
-  constructor(public readonly wire: Wire, opts?: { Ctx?: ContextConstructor, uuid?: () => string, log?: Logger }, ) {
+  constructor(public readonly wire: Wire, opts?: { Ctx?: ContextConstructor, uuid?: () => string, log?: ILogger }, ) {
     super();
 
     this.Ctx = (opts ? opts.Ctx : undefined) || DefaultContext;
@@ -45,6 +46,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
         this.out
           .use(new AfterIf((ctx) => !!ctx.out, [
             new UpgradeOutgoingIterable(),
+            new UpgradeOutgoingObservable(),
             new BodyEncoder(),
             new Send(this._encoder)
           ]))
@@ -52,14 +54,13 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
       .use(new Catch(async (err: Error, ctx: Ctx) => { this._ev.emit("error", err, ctx); }))
       .use(new BodyDecoder())
       .use(new UpgradeIncomingIterable())
+      .use(new UpgradeIncomingObservable())
       .use(this._interceptor);
-      //.use stuff
+    //.use stuff
 
     /** Hook onto the wire events*/
     wire.on("message", (data: ArrayBuffer | ArrayBufferView) => {
-      const msg = this._encoder.decode(toUint8Array(data));
-      const ctx = new this.Ctx({ connection: this, in: msg });
-      this.process(ctx as Ctx).catch(e => this._ev.emit("error", e));
+      this._onMessage(data);
     });
     wire.on("open", () => {
       this._ev.emit("open");
@@ -73,16 +74,27 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     });
   }
 
+  private async _onMessage(data: ArrayBuffer | ArrayBufferView) {
+    const msg = this._encoder.decode(toUint8Array(data));
+    const ctx = new this.Ctx({ connection: this, in: msg });
+    await this.process(ctx as Ctx).catch(e => this._ev.emit("error", e));
+  }
+
   /**
-   * Add a message to the outgoing pipeline
+   * Fire and Forget - Add a message to the outgoing pipeline
    **/
-  private async _send(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
+  async send(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
     if (!msg.id) msg.id = uuid();
     if (opts && opts.encoding) {
       msg.head = msg.head || {};
       msg.head.encoding = opts.encoding;
     }
-    await this.out.process(new this.Ctx({ connection: this, out: msg as Message<any> }));
+
+    try {
+      await this.out.process(new this.Ctx({ connection: this, out: msg as Message<any> }));
+    } catch (err) {
+      console.log("MOO", err);
+    }
   }
 
   /**
@@ -110,7 +122,7 @@ export default class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     clock = setTimeout(() => { reject("Request Timeout"); }, (opts ? opts.timeout : undefined) || 10000);
 
     try {
-      await this._send(msg, opts);
+      await this.send(msg, opts);
       return await promise;
     }
     catch (err) {

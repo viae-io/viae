@@ -7,12 +7,11 @@ import { MessageSerialiser } from "../message-encoder";
  */
 export default class Send<Ctx extends Context = Context> implements Middleware<Context> {
   constructor(private _encoder: MessageSerialiser) { }
-  process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
+  async process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
     let out = ctx.out;
-    if (out) {
+    if (out) {          
       let raw = this._encoder.encode(out);
       ctx.connection.wire.send(raw);
-    }
-    return Promise.resolve();
+    }    
   }
 }
