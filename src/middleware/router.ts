@@ -30,8 +30,6 @@ export class Router implements Middleware<Context>, RouterOptions {
   constructor(opts?: RouterOptions) {
     Object.assign(this, opts);
 
-
-
     this.root = this.root.trim();
 
     if (this.root.startsWith("/") == false) {
@@ -69,8 +67,8 @@ export class Router implements Middleware<Context>, RouterOptions {
       ctx.in.head.path = originalPath.substr(match.length);
       return Rowan.process(this.middleware, ctx, function () {
         ctx.in.head.path = originalPath;
-        return next()
-      });
+        return next();
+      }).then(() => { ctx.in.head.path = originalPath; });
     }
     return next();
   }
@@ -132,11 +130,12 @@ export class Router implements Middleware<Context>, RouterOptions {
         }
 
         let originalPath = ctx.in.head.path;
+
         ctx.in.head.path = originalPath.substr(match[0].length);
         return Rowan.process(processors, ctx, function () {
           ctx.in.head.path = originalPath;
-          return next()
-        });
+          return next();
+        }).then(() => { ctx.in.head.path = originalPath; });
       });
   }
 

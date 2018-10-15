@@ -1,8 +1,6 @@
-import Via from './src/via';
+import {Via} from './src';
 import * as WebSocket from 'ws';
-import { Wire, Status } from './src';
 import { isObservable, from } from 'rxjs';
-import { last, take, every } from 'rxjs/operators';
 
 let wire = new WebSocket("ws://localhost:8080");
 let via = new Via(wire as any);

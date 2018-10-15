@@ -39,3 +39,5 @@ export function toUint8Array(value: ArrayBuffer | ArrayBufferView) {
 function isArrayBufferView(value): value is ArrayBufferView {
   return value.buffer != undefined;
 } 
+
+export * from './uuid';

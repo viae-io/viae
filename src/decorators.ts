@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { ConsoleLogger } from "./log";
 
 function methodDecorator(method: string, path: string, opts?: { end?: boolean }) {
   return function (target: any, propertyKey: string | symbol, parameterDesc: TypedPropertyDescriptor<Function>) {
@@ -143,3 +144,26 @@ export function Controller(root?: string) {
     Reflect.defineMetadata("__router", router, target.prototype);
   };
 }
+
+const _nolog = new ConsoleLogger();
+
+export function Trace() {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    // keep a reference to the original function
+    const originalValue = descriptor.value;
+
+    // Replace the original function with a wrapper
+    descriptor.value = function (...args: any[]) {
+      const ctx = args[0] || {};
+      const log = ctx.log || _nolog;
+
+      log.debug(`=> ${propertyKey}(${args.join(", ")})`);
+
+      // Call the original function
+      var result = originalValue.apply(this, args);
+
+      log.debug(`<= ${result}`);
+      return result;
+    };
+  };
+};

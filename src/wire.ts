@@ -3,6 +3,9 @@
  */
 export interface Wire {
   readonly state: "opening" | "open" | "closing" | "closed";
+  readonly meta?: {
+    remoteAddress?: string;
+  };
 
   send(data: ArrayBuffer | ArrayBufferView): Promise<void>;
   close(): Promise<void>;

@@ -3,7 +3,6 @@ import { observeOn } from 'rxjs/operators';
 import { Context, RequestContext, ResponseContext } from '../context';
 import { Rowan, If, Middleware } from "rowan";
 import { request } from "./request";
-import { v4 as uuid } from 'uuid';
 
 export class ObservableSender extends Rowan<RequestContext> {
   constructor(observable: Observable<any>, dispose: () => void) {
@@ -62,7 +61,7 @@ export class UpgradeOutgoingObservable implements Middleware<Context> {
     if (isObservable(data)) {
 
       let observable = data;
-      let sid = uuid();
+      let sid = ctx.connection.genId();
       let router = new ObservableSender(observable, function () { dispose(); });
       let dispose = ctx.connection.intercept(sid, [router]);
 

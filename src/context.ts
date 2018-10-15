@@ -1,8 +1,9 @@
 import { IRowan, Middleware, Handler, AutoHandler, Rowan } from "rowan";
-import Via from "./via";
+import { Via } from "./via";
 import { Message, MessageHeader, Request, Response } from "./message";
 import { Status } from "./status";
 import Interceptor from "./middleware/interceptor";
+import { Logger } from "./log";
 
 export interface Context {
   id: string;
@@ -24,8 +25,8 @@ export interface Context {
 }
 
 export interface ContextConstructor<Ctx extends Context = Context> {
-  new(init: { connection: Via<Ctx>; in: Message<any> }): Ctx;
-  new(init: { connection: Via<Ctx>; out: Message<any> }): Ctx;
+  new(init: { connection: Via<Ctx>; in: Message<any>, log: Logger }): Ctx;
+  new(init: { connection: Via<Ctx>; out: Message<any>, log: Logger }): Ctx;
 }
 
 export class DefaultContext implements Context {

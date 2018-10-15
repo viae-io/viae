@@ -1,7 +1,6 @@
 import { Rowan, If, Middleware } from "rowan";
 import { RequestContext, Context } from "../context";
 import { request } from "./request";
-import { v4 as uuid } from 'uuid';
 import { Message } from "..";
 
 /** 
@@ -68,7 +67,7 @@ export class UpgradeOutgoingIterable implements Middleware<Context> {
     const data = ctx.out.data;
     if (data != undefined && data[Symbol.asyncIterator] != undefined && ((head ? head.iterable : true) || true)) {
       let iterable = data;
-      let sid = uuid();
+      let sid = ctx.connection.genId();
       let router = new IteratorRouter(iterable, function () { dispose(); });
       let dispose = ctx.connection.intercept(sid, [router]);
 

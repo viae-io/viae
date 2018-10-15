@@ -7,5 +7,8 @@ export * from './wire-server';
 
 export * from './middleware';
 
-export { default as Via, ViaSendOptions } from './via';
-export { default as Viae } from './viae';
+export * from './via';
+export * from './viae';
+
+export * from './app';
+export * from './decorators';

@@ -1,7 +1,7 @@
 {
   "name": "viae",
   "version": "1.0.0-beta.1",
-  "description": "A bi-directional communication framework",
+  "description": "bi-directional binary streaming req/res framework",
   "main": "dist/commonjs/index.js",
   "typings": "dist/commonjs/index.d.ts",
   "scripts": {
@@ -66,7 +66,6 @@
     "reflect-metadata": "^0.1.12",
     "rowan": "1.0.0-beta.4",
     "rxjs": "^6.3.3",
-    "uuid": "^3.2.1",
     "varint": "^5.0.0"
   },
   "nyc": {

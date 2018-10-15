@@ -1,44 +1,66 @@
-export interface ILogger {
-  debug(message: String, ctx?: any): void;
-  info(message: String, ctx?: any): void;
-  warn(message: String, ctx?: any): void;
-  error(message: String, ctx?: { err: Error, [k: string]: any }): void;
-  fatal(message: String, ctx?: { err: Error, [k: string]: any }): void;
+import { debug } from "util";
+
+export interface Logger {
+  debug(message: String, ...args): void;
+  info(message: String, ...args): void;
+  warn(message: String, ...args): void;
+  error(message: String, err: Error, ...args): void;
+  fatal(message: String, err: Error, ...args): void;
 }
 
-export function Log() {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    // keep a reference to the original function
-    const originalValue = descriptor.value;
+enum CC {
+  Reset = "\x1b[0m",
+  Bright = "\x1b[1m",
+  Dim = "\x1b[2m",
+  Underscore = "\x1b[4m",
+  Blink = "\x1b[5m",
+  Reverse = "\x1b[7m",
+  Hidden = "\x1b[8m",
 
-    // Replace the original function with a wrapper
-    descriptor.value = function (...args: any[]) {
-      console.log(`=> ${propertyKey}(${args.join(", ")})`);
+  FgBlack = "\x1b[30m",
+  FgRed = "\x1b[31m",
+  FgGreen = "\x1b[32m",
+  FgYellow = "\x1b[33m",
+  FgBlue = "\x1b[34m",
+  FgMagenta = "\x1b[35m",
+  FgCyan = "\x1b[36m",
+  FgWhite = "\x1b[37m",
 
-      // Call the original function
-      var result = originalValue.apply(this, args);
-
-      console.log(`<= ${result}`);
-      return result;
-    };
-  };
+  BgBlack = "\x1b[40m",
+  BgRed = "\x1b[41m",
+  BgGreen = "\x1b[42m",
+  BgYellow = "\x1b[43m",
+  BgBlue = "\x1b[44m",
+  BgMagenta = "\x1b[45m",
+  BgCyan = "\x1b[46m",
+  BgWhite = "\x1b[47m",
 }
 
-export class ConsoleLogger implements ILogger {
-  debug(message: String, ctx?: any): void {
-    console.log("DEBUG", new Date(), message, ctx);
+enum Level {
+  Debug = 0,
+  Info = 1,
+  Warn = 2,
+  Error = 3,
+  Fatal = 4,
+}
+
+export class ConsoleLogger implements Logger {
+  level = Level.Info;
+
+  debug(message: String, ...args: any[]): void {
+    if (this.level <= Level.Debug) console.log(`${CC.Dim}DEBUG${CC.Reset}`, new Date(), message, ...args);
   }
-  info(message: String, ctx?: any): void {
-    console.log("INFO", new Date(), message, ctx);
+  info(message: String, ...args: any[]): void {
+    if (this.level <= Level.Info) console.log(`${CC.FgCyan}INFO ${CC.Reset}`, new Date(), message, ...args);
   }
-  warn(message: String, ctx?: any): void {
-    console.log("WARN", new Date(), message, ctx);
+  warn(message: String, ...args: any[]): void {
+    if (this.level <= Level.Warn) console.log(`${CC.FgYellow}WARN ${CC.Reset}`, new Date(), message, ...args);
   }
-  error(message: String, ctx?: any): void {
-    console.log("ERROR", new Date(), message, ctx);
+  error(message: String, ...args: any[]): void {
+    if (this.level <= Level.Error) console.log(`${CC.FgRed}ERROR${CC.Reset}`, new Date(), message, ...args);
   }
-  fatal(message: String, ctx?: any): void {
-    console.log("FATAL", new Date(), message, ctx);
+  fatal(message: String, ...args: any[]): void {
+    if (this.level <= Level.Fatal) console.log(`${CC.BgRed}FATAL${CC.Reset}`, new Date(), message, ...args);
   }
 }
 
