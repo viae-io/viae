@@ -22,13 +22,13 @@ export class ObservableSender extends Rowan<RequestContext> {
 
         sub = observable.pipe(observeOn(asyncScheduler)).subscribe(
           async (next) => {
-            await wire.send({ id: sid,  head: { status: 206 }, data: next });
+            await wire.send({ id: sid, head: { status: 206 }, data: next });
           },
-          async (err) => {            
+          async (err) => {
             await wire.send({ id: sid, head: { status: 500 }, data: err });
             dispose();
           },
-          async () => {            
+          async () => {
             await wire.send({ id: sid, head: { status: 200 } });
             dispose();
           });
@@ -39,10 +39,10 @@ export class ObservableSender extends Rowan<RequestContext> {
 
     this.use(new If(request("UNSUBSCRIBE"), [
       async (ctx, next) => {
-        if (sub){
+        if (sub) {
           sub.unsubscribe();
         }
-        if(dispose){
+        if (dispose) {
           dispose();
         }
         ctx.send({ head: { status: 200 } });
@@ -61,7 +61,7 @@ export class UpgradeOutgoingObservable implements Middleware<Context> {
     if (isObservable(data)) {
 
       let observable = data;
-      let sid = ctx.connection.genId();
+      let sid = ctx.connection.createId();
       let router = new ObservableSender(observable, function () { dispose(); });
       let dispose = ctx.connection.intercept(sid, [router]);
 
@@ -78,7 +78,7 @@ export class UpgradeIncomingObservable implements Middleware<Context> {
     if (!ctx.in || !ctx.in.head || typeof ctx.in.head["observable"] !== "string") {
       return next();
     }
-    
+
     const sid = ctx.in.head["observable"] as string;
     const connection = ctx.connection;
 
@@ -87,20 +87,20 @@ export class UpgradeIncomingObservable implements Middleware<Context> {
 
         let dispose = connection.intercept(sid, [
           async (ctx: ResponseContext) => {
-              let res = ctx.in;
-              let status = res.head.status;
-              let data = res.data;
+            let res = ctx.in;
+            let status = res.head.status;
+            let data = res.data;
 
-              if (status == 206) {
-                observer.next(data);
-              } else if (status == 500) {
-                observer.error(data);
-                dispose();
-              } else {
-                observer.complete();
-                dispose();
-                dispose = undefined;
-              }            
+            if (status == 206) {
+              observer.next(data);
+            } else if (status == 500) {
+              observer.error(data);
+              dispose();
+            } else {
+              observer.complete();
+              dispose();
+              dispose = undefined;
+            }
           }]);
 
         await connection.send({ id: sid, head: { method: "SUBSCRIBE" } });

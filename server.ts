@@ -1,9 +1,9 @@
-import { Viae } from './src';
+import { Viae, Status } from './src';
 import { Server as WebSocketServer } from 'ws';
 import { App } from './src/app';
-import { Controller, Get, Data, Param, All, Next, Ctx, Raw, Head } from './src/decorators';
+import { Controller, Get, Data, Param, All, Next, Ctx, Raw, Head, Put } from './src/decorators';
 import { Middleware } from 'rowan';
-import { Observable, from, isObservable } from 'rxjs';
+import { Observable, from, isObservable, Subject } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ftruncate } from 'fs';
 
@@ -13,21 +13,23 @@ let viae = new Viae(server);
 
 @Controller('chat')
 class ChatRoomController {
-  @Get("echo")
-  general(@Data() data) {
-    if (isObservable(data)) {
-      return data.pipe(map(x => {
-        if (typeof x != "number")
-          throw Error("Not a number");
-        return x * 2;
-      }));
-    }
+  private _generalChannel = new Subject<string>();
+
+  @Get("channel")
+  general() {
+    return this._generalChannel;
+  }
+
+  @Put("message")
+  generalMessage(@Data() data: string) {
+    this._generalChannel.next(data);
+    return Status.OK;
   }
 }
 
 viae.before(async (ctx, next) => {
   let start = Date.now();
-
+  
   await next();
 
   let duration = Date.now() - start;

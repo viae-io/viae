@@ -1,11 +1,19 @@
 import { debug } from "util";
 
-export interface Logger {
+export interface Log {
   debug(message: String, ...args): void;
   info(message: String, ...args): void;
   warn(message: String, ...args): void;
   error(message: String, err: Error, ...args): void;
   fatal(message: String, err: Error, ...args): void;
+}
+
+export enum LogLevel {
+  Debug = 0,
+  Info = 1,
+  Warn = 2,
+  Error = 3,
+  Fatal = 4,
 }
 
 enum CC {
@@ -36,31 +44,23 @@ enum CC {
   BgWhite = "\x1b[47m",
 }
 
-enum Level {
-  Debug = 0,
-  Info = 1,
-  Warn = 2,
-  Error = 3,
-  Fatal = 4,
-}
-
-export class ConsoleLogger implements Logger {
-  level = Level.Info;
+export class ConsoleLog implements Log {
+  level = LogLevel.Info;
 
   debug(message: String, ...args: any[]): void {
-    if (this.level <= Level.Debug) console.log(`${CC.Dim}DEBUG${CC.Reset}`, new Date(), message, ...args);
+    if (this.level <= LogLevel.Debug) console.log(`${CC.Dim}DEBUG${CC.Reset}`, new Date(), message, ...args);
   }
   info(message: String, ...args: any[]): void {
-    if (this.level <= Level.Info) console.log(`${CC.FgCyan}INFO ${CC.Reset}`, new Date(), message, ...args);
+    if (this.level <= LogLevel.Info) console.log(`${CC.FgCyan}INFO ${CC.Reset}`, new Date(), message, ...args);
   }
   warn(message: String, ...args: any[]): void {
-    if (this.level <= Level.Warn) console.log(`${CC.FgYellow}WARN ${CC.Reset}`, new Date(), message, ...args);
+    if (this.level <= LogLevel.Warn) console.log(`${CC.FgYellow}WARN ${CC.Reset}`, new Date(), message, ...args);
   }
   error(message: String, ...args: any[]): void {
-    if (this.level <= Level.Error) console.log(`${CC.FgRed}ERROR${CC.Reset}`, new Date(), message, ...args);
+    if (this.level <= LogLevel.Error) console.log(`${CC.FgRed}ERROR${CC.Reset}`, new Date(), message, ...args);
   }
   fatal(message: String, ...args: any[]): void {
-    if (this.level <= Level.Fatal) console.log(`${CC.BgRed}FATAL${CC.Reset}`, new Date(), message, ...args);
+    if (this.level <= LogLevel.Fatal) console.log(`${CC.BgRed}FATAL${CC.Reset}`, new Date(), message, ...args);
   }
 }
 

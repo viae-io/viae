@@ -67,7 +67,7 @@ export class UpgradeOutgoingIterable implements Middleware<Context> {
     const data = ctx.out.data;
     if (data != undefined && data[Symbol.asyncIterator] != undefined && ((head ? head.iterable : true) || true)) {
       let iterable = data;
-      let sid = ctx.connection.genId();
+      let sid = ctx.connection.createId();
       let router = new IteratorRouter(iterable, function () { dispose(); });
       let dispose = ctx.connection.intercept(sid, [router]);
 

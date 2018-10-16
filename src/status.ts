@@ -3,7 +3,7 @@ export enum Status {
 
   // Success 
 
-  Okay = 200,
+  OK = 200,
   OkayPartial = 206,
 
   // Client Error 

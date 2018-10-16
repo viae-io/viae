@@ -1,13 +1,10 @@
-import { IRowan, Middleware, Handler, AutoHandler, Rowan } from "rowan";
-import { Via } from "./via";
-import { Message, MessageHeader, Request, Response } from "./message";
-import { Status } from "./status";
-import Interceptor from "./middleware/interceptor";
-import { Logger } from "./log";
+import { Message, Request, Response } from "./message";
+import { Log } from "./log";
+import { IVia } from "./_via";
 
 export interface Context {
   id: string;
-  connection: Via<Context>;
+  connection: IVia<Context>;
 
   in?: Message<any>;
   out?: Message<any>;
@@ -24,19 +21,19 @@ export interface Context {
   [key: string]: any;
 }
 
-export interface ContextConstructor<Ctx extends Context = Context> {
-  new(init: { connection: Via<Ctx>; in: Message<any>, log: Logger }): Ctx;
-  new(init: { connection: Via<Ctx>; out: Message<any>, log: Logger }): Ctx;
+export interface ContextConstructor<C extends Context = Context> {
+  new(init: { connection: IVia<C>; in: Message<any>, log: Log }): C;
+  new(init: { connection: IVia<C>; out: Message<any>, log: Log }): C;
 }
 
 export class DefaultContext implements Context {
   id: string;
-  connection: Via<Context>;
+  connection: IVia<Context>;
 
-  in?: Message<any>;
-  out?: Message<any>;
+  in?: Message;
+  out?: Message;
 
-  constructor(init: { connection: Via<Context>; in?: Message<any>, out?: Message<any> }) {
+  constructor(init: { connection: IVia<Context>; in?: Message, out?: Message }) {
     this.connection = init.connection;
 
     this.out = init.out;

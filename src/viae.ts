@@ -5,9 +5,9 @@ import { WireServer } from "./wire-server";
 import { EventEmitter } from "events";
 
 import { Via } from "./via";
-import { Logger, ConsoleLogger } from "./log";
+import { Log, ConsoleLog } from "./log";
 
-export class Viae<Ctx extends Context = Context> extends Rowan<Context> {  
+export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
   private _connections = new Array<Via>();
   private _ev = new EventEmitter();
   private _before = new Rowan<Context>();
@@ -16,7 +16,7 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
     super(middleware);
 
     server.on("connection", (wire) => {
-      let via = new Via(wire, { log: Viae.Log }).before(this._before).use(this);
+      let via = new Via({ wire: wire, log: Viae.Log }).before(this._before).use(this);
 
       wire.on("close", () => {
         this._connections.splice(this._connections.indexOf(via), 1);
@@ -43,5 +43,5 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
     return this;
   }
 
-  static Log: Logger = new ConsoleLogger();
+  static Log: Log = new ConsoleLog();
 }

@@ -1,5 +1,6 @@
 import { Context } from '../context';
 import { Rowan, Processor, Middleware } from 'rowan';
+import { Disposer } from '../_disposer';
 
 type InterceptConfig<Ctx extends Context = Context> = {
   dispose: () => void,
@@ -33,7 +34,7 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
     if (handlers == undefined) throw Error("handlers cannot be undefined");
     if (handlers.length == 0) throw Error("handlers length cannot be zero");
 
-    const dispose = () => {
+    const dispose: Disposer = () => {
       //console.log("disposed interceptor for", id);
       this._interceptors.delete(id);
     };
@@ -70,7 +71,6 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
   };
 
   dispose() {
-
     for (let [key, value] of this._interceptors.entries()) {
       value.dispose();
     }

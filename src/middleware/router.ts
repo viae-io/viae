@@ -57,7 +57,7 @@ export class Router implements Middleware<Context>, RouterOptions {
         }
       }
       return match[0];
-    }
+    };
   }
 
   process(ctx: Context, next: Next): Promise<void> {
@@ -73,8 +73,8 @@ export class Router implements Middleware<Context>, RouterOptions {
     return next();
   }
 
-  private use(proc: Processor<Context>) {
-    this.middleware.push(Rowan.convertToMiddleware(proc));
+  private use(processor: Processor<Context>) {
+    this.middleware.push(Rowan.convertToMiddleware(processor));
   }
 
   route(opts: {
@@ -175,7 +175,7 @@ export class Router implements Middleware<Context>, RouterOptions {
                   case "next":
                     return next;
                   case "param":
-                    return x.opt ? ctx.params[x.opt] : ctx.params
+                    return x.opt ? ctx.params[x.opt] : ctx.params;
                 };
                 return undefined;
               });
@@ -183,8 +183,12 @@ export class Router implements Middleware<Context>, RouterOptions {
               try {
                 let result = await func(...args);
                 if (result) {
-                  ctx.out.head.status = 200;
-                  ctx.out.data = result;
+                  if (typeof result == "number") {
+                    ctx.out.head.status = result;
+                  } else {
+                    ctx.out.head.status = 200;
+                    ctx.out.data = result;
+                  }
                 }
               } catch (err) {
                 if (typeof err == "number") {

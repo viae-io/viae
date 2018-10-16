@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { ConsoleLogger } from "./log";
+import { ConsoleLog } from "./log";
 
 function methodDecorator(method: string, path: string, opts?: { end?: boolean }) {
   return function (target: any, propertyKey: string | symbol, parameterDesc: TypedPropertyDescriptor<Function>) {
@@ -145,7 +145,7 @@ export function Controller(root?: string) {
   };
 }
 
-const _nolog = new ConsoleLogger();
+const _nolog = new ConsoleLog();
 
 export function Trace() {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {

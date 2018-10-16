@@ -1,42 +1,51 @@
-import { Rowan, Middleware, IRowan, After, AfterIf, If, Catch, Processor } from "rowan";
+import { Rowan, After, AfterIf, Processor } from "rowan";
 import { EventEmitter } from "events";
 import { Wire } from "./wire";
 import { Message, isRequest } from './message';
-import { Context, ContextConstructor, DefaultContext, } from "./context";
+import { Context, ContextConstructor, DefaultContext } from "./context";
 
-import BodyDecoder from "./middleware/data-decoder";
-import BodyEncoder from "./middleware/data-encoder";
+import DataDecoder from "./middleware/data-decoder";
+import DataEncoder from "./middleware/data-encoder";
 import Interceptor from "./middleware/interceptor";
 import Send from "./middleware/send";
 
 import { UpgradeOutgoingIterable, UpgradeIncomingIterable } from "./middleware/iterable";
 import { MessageSerialiser } from "./message-encoder";
-import { Logger, ConsoleLogger } from "./log";
+import { Log, ConsoleLog } from "./log";
 import { toUint8Array, basicId } from "./util";
 import { UpgradeOutgoingObservable, UpgradeIncomingObservable } from "./middleware/observable";
+import { IVia, SendOptions } from "./_via";
 
 /**
  * Via
  * Wraps a wire connection and processes inbound and outbound messages
  */
-export class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
+export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C> {
   private _ev = new EventEmitter();
+  private _wire: Wire;
   private _uuid: () => string;
-  private _log: Logger;
+  private _log: Log;
   private _interceptor = new Interceptor();
   private _encoder = new MessageSerialiser();
   private _before: Rowan<Context> = new Rowan<Context>();
-  private Ctx: ContextConstructor;
+  private CtxCtor: ContextConstructor;
 
   /* outgoing message pipeline */
 
   readonly out: Rowan<Context> = new Rowan<Context>();
+  
+  get wire(){
+    return this._wire;
+  }
 
-  constructor(public readonly wire: Wire, opts?: { Ctx?: ContextConstructor, uuid?: () => string, log?: Logger }, ) {
+  constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log }, ) {
     super();
 
-    this.Ctx = (opts ? opts.Ctx : undefined) || DefaultContext;
-    this._log = (opts ? opts.log : undefined) || new ConsoleLogger();
+    const wire = this._wire = opts.wire;
+
+    this.CtxCtor = (opts ? opts.Ctx : undefined) || DefaultContext;
+
+    this._log = (opts ? opts.log : undefined) || new ConsoleLog();
     this._uuid = (opts ? opts.uuid : undefined) || basicId;
 
     this
@@ -48,12 +57,12 @@ export class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
           .use(new AfterIf((ctx) => !!ctx.out, [
             new UpgradeOutgoingIterable(),
             new UpgradeOutgoingObservable(),
-            new BodyEncoder(),
+            new DataEncoder(),
             new Send(this._encoder)
           ]))
       ]))
       /* add the lazy data decoder */
-      .use(new BodyDecoder())
+      .use(new DataDecoder())
       /* convert data to an async iterable */
       .use(new UpgradeIncomingIterable())
       /* convert data to an observable */
@@ -77,19 +86,19 @@ export class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     });
   }
 
-  get log(){
+  get log() {
     return this._log;
   }
 
   private async _onMessage(data: ArrayBuffer | ArrayBufferView) {
     const msg = this._encoder.decode(toUint8Array(data));
-    const ctx = new this.Ctx({ connection: this, in: msg, log: this._log });
+    const ctx = new this.CtxCtor({ connection:  this as IVia<C>, in: msg, log: this._log });
 
     this._log.debug("Received", msg);
 
     try {
-      await this.process(ctx as Ctx);
-    } catch (err) {      
+      await this.process(ctx as C);
+    } catch (err) {
       this._ev.emit("error", err);
     }
   }
@@ -97,7 +106,7 @@ export class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
   /**
    * Fire and Forget - Add a message to the outgoing pipeline
    **/
-  async send(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
+  async send(msg: Partial<Message>, opts?: SendOptions) {
     if (!msg.id) msg.id = basicId();
     if (opts && opts.encoding) {
       msg.head = msg.head || {};
@@ -105,7 +114,7 @@ export class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
     }
 
     try {
-      await this.out.process(new this.Ctx({ connection: this, out: msg as Message<any>, log: this._log }));
+      await this.out.process(new this.CtxCtor({ connection: this as IVia<C>, out: msg as Message, log: this._log }));
     } catch (err) {
       this._ev.emit("error", err);
     }
@@ -116,7 +125,7 @@ export class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
    * @param msg 
    * @param opts 
    */
-  async request(msg: Partial<Message<any>>, opts?: ViaSendOptions) {
+  async request(msg: Partial<Message>, opts?: SendOptions) {
     if (!msg.id) msg.id = basicId();
 
     if (!isRequest(msg)) {
@@ -153,7 +162,7 @@ export class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
    * @param id message id to intercept
    * @param handlers processors to call on interception
    */
-  intercept(id: string, handlers: Processor<Ctx>[]) {
+  intercept(id: string, handlers: Processor<C>[]) {
     return this._interceptor.intercept({ id: id, handlers: handlers });
   }
 
@@ -161,24 +170,22 @@ export class Via<Ctx extends Context = Context> extends Rowan<Ctx> {
    * processors to use before any  in-built (inbound)processing
    * @param processor 
    */
-  before(processor: Processor<Ctx>) {
+  before(processor: Processor<C>) {
     this._before.use(processor);
     return this;
   }
 
-  genId(): string {
+  createId(): string {
     return this._uuid();
   }
 
   on(event: "close", cb: () => void)
   on(event: "open", cb: () => void)
-  on(event: "error", cb: (err: Error, ctx: Ctx) => void)
+  on(event: "error", cb: (err: Error, ctx: C) => void)
   on(event: string, cb: (...args: any[]) => void) {
     this._ev.on(event, cb);
   }
+
+  static Log: Log = new ConsoleLog();
 }
 
-export type ViaSendOptions = {
-  encoding?: "none" | "msgpack" | "json",
-  timeout?: number
-};
