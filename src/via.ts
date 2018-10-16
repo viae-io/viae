@@ -12,7 +12,7 @@ import Send from "./middleware/send";
 import { UpgradeOutgoingIterable, UpgradeIncomingIterable } from "./middleware/iterable";
 import { MessageSerialiser } from "./message-encoder";
 import { Log, ConsoleLog } from "./log";
-import { toUint8Array, basicId } from "./util";
+import { toUint8Array, shortId } from "./util";
 import { UpgradeOutgoingObservable, UpgradeIncomingObservable } from "./middleware/observable";
 import { IVia, SendOptions } from "./_via";
 
@@ -46,7 +46,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     this.CtxCtor = (opts ? opts.Ctx : undefined) || DefaultContext;
 
     this._log = (opts ? opts.log : undefined) || new ConsoleLog();
-    this._uuid = (opts ? opts.uuid : undefined) || basicId;
+    this._uuid = (opts ? opts.uuid : undefined) || shortId;
 
     this
       /* execute the 'before' pipeline */
@@ -107,7 +107,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
    * Fire and Forget - Add a message to the outgoing pipeline
    **/
   async send(msg: Partial<Message>, opts?: SendOptions) {
-    if (!msg.id) msg.id = basicId();
+    if (!msg.id) msg.id = shortId();
     if (opts && opts.encoding) {
       msg.head = msg.head || {};
       msg.head.encoding = opts.encoding;
@@ -126,7 +126,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
    * @param opts 
    */
   async request(msg: Partial<Message>, opts?: SendOptions) {
-    if (!msg.id) msg.id = basicId();
+    if (!msg.id) msg.id = shortId();
 
     if (!isRequest(msg)) {
       throw Error("Message is not a Request");
