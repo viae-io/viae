@@ -7,7 +7,12 @@ import { Wire } from "./wire";
 export interface IVia<T> extends IRowan<T> {
   before(processor: Processor<T>): this;
 
-  request(msg: Partial<Message<any>>, opts?: SendOptions): Promise<Message>;
+  request(
+    method: string,
+    path: string,
+    data: any,
+    opts?: SendOptions): Promise<Message>;
+
   send(msg: Partial<Message<any>>, opts?: SendOptions): Promise<void>;
   intercept(id: string, handlers: Processor<T>[]): Disposer;
   createId(): string;
@@ -23,6 +28,7 @@ export interface IVia<T> extends IRowan<T> {
 }
 
 export type SendOptions = {
+  id?: string;
   encoding?: "none" | "msgpack" | "json",
   timeout?: number
 };
