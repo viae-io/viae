@@ -1,13 +1,12 @@
-import { Viae, Status } from './src';
+import { Viae, } from './src';
 import { Server as WebSocketServer } from 'ws';
 import { App } from './src/app';
-import { Controller, Get, Data, Param, All, Next, Ctx, Raw, Head, Put } from './src/decorators';
-import { Subject, from, isObservable, Observable } from 'rxjs';
+import { Controller, Get, Data } from './src/decorators';
+import { Subject,  isObservable, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 let server = new WebSocketServer({ port: 8080, host: "0.0.0.0" });
 let viae = new Viae(server);
-
 let op = 0;
 
 setInterval(() => {
@@ -20,14 +19,14 @@ viae.before((ctx, next) => {
   return next();
 });
 
-@Controller('api')
+@Controller('api/:foo')
 class ChatRoomController {
   private _generalChannel = new Subject<string>();
 
-  @Get("dummy")
+  @Get("dummy/:bar")
   general(@Data() data: Observable<number>) {
     if (isObservable(data)) {
-      return data;
+      return data.pipe(map(x => x * 2));
     }
   }
 }
@@ -42,7 +41,6 @@ viae.before(async (ctx, next) => {
     ctx.connection.log.info(`${ctx.in.head.method} ${ctx.in.head.path} - ${ctx.out.head.status} ${duration.toFixed()}ms`);
   }
 });
-
 
 viae.use(new App({
   controllers: [new ChatRoomController()]
