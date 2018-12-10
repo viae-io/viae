@@ -1,10 +1,19 @@
 export enum Status {
-  Next = 100,
-  
-  OK = 200,
+  // Informational 
 
-  BadRequest = 400,  
+  // Success 
+
+  OK = 200,
+  OkayPartial = 206,
+
+  // Client Error 
+
+  BadRequest = 400,
+  Unauthorized = 401,  
+  Forbidden = 403,
   NotFound = 404,
+
+  // Server Error 
 
   Error = 500  
 }

@@ -1,7 +1,7 @@
 {
   "name": "viae",
-  "version": "0.6.1",
-  "description": "A bi-directional communication framework",
+  "version": "1.0.0-beta.1",
+  "description": "bi-directional binary streaming req/res framework",
   "main": "dist/commonjs/index.js",
   "typings": "dist/commonjs/index.d.ts",
   "scripts": {
@@ -11,7 +11,7 @@
     "build:es2015": "tsc --project tsconfig.build.json --rootDir src/ --outDir ./dist/es2017 --module es2015",
     "build:commonjs": "tsc --project tsconfig.build.json --rootDir src/ --outDir ./dist/commonjs --module commonjs",
     "debug": "npm run clean && cross-env tsc --project tsconfig.json --outDir ./.tmp/ --module commonjs ",
-    "test": "nyc node_modules/mocha/bin/_mocha --require source-map-support/register --compilers ts:ts-node/register test/unit/**/*.ts",
+    "test": "nyc node_modules/mocha/bin/_mocha --require source-map-support/register --compilers ts:ts-node/register test/**/*.ts",
     "cover": "codecov",
     "prepublishOnly": "npm run build"
   },
@@ -42,24 +42,31 @@
     "@types/chai": "^4.0.1",
     "@types/mocha": "^2.2.41",
     "@types/node": "^8.0.13",
-    "chai": "^3.5.0",
+    "@types/ws": "^4.0.2",
+    "async-generators": "^0.2.1",
+    "chai": "^4.1.2",
     "codecov": "^1.0.1",
     "concurrently": "^3.4.0",
     "core-js": "^2.4.1",
     "cross-env": "^3.2.4",
     "mocha": "^3.2.0",
     "nyc": "^11.0.3",
+    "ora": "^2.1.0",
     "rimraf": "^2.6.1",
+    "source-map-support": "^0.4.15",
     "ts-node": "^3.2.0",
     "tslint": "^4.3.1",
     "typescript": "^2.4.2",
-    "source-map-support": "^0.4.15",
-    "ws": "^3.0.0"
+    "ws": "^5.1.1"
   },
   "dependencies": {
+    "lite-event-emitter": "^1.0.2",
     "msgpack-lite": "~0.1.26",
-    "path-to-regexp": "^1.7.0",
-    "rowan": "~0.7.0"  
+    "path-to-regexp": "0.1.7",
+    "reflect-metadata": "^0.1.12",
+    "rowan": "1.0.0-beta.4",
+    "rxjs": "^6.3.3",
+    "varint": "^5.0.0"
   },
   "nyc": {
     "include": [

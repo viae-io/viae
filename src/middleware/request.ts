@@ -1,18 +1,16 @@
-import { Context, isRequest } from '../context';
-import { Method } from '../method';
-import * as pathToRegexp from 'path-to-regexp';
 
-export type PathRequest = string | RegExp | (string | RegExp)[];
+import * as pathToRegexp from 'path-to-regexp';
+import { Context } from '../context';
 
 /* the message is a request with a path matching the parameter */
-export function request(method?: Method, path?: string) {
+export function request(method?: string, path?: string) {
   if (method != undefined && path != undefined) {
     let keys = [];
     var exp = pathToRegexp(path, keys);
     return (ctx: Context) => {
-      if (ctx.req == undefined || ctx.req.method !== method)
+      if (ctx.in == undefined || ctx.in.head == undefined || ctx.in.head.method !== method)
         return false;
-      let match = (ctx.req.path) ? exp.exec(ctx.req.path) : null;
+      let match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;
       if (match == null) {
         return false;
       }
@@ -22,15 +20,15 @@ export function request(method?: Method, path?: string) {
           ctx.params[keys[i].name] = match[i + 1];
         }
       }
+      return true;
     };
   }
   else if (method != undefined) {
     return (ctx: Context) => {
-      return ctx.req != undefined && ctx.req.method === method;
+      return ctx.in != undefined && ctx.in.head != undefined && ctx.in.head.method === method;
     };
   }
   return (ctx: Context) => {
-    return ctx.req != undefined;
+    return ctx.in != undefined;
   };
 }
-

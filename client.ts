@@ -1,58 +1,51 @@
-import "core-js/modules/es7.symbol.async-iterator";
-
-import * as Ws from 'ws';
+import { Via } from './src';
+import * as WebSocket from 'ws';
+import { isObservable, from } from 'rxjs';
 import * as readline from 'readline';
-import { Via, Method, Status, Itable } from './src';
-import {WebSocketWire} from 'viae-ws';
 
-let ws = new WebSocketWire(Ws);
-
-ws.connect("ws://127.0.0.1:9090");
-
-ws.on("open", async () => {
-  let via = new Via(ws);
-
-  via.use(new Itable());
-
-  via.on("send", (msg) => {
-    console.log("out: ", msg);
-  });
-
-  via.on("message", (msg) => {
-    console.log(" in: ", msg);
-  });
-
-  await via.request({
-    method: Method.POST,
-    path: "/base/auth",
-    body: "john"
-  });
-
-  let start = process.hrtime();
-  let result = await via.request({
-    method: Method.GET,
-    path: "/base/echo",
-    body: {
-      async *[Symbol.asyncIterator]() {
-        yield "hello..."
-        yield "world";
-      }
-    }
-  });
-
-  if (isAsyncIterator(result.body)) {
-    for await (let item of result.body) {
-      //console.log(item)  
-    }
-  }
-  let hrend = process.hrtime(start);
-
-  console.info("Execution time: %ds", hrend[0] + hrend[1] / 1000000000);
-
-  ws.close();
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
 });
 
+let wire = new WebSocket("ws://localhost:8080");
+let via = new Via({ wire: wire as any });
 
-function isAsyncIterator(obj): obj is AsyncIterableIterator<any> {
-  return typeof obj[Symbol.asyncIterator] !== "undefined"
+function isIterable(a: any): a is AsyncIterable<any> {
+  return a != undefined && a[Symbol.asyncIterator] != undefined;
 }
+
+rl.on('line', (input) => {
+  via.request({
+    head: {
+      method: "PUT",
+      path: "/chat/message",
+    },
+    data: input
+  });
+});
+
+via.on("open", async () => {
+  console.log("opened");
+  try {
+    let res = await via.request({
+      head: {
+        method: "GET",
+        path: "/chat/channel",
+      },
+      data: from([1, 2, 3, 4])
+    });
+
+    let task;
+
+    if (isObservable(res.data)) {
+      task = res.data.forEach(x => console.log(x));
+    }
+  } catch (err) {
+    console.log(err);
+  }
+});
+
+via.on("error", (err) => {
+  console.log(err);
+});

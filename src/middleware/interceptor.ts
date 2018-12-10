@@ -1,57 +1,88 @@
-import { Context, isResponse, isRequest } from '../context';
-import { ContextProcessor, ContextHandler } from '../context';
-import { Rowan } from 'rowan';
+import { Context } from '../context';
+import { Rowan, Processor, Middleware } from 'rowan';
+import { Disposer } from '../_disposer';
 
-type InterceptConfig = {
+type InterceptConfig<Ctx extends Context = Context> = {
   dispose: () => void,
   timestamp: number,
-  handlers: ContextHandler[]
+  middleware: Middleware<Ctx>[]
+};
+
+export type InterceptOptions<Ctx extends Context = Context> = {
+  id: string;
+  handlers: Processor<Ctx>[];
 };
 
 /** 
- * used to intercept messages with matching request/response ids and terminate further processing
- * does NOT intercept if there is a processing error
+ * used to intercept messages with matching message ids and terminate further processing
  **/
-export class Interceptor implements ContextProcessor {
+export default class Interceptor<Ctx extends Context = Context> implements Middleware<Ctx> {
+
   private _interceptors = new Map<string, InterceptConfig>();
 
   /**
-   * intercept any message with a matching res/req id
-   * @param id: message id to incercept 
-   * @param handlers: 1 or more handlers 
-   * @returns method to remove (dispose) the interception entry. 
+   * intercept any message with a matching id
+   * @param id: message id to intercept
+   * @param handlers: handlers or middleware
+   * @returns method to remove (dispose) the interception entry.`
    */
-  intercept(id: string, handlers: ContextHandler[]): () => void {
+  intercept(opt: InterceptOptions): () => void {
+    const { id, handlers } = opt;
+
     if (id == undefined) throw Error("id cannot be undefined");
     if (id.length == 0) throw Error("id cannot be empty");
     if (handlers == undefined) throw Error("handlers cannot be undefined");
     if (handlers.length == 0) throw Error("handlers length cannot be zero");
 
-    let dispose = () => this._interceptors.delete(id);
+    const dispose: Disposer = () => {
+      //console.log("disposed interceptor for", id);
+      this._interceptors.delete(id);
+    };
+
+    const middleware = handlers.map(x => Rowan.convertToMiddleware(x));
+
+    //if (this._interceptors.has(id)) {
+    // TODO: figure out what to do if an interceptor exists already
+    //}
 
     this._interceptors.set(id, {
       dispose: dispose,
       timestamp: Date.now(),
-      handlers: handlers
+      middleware: middleware
     });
 
     return dispose;
   }
 
-  /**
-   * @internal 
+  /** 
+   * re-route processing to an interceptor's middleware
    */
-  process(ctx: Context, err: any): Promise<boolean> {
-    if (err) return undefined;
+  async process(ctx: Context, next): Promise<void> {
+    const id = ctx.in.id;
 
-    const id = ctx.req!= undefined ? ctx.req.id : ctx.res != undefined ? ctx.res.id : undefined;
+    if (this._interceptors.has(id)) {
+      const interceptor = this._interceptors.get(id);
 
-    if (!id) return undefined;
-
-    const interceptor = this._interceptors.get(id);
-
-    if (interceptor) {      
-      return Rowan.execute(ctx, undefined, interceptor.handlers).then(function(){ return Promise.resolve(false)});
+      if (interceptor) {
+        return Rowan.process(interceptor.middleware, ctx, next);
+      }
     }
+    return next();
   };
+
+  dispose() {
+    for (let [key, value] of this._interceptors.entries()) {
+      value.dispose();
+    }
+  }
+
+  private _checkTimeout() {
+    let now = Date.now();
+    for (let [key, value] of this._interceptors.entries()) {
+      let span = now - value.timestamp;
+      if (span > 5000) {
+        value.dispose();
+      }
+    }
+  }
 }

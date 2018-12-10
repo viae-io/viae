@@ -1,74 +1,47 @@
-import { Context, ContextProcessor, ContextHandler } from './context';
-import { Wire, WireServer } from './wire';
-import { Via } from './via';
-import { Method } from './method';
-import { Message } from './message';
-import { Rowan } from 'rowan';
-import { LiteEventEmitter } from 'lite-event-emitter';
+import { Rowan, Processor } from "rowan";
 
-import { Interceptor } from './middleware';
-import { Plugin, isPlugin } from './plugin';
+import { Context } from "./context";
+import { WireServer } from "./wire-server";
+import { EventEmitter } from "events";
 
-export class Viae implements ContextProcessor {
+import { Via } from "./via";
+import { Log, ConsoleLog } from "./log";
+
+export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
   private _connections = new Array<Via>();
-
-  private _interceptor = new Interceptor();
+  private _ev = new EventEmitter();
   private _before = new Rowan<Context>();
-  private _after = new Rowan<Context>();
-  private _app = new Rowan<Context>([this._interceptor, this._before]);
 
-  private _events = new LiteEventEmitter();
+  constructor(server: WireServer, middleware?: Processor<Ctx>[]) {
+    super(middleware);
 
-  constructor(server: WireServer, ...plugins: Plugin[]) {
-    server.on("connection", (wire: Wire) => {
-      let via = new Via(wire);
-    
-      via.use(this);
+    server.on("connection", (wire) => {
+      let via = new Via({ wire: wire, log: Viae.Log }).before(this._before).use(this);
 
       wire.on("close", () => {
         this._connections.splice(this._connections.indexOf(via), 1);
+        Viae.Log.info("disconnection", via.wire.meta);
+      });
+
+      via.on("error", (err) => {
+        Viae.Log.fatal("unhandled exception - closing wire.", err);
+        wire.close();
       });
 
       this._connections.push(via);
-
-      this._events.emit("connection", via);
+      this._ev.emit("connection", via);
+      Viae.Log.info("connection", via.wire.meta);
     });
-
-    for (let extension of plugins) {
-      extension.plugin(this);
-    }
   }
 
-  get connections() { return this._connections.slice(0); };
-
-  on(event: "connection", cb: (connection: Via) => void) {
-    this._events.on(event, cb);
+  on(event: "connection", cb: (connection: Via<Ctx>) => void) {
+    this._ev.on(event, cb);
   }
 
-  process(ctx: Context, error?: Error): Promise<void> {
-    return this._app.process(ctx, error)
-      .catch((err) => {
-        return Promise.resolve(error = err);
-      })
-      .then(_ => {
-        delete ctx.$done;
-        return this._after.process(ctx, error);
-      });
+  before(processor: Processor<Ctx>) {
+    this._before.use(processor);
+    return this;
   }
 
-  before(handler: ContextHandler, ...handlers: ContextHandler[]) {
-    this._before.use(handler, ...handlers);
-  }
-  use(plugin: Plugin)
-  use(handler: ContextHandler, ...handlers: ContextHandler[])
-  use(handler: ContextHandler | Plugin, ...handlers: ContextHandler[]) {
-    if (isPlugin(handler)) {
-      handler.plugin(this);
-    } else {
-      this._app.use(handler, ...handlers);
-    }
-  }
-  after(handler: ContextHandler, ...handlers: ContextHandler[]) {
-    this._after.use(handler, ...handlers);
-  }
+  static Log: Log = new ConsoleLog();
 }

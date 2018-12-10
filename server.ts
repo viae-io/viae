@@ -1,47 +1,43 @@
+import { Viae, Status } from './src';
 import { Server as WebSocketServer } from 'ws';
-import { Viae, RequestContext, Method, Router, Subscription, Subscriber } from './src';
-import { Scribe, Itable, unhandled } from './src';
+import { App } from './src/app';
+import { Controller, Get, Data, Param, All, Next, Ctx, Raw, Head, Put } from './src/decorators';
+import { Middleware } from 'rowan';
+import { Observable, from, isObservable, Subject } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { ftruncate } from 'fs';
 
-let wss = new WebSocketServer({ port: 9090 });
-let server = new Viae(wss, new Scribe(), new Itable());
-let router = new Router({ root: "/base", name: "example", doc: "An example router" });
 
-router.route({
-  method: Method.GET,
-  path: "/echo",
-  handlers: [
-    (ctx) => {
-      const req = ctx.req;
-      const con = ctx.connection;
-      const auth = con.auth;
+let server = new WebSocketServer({ port: 8080, host: "localhost" });
+let viae = new Viae(server);
 
-      if (auth == "john") {
-        ctx.send({ body: req.body, status: 200 });
-      }
-      else {
-        ctx.send({ status: 403 });
-      }
-    }
-  ]
+@Controller('chat')
+class ChatRoomController {
+  private _generalChannel = new Subject<string>();
+
+  @Get("channel")
+  general() {
+    return this._generalChannel;
+  }
+
+  @Put("message")
+  generalMessage(@Data() data: string) {
+    this._generalChannel.next(data);
+    return Status.OK;
+  }
+}
+
+viae.before(async (ctx, next) => {
+  let start = Date.now();
+  
+  await next();
+
+  let duration = Date.now() - start;
+  if (ctx && ctx.in && ctx.out) {
+    ctx.connection.log.info(`${ctx.in.head.method} ${ctx.in.head.path} - ${ctx.out.head.status} ${duration.toFixed()}ms`);
+  }
 });
 
-router.route({
-  method: Method.POST,
-  path: "/auth",
-  handlers: [
-    (ctx) => {
-      const req = ctx.req;
-      const con = ctx.connection;
-
-      con["auth"] = req.body;
-
-      ctx.send({ status: 200 });
-    }
-  ]
-});
-
-server.use(router);
-server.use(unhandled());
-
-console.log("Server Running on 9090....");
-
+viae.use(new App({
+  controllers: [new ChatRoomController()]
+}));
