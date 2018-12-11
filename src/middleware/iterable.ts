@@ -94,13 +94,13 @@ export class UpgradeIncomingIterable implements Middleware<Context> {
         next: async function (): Promise<IteratorResult<any>> {
           if (!subscribed) {
             subscribed = true;
-            response = await connection.request({ id: sid, head: { method: "SUBSCRIBE" } });
+            response = await connection.request("SUBSCRIBE", undefined, undefined, { id: sid });
             if (response.head.status != 200) {
               throw Error(response.data);
             }
           }
 
-          response = await connection.request({ id: sid, head: { method: "NEXT" } });
+          response = await connection.request("NEXT", undefined, undefined, { id: sid });
 
           switch (response.head.status) {
             case 206:
@@ -113,7 +113,7 @@ export class UpgradeIncomingIterable implements Middleware<Context> {
           }
         },
         return: async function () {
-          response = await connection.request({ id: sid, head: { method: "UNSUBSCRIBE" } });
+          response = await connection.request("UNSUBSCRIBE", undefined, undefined, { id: sid });
           return { value: undefined, done: true };
         }
       };

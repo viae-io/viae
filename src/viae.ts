@@ -24,7 +24,6 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
       });
 
       via.on("error", (err) => {
-        Viae.Log.fatal("unhandled exception - closing wire.", err);
         wire.close();
       });
 

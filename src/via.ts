@@ -9,10 +9,9 @@ import DataEncoder from "./middleware/data-encoder";
 import Interceptor from "./middleware/interceptor";
 import Send from "./middleware/send";
 
-import { UpgradeOutgoingIterable, UpgradeIncomingIterable } from "./middleware/iterable";
 import { MessageSerialiser } from "./message-encoder";
 import { Log, ConsoleLog } from "./log";
-import { toUint8Array, basicId } from "./util";
+import { toUint8Array, shortId } from "./util";
 import { UpgradeOutgoingObservable, UpgradeIncomingObservable } from "./middleware/observable";
 import { IVia, SendOptions } from "./_via";
 
@@ -33,8 +32,8 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
   /* outgoing message pipeline */
 
   readonly out: Rowan<Context> = new Rowan<Context>();
-  
-  get wire(){
+
+  get wire() {
     return this._wire;
   }
 
@@ -46,7 +45,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     this.CtxCtor = (opts ? opts.Ctx : undefined) || DefaultContext;
 
     this._log = (opts ? opts.log : undefined) || new ConsoleLog();
-    this._uuid = (opts ? opts.uuid : undefined) || basicId;
+    this._uuid = (opts ? opts.uuid : undefined) || shortId;
 
     this
       /* execute the 'before' pipeline */
@@ -55,7 +54,6 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       .use(new After([
         this.out
           .use(new AfterIf((ctx) => !!ctx.out, [
-            new UpgradeOutgoingIterable(),
             new UpgradeOutgoingObservable(),
             new DataEncoder(),
             new Send(this._encoder)
@@ -63,8 +61,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       ]))
       /* add the lazy data decoder */
       .use(new DataDecoder())
-      /* convert data to an async iterable */
-      .use(new UpgradeIncomingIterable())
+
       /* convert data to an observable */
       .use(new UpgradeIncomingObservable())
       /* intercept id-matching messages */
@@ -92,7 +89,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
 
   private async _onMessage(data: ArrayBuffer | ArrayBufferView) {
     const msg = this._encoder.decode(toUint8Array(data));
-    const ctx = new this.CtxCtor({ connection:  this as IVia<C>, in: msg, log: this._log });
+    const ctx = new this.CtxCtor({ connection: this as IVia<C>, in: msg, log: this._log });
 
     this._log.debug("Received", msg);
 
@@ -107,7 +104,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
    * Fire and Forget - Add a message to the outgoing pipeline
    **/
   async send(msg: Partial<Message>, opts?: SendOptions) {
-    if (!msg.id) msg.id = basicId();
+    if (!msg.id) msg.id = shortId();
     if (opts && opts.encoding) {
       msg.head = msg.head || {};
       msg.head.encoding = opts.encoding;
@@ -125,11 +122,21 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
    * @param msg 
    * @param opts 
    */
-  async request(msg: Partial<Message>, opts?: SendOptions) {
-    if (!msg.id) msg.id = basicId();
+  async request(
+    method: string,
+    path: string,
+    data?: any,
+    opts?: SendOptions) {
+    let msg: Partial<Message> = {
+      id: (opts && opts.id) ? opts.id : shortId(),
+      head: {
+        method,
+        path
+      }
+    };
 
-    if (!isRequest(msg)) {
-      throw Error("Message is not a Request");
+    if (data) {
+      msg.data = data;
     }
 
     let reject, resolve, promise = new Promise<Message>((r, x) => { resolve = r; reject = x; });

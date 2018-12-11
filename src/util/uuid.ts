@@ -1,7 +1,7 @@
 const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 const charLen = chars.length;
 
-export function basicId() {
+export function shortId() {
   let N = 6;
   let id = "";
 

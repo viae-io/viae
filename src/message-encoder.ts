@@ -67,7 +67,7 @@ export class MessageSerialiser {
           offset += length;
           break;
         default:
-          throw Error("unsupported protobuf-type");
+          throw Error("unsupported field");
       }
     }
     return fields;
