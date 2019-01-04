@@ -56,11 +56,11 @@ export class ConsoleLog implements Log {
   warn(message: String, ...args: any[]): void {
     if (this.level <= LogLevel.Warn) console.log(`${CC.FgYellow}WARN ${CC.Reset}`, new Date(), message, ...args);
   }
-  error(message: String, ...args: any[]): void {
-    if (this.level <= LogLevel.Error) console.log(`${CC.FgRed}ERROR${CC.Reset}`, new Date(), message, ...args);
+  error(message: String, err: Error, ...args: any[]): void {
+    if (this.level <= LogLevel.Error) console.log(`${CC.FgRed}ERROR${CC.Reset}`, new Date(), message, err.message, ...args);
   }
-  fatal(message: String, ...args: any[]): void {
-    if (this.level <= LogLevel.Fatal) console.log(`${CC.BgRed}FATAL${CC.Reset}`, new Date(), message, ...args);
+  fatal(message: String, err: Error, ...args: any[]): void {
+    if (this.level <= LogLevel.Fatal) console.log(`${CC.BgRed}FATAL${CC.Reset}`, new Date(), message, err.message, ...args);
   }
 }
 

@@ -1,8 +1,8 @@
 import { Viae, } from './src';
 import { Server as WebSocketServer } from 'ws';
 import { App } from './src/app';
-import { Controller, Get, Data } from './src/decorators';
-import { Subject,  isObservable, Observable } from 'rxjs';
+import { Controller, Get, Data, Param } from './src/decorators';
+import { Subject, isObservable, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 let server = new WebSocketServer({ port: 8080, host: "0.0.0.0" });
@@ -19,15 +19,13 @@ viae.before((ctx, next) => {
   return next();
 });
 
-@Controller('api/:foo')
+@Controller('api')
 class ChatRoomController {
   private _generalChannel = new Subject<string>();
 
-  @Get("dummy/:bar")
-  general(@Data() data: Observable<number>) {
-    if (isObservable(data)) {
-      return data.pipe(map(x => x * 2));
-    }
+  @Get(":bar")
+  general(@Param("bar", Number) bar: number) {
+    return { bar: bar };
   }
 }
 

@@ -121,14 +121,18 @@ export function Next() {
   };
 }
 
-export function Param(key: string) {
+export function Param(key: string, type?: any) {
   return function (target: any, propertyKey: string | symbol, index: number) {
     let router: any = Reflect.getMetadata("__router", target) || {};
     let routes = router.routes || [];
     let route = routes[propertyKey] || {};
 
     route.args = route.args || [];
-    route.args[index] = { type: "param", opt: key };
+    route.args[index] = { 
+      type: "param", 
+      opt: key,
+      ctor: type || String
+     };
 
     routes[propertyKey] = route;
     router["routes"] = routes;

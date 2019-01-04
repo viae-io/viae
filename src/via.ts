@@ -61,7 +61,6 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       ]))
       /* add the lazy data decoder */
       .use(new DataDecoder())
-
       /* convert data to an observable */
       .use(new UpgradeIncomingObservable())
       /* intercept id-matching messages */
@@ -96,6 +95,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     try {
       await this.process(ctx as C);
     } catch (err) {
+      this._log.error("Unhandled Error", err);
       this._ev.emit("error", err);
     }
   }

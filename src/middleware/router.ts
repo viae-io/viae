@@ -175,7 +175,7 @@ export class Router implements Middleware<Context>, RouterOptions {
                   case "next":
                     return next;
                   case "param":
-                    return x.opt ? ctx.params[x.opt] : ctx.params;
+                    return x.opt ? new x.ctor(ctx.params[x.opt]).valueOf() : ctx.params;
                 };
                 return undefined;
               });
