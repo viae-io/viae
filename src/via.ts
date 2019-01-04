@@ -1,4 +1,4 @@
-import { Rowan, After, AfterIf, Processor } from "rowan";
+import { Rowan, After, AfterIf, Processor, Catch } from "rowan";
 import { EventEmitter } from "events";
 import { Wire } from "./wire";
 import { Message, isRequest } from './message';
@@ -14,6 +14,7 @@ import { Log, ConsoleLog } from "./log";
 import { toUint8Array, shortId } from "./util";
 import { UpgradeOutgoingObservable, UpgradeIncomingObservable } from "./middleware/observable";
 import { IVia, SendOptions } from "./_via";
+import { Status } from "./status";
 
 /**
  * Via
@@ -59,6 +60,10 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
             new Send(this._encoder)
           ]))
       ]))
+      .use(new Catch(
+        async (_, ctx) => {
+          ctx.out.head.status = Status.Error;
+        }))
       /* add the lazy data decoder */
       .use(new DataDecoder())
       /* convert data to an observable */
