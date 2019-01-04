@@ -68,7 +68,8 @@ export class Router implements Middleware<Context>, RouterOptions {
       return Rowan.process(this.middleware, ctx, function () {
         ctx.in.head.path = originalPath;
         return next();
-      }).then(() => { ctx.in.head.path = originalPath; });
+      }).then(() => { ctx.in.head.path = originalPath; })
+        .catch((err) => { ctx.in.head.path = originalPath; throw err; });
     }
     return next();
   }
@@ -135,7 +136,11 @@ export class Router implements Middleware<Context>, RouterOptions {
         return Rowan.process(processors, ctx, function () {
           ctx.in.head.path = originalPath;
           return next();
-        }).then(() => { ctx.in.head.path = originalPath; });
+        }).then(() => { ctx.in.head.path = originalPath; })
+          .catch((err) => {
+            ctx.in.head.path = originalPath;
+            throw err;
+          });
       });
   }
 
