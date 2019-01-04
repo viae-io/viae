@@ -12,7 +12,7 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
   private _ev = new EventEmitter();
   private _before = new Rowan<Context>();
 
-  constructor(server: WireServer, opts: { log?: Log, middleware?: Processor<Ctx>[], }) {
+  constructor(server: WireServer, opts?: { log?: Log, middleware?: Processor<Ctx>[], }) {
     super((opts) ? opts.middleware : undefined);
 
     server.on("connection", (wire) => {
