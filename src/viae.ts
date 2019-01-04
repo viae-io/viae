@@ -12,11 +12,12 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
   private _ev = new EventEmitter();
   private _before = new Rowan<Context>();
 
-  constructor(server: WireServer, middleware?: Processor<Ctx>[]) {
-    super(middleware);
+  constructor(server: WireServer, opts: { log?: Log, middleware?: Processor<Ctx>[], }) {
+    super((opts) ? opts.middleware : undefined);
 
     server.on("connection", (wire) => {
-      let via = new Via({ wire: wire, log: Viae.Log }).before(this._before).use(this);
+      let log = opts && opts.log ? opts.log : Viae.Log;
+      let via = new Via({ wire: wire, log: log }).before(this._before).use(this);
 
       wire.on("close", () => {
         this._connections.splice(this._connections.indexOf(via), 1);
