@@ -25,6 +25,7 @@ class ChatRoomController {
 
   @Get(":bar")
   general(@Param("bar", Number) bar: number) {
+    throw Error("boo");
     return { bar: bar };
   }
 }
@@ -36,7 +37,15 @@ viae.before(async (ctx, next) => {
 
   let duration = Date.now() - start;
   if (ctx && ctx.in && ctx.out) {
-    ctx.connection.log.info(`${ctx.in.head.method} ${ctx.in.head.path} - ${ctx.out.head.status} ${duration.toFixed()}ms`);
+    let msg = `${ctx.in.head.method} ${ctx.in.head.path} - ${ctx.out.head.status} ${duration.toFixed()}ms`;
+
+    if(ctx.out.head.status >= 500){
+      ctx.connection.log.error(msg, ctx.err);
+    }else if(ctx.out.head.status >= 400){
+      ctx.connection.log.warn(msg);
+    }else{
+      ctx.connection.log.info(msg);
+    }
   }
 });
 

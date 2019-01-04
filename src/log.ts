@@ -48,19 +48,19 @@ export class ConsoleLog implements Log {
   level = LogLevel.Info;
 
   debug(message: String, ...args: any[]): void {
-    if (this.level <= LogLevel.Debug) console.log(`${CC.Dim}DEBUG${CC.Reset}`, new Date(), message, ...args);
+    if (this.level <= LogLevel.Debug) console.log(`${CC.Dim}DEBUG${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
   }
   info(message: String, ...args: any[]): void {
-    if (this.level <= LogLevel.Info) console.log(`${CC.FgCyan}INFO ${CC.Reset}`, new Date(), message, ...args);
+    if (this.level <= LogLevel.Info) console.log(`${CC.FgCyan}INFO ${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
   }
   warn(message: String, ...args: any[]): void {
-    if (this.level <= LogLevel.Warn) console.log(`${CC.FgYellow}WARN ${CC.Reset}`, new Date(), message, ...args);
+    if (this.level <= LogLevel.Warn) console.log(`${CC.FgYellow}WARN ${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
   }
-  error(message: String, err: Error, ...args: any[]): void {
-    if (this.level <= LogLevel.Error) console.log(`${CC.FgRed}ERROR${CC.Reset}`, new Date(), message, err.message, ...args);
+  error(message: String, ...args: any[]): void {
+    if (this.level <= LogLevel.Error) console.log(`${CC.FgRed}ERROR${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
   }
-  fatal(message: String, err: Error, ...args: any[]): void {
-    if (this.level <= LogLevel.Fatal) console.log(`${CC.BgRed}FATAL${CC.Reset}`, new Date(), message, err.message, ...args);
+  fatal(message: String, ...args: any[]): void {
+    if (this.level <= LogLevel.Fatal) console.log(`${CC.BgRed}FATAL${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args); 
   }
 }
 

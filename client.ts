@@ -10,7 +10,7 @@ via.on("open", async () => {
   try {
     let res = await via.request("GET", "/api/1/");
 
-    console.log(res.data);
+    console.log(res);
 
   } catch (err) {
     console.log(err);

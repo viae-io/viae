@@ -61,7 +61,8 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
           ]))
       ]))
       .use(new Catch(
-        async (_, ctx) => {
+        async (err, ctx) => {
+          ctx.err = err;
           ctx.out.head.status = Status.Error;
         }))
       /* add the lazy data decoder */

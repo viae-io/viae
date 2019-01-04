@@ -21,7 +21,7 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
 
       wire.on("close", () => {
         this._connections.splice(this._connections.indexOf(via), 1);
-        Viae.Log.info("disconnection", via.wire.meta);
+        Viae.Log.info("disconnection", ... (via.wire.meta ? [via.wire.meta] : []));
       });
 
       via.on("error", (err) => {
@@ -30,7 +30,7 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
 
       this._connections.push(via);
       this._ev.emit("connection", via);
-      Viae.Log.info("connection", via.wire.meta);
+      Viae.Log.info("connection", ... (via.wire.meta ? [via.wire.meta] : []));
     });
   }
 
