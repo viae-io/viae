@@ -25,12 +25,11 @@ class ChatRoomController {
 
   @Get(":bar")
   general(@Param("bar", Number) bar: number) {
-    throw Error("boo");
     return { bar: bar };
   }
 }
 
-viae.before(async (ctx, next) => {
+/*viae.before(async (ctx, next) => {
   let start = Date.now();
 
   await next();
@@ -47,7 +46,7 @@ viae.before(async (ctx, next) => {
       ctx.connection.log.info(msg);
     }
   }
-});
+});*/
 
 viae.use(new App({
   controllers: [new ChatRoomController()]

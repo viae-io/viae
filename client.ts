@@ -8,10 +8,9 @@ let via = new Via({ wire: wire as any });
 via.on("open", async () => {
   console.log("opened");
   try {
-    let res = await via.request("GET", "/api/1/");
-
-    console.log(res);
-
+    for (let i = 0; i < 1000000; i++) {
+      let res = await via.request("GET", "/api/1/");
+    }
   } catch (err) {
     console.log(err);
   }

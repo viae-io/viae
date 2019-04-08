@@ -23,8 +23,6 @@ export interface IVia<T> extends IRowan<T> {
   on(event: "close", cb: () => void): void;
   on(event: "open", cb: () => void): void;
   on(event: "error", cb: (err: Error, ctx: T) => void): void;
-
-
 }
 
 export type SendOptions = {
