@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.0-alpha.5",
   "description": "bi-directional binary streaming req/res framework",
   "main": "dist/commonjs/index.js",
   "module": "dist/es2015/index.js",
@@ -62,7 +62,7 @@
     "msgpack-lite": "~0.1.26",
     "path-to-regexp": "0.1.7",
     "reflect-metadata": "^0.1.12",
-    "rowan": "1.0.0-beta.4",
+    "rowan": "^1.0.0",
     "rxjs": "^6.3.3",
     "varint": "^5.0.0"
   },

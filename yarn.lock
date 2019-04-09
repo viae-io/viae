@@ -2424,10 +2424,10 @@ rimraf@~2.1.4:
   optionalDependencies:
     graceful-fs "~1"
 
-rowan@1.0.0-beta.4:
-  version "1.0.0-beta.4"
-  resolved "https://registry.yarnpkg.com/rowan/-/rowan-1.0.0-beta.4.tgz#31448b497b8fccdcc90607d194caff862f29a4be"
-  integrity sha512-UkQJ4neB0j2Fa89aO/S9qHp8nGjNVxyo9ILKgvBfQlDqFq7VSvHJRyf/pS01x0gjUIa6ch5VqcmGFE9DAraReQ==
+rowan@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/rowan/-/rowan-1.0.0.tgz#c41605c779900265d0b0a0740b44af5a2eb18b09"
+  integrity sha512-oJLmgA3WhXzluDi2nuUeSNj+JXL3W07HleIbpP1LpeNha8c0Jr3B/+Opw+daTs4iHFsWZl37BD0bTcPBCzfBaA==
 
 rx@2.3.24:
   version "2.3.24"
