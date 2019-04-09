@@ -54,16 +54,17 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       /* execute the 'outbound' pipeline after the main pipeline */
       .use(new After([
         this.out
-          .use(new AfterIf((ctx) => !!ctx.out, [
+          .use(new AfterIf(function (ctx) { return Promise.resolve(!!ctx.out); }, [
             new UpgradeOutgoingObservable(),
             new DataEncoder(),
             new Send(this._encoder)
           ]))
       ]))
       .use(new Catch(
-        async (err, ctx) => {
+        function (err, ctx) {
           ctx.err = err;
           ctx.out.head.status = Status.Error;
+          return Promise.resolve();
         }))
       /* add the lazy data decoder */
       .use(new DataDecoder())
@@ -92,35 +93,31 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     return this._log;
   }
 
-  private async _onMessage(data: ArrayBuffer | ArrayBufferView) {
+  private _onMessage(data: ArrayBuffer | ArrayBufferView) {
     const msg = this._encoder.decode(toUint8Array(data));
     const ctx = new this.CtxCtor({ connection: this as IVia<C>, in: msg, log: this._log });
 
     this._log.debug("Received", msg);
 
-    try {
-      await this.process(ctx as C);
-    } catch (err) {
+    this.process(ctx as C).catch(err => {
       this._log.error("Unhandled Error", err);
       this._ev.emit("error", err);
-    }
+    });
   }
 
   /**
    * Fire and Forget - Add a message to the outgoing pipeline
    **/
-  async send(msg: Partial<Message>, opts?: SendOptions) {
+  send(msg: Partial<Message>, opts?: SendOptions) {
     if (!msg.id) msg.id = shortId();
     if (opts && opts.encoding) {
       msg.head = msg.head || {};
       msg.head.encoding = opts.encoding;
     }
 
-    try {
-      await this.out.process(new this.CtxCtor({ connection: this as IVia<C>, out: msg as Message, log: this._log }));
-    } catch (err) {
+    return this.out.process(new this.CtxCtor({ connection: this as IVia<C>, out: msg as Message, log: this._log })).catch(function (err){
       this._ev.emit("error", err);
-    }
+    });
   }
 
   /**
@@ -150,12 +147,13 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
 
     let dispose = this._interceptor.intercept({
       id: msg.id,
-      handlers: [async (ctx, next) => {
+      handlers: [function(ctx, _) {
         resolve(ctx.in);
+        return Promise.resolve();
       }]
     });
 
-    clock = setTimeout(() => { reject("Request Timeout"); }, (opts ? opts.timeout : undefined) || 10000);
+    clock = setTimeout(() => { reject("Request Timeout"); }, (opts ? opts.timeout : undefined) || 3000);
 
     try {
       await this.send(msg, opts);

@@ -9,10 +9,10 @@ export function request(method?: string, path?: string) {
     var exp = pathToRegexp(path, keys);
     return (ctx: Context) => {
       if (ctx.in == undefined || ctx.in.head == undefined || ctx.in.head.method !== method)
-        return false;
+        return Promise.resolve(false);
       let match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;
       if (match == null) {
-        return false;
+        return Promise.resolve(false);
       }
       if (keys.length > 0) {
         ctx.params = ctx.params || {};
@@ -20,15 +20,15 @@ export function request(method?: string, path?: string) {
           ctx.params[keys[i].name] = match[i + 1];
         }
       }
-      return true;
+      return Promise.resolve(true);
     };
   }
   else if (method != undefined) {
     return (ctx: Context) => {
-      return ctx.in != undefined && ctx.in.head != undefined && ctx.in.head.method === method;
+      return Promise.resolve(ctx.in != undefined && ctx.in.head != undefined && ctx.in.head.method === method);
     };
   }
   return (ctx: Context) => {
-    return ctx.in != undefined;
+    return Promise.resolve(ctx.in != undefined);
   };
 }
