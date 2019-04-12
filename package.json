@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "1.0.0-alpha.6",
+  "version": "1.0.0-alpha.7",
   "description": "bi-directional binary streaming req/res framework",
   "main": "dist/commonjs/index.js",
   "module": "dist/es2015/index.js",
