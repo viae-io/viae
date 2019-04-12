@@ -12,3 +12,5 @@ export * from './viae';
 
 export * from './app';
 export * from './decorators';
+
+export * from './error';

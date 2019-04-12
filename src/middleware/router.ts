@@ -3,6 +3,7 @@
 import { Rowan, If, Processor, IRowan, Middleware, Next } from 'rowan';
 import { Context } from '../context';
 import * as pathToRegexp from 'path-to-regexp';
+import { ViaeError } from '../error';
 
 
 export interface RouterOptions {
@@ -198,7 +199,12 @@ export class Router implements Middleware<Context>, RouterOptions {
               } catch (err) {
                 if (typeof err == "number") {
                   ctx.out.head.status = err;
-                } else {
+                }
+                else if (err instanceof ViaeError) {
+                  ctx.out.head.status = err.status;
+                  ctx.out.data = err.message;
+                }
+                else {
                   throw err;
                 }
               }
