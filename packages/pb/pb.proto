@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+message Msg {
+  string id = 1;
+  map<string, string> head = 2;
+  bytes raw = 3;
+}

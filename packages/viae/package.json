@@ -1,0 +1,88 @@
+{
+  "name": "viae",
+  "version": "1.0.0",
+  "description": "bi-directional binary streaming req/res framework",
+  "main": "dist/commonjs/index.js",
+  "module": "dist/es2015/index.js",
+  "typings": "dist/commonjs/index.d.ts",
+  "scripts": {
+    "lint": "cross-env tslint --project tsconfig.json --config tslint.json",
+    "clean": "cross-env rimraf .tmp .nyc_output coverage dist",
+    "build": "tsc --build tsconfig.json",
+    "debug": "npm run clean && cross-env tsc --project tsconfig.json --outDir ./.tmp/ --module commonjs ",
+    "test": "nyc node_modules/mocha/bin/_mocha --require source-map-support/register --compilers ts:ts-node/register test/**/*.ts",
+    "cover": "codecov",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/viae-io/viae.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "keywords": [
+    "api",
+    "middleware",
+    "request",
+    "response",
+    "websocket",
+    "async-iterable",
+    "rowan",
+    "ws"
+  ],
+  "author": "Meirion Hughes <crakinshot@yahoo.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/viae-io/viae/issues"
+  },
+  "homepage": "https://github.com/viae-io/viae#readme",
+  "devDependencies": {  
+    "@types/ws": "^4.0.2",
+    "chai": "^4.1.2",
+    "codecov": "^1.0.1",
+    "concurrently": "^3.4.0",
+    "core-js": "^2.4.1",
+    "cross-env": "^3.2.4",
+    "mocha": "^5.2.0",
+    "nyc": "^11.0.3",
+    "rimraf": "^2.6.1",
+    "source-map-support": "^0.4.15",
+    "ts-node": "^3.2.0",
+    "tslint": "^4.3.1",
+    "typescript": "^3.4.2",
+    "ws": "^5.1.1"
+  },
+  "dependencies": {
+    "@viae/pb": "^1.0.0",
+    "@viae/core": "^1.0.0",
+    "msgpack-lite": "~0.1.26",
+    "path-to-regexp": "0.1.7",
+    "reflect-metadata": "^0.1.12",
+    "rowan": "^1.0.0",
+    "rxjs": "^6.3.3"
+  },
+  "nyc": {
+    "include": [
+      "src/**/*.ts"
+    ],
+    "exclude": [
+      "node_modules/",
+      "dist/"
+    ],
+    "extension": [
+      ".ts"
+    ],
+    "require": [
+      "source-map-support/register",
+      "ts-node/register"
+    ],
+    "reporter": [
+      "text-summary",
+      "html",
+      "lcov"
+    ],
+    "sourceMap": true,
+    "instrument": true
+  }
+}

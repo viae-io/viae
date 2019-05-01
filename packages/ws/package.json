@@ -1,0 +1,26 @@
+{
+  "name": "@viae/ws",
+  "version": "1.0.0",  
+  "author": "Meirion Hughes <crakinshot@yahoo.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/viae-io/viae/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/viae-io/viae.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "homepage": "https://github.com/viae-io/viae#readme",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  
+  "dependencies": {
+    "@viae/core" : "^1.0.0"
+  },
+  "scripts": {
+    "build": "tsc --build tsconfig.json"
+  }
+}
