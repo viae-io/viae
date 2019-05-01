@@ -336,14 +336,14 @@
       "emitDecoratorMetadata": true,
       "declaration": true,
       "sourceMap": true,
-      "outDir": "d:/Code/viae/packages/ws/dist",
-      "rootDir": "d:/Code/viae/packages/ws/src/",
+      "outDir": "D:/Code/viae/packages/ws/dist",
+      "rootDir": "D:/Code/viae/packages/ws/src/",
       "composite": true,
       "lib": [
         "lib.es2017.d.ts",
         "lib.dom.d.ts"
       ],
-      "configFilePath": "d:/Code/viae/packages/ws/tsconfig.json"
+      "configFilePath": "D:/Code/viae/packages/ws/tsconfig.json"
     },
     "referencedMap": {
       "d:/code/viae/node_modules/typescript/lib/lib.es5.d.ts": [
@@ -889,19 +889,6 @@
         "d:/code/viae/node_modules/@types/node/util.d.ts",
         "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
       ],
-      "d:/code/viae/packages/core/dist/index.d.ts": [
-        "d:/code/viae/packages/core/dist/_message-frame.d.ts",
-        "d:/code/viae/packages/core/dist/_message-header.d.ts",
-        "d:/code/viae/packages/core/dist/_wire.d.ts",
-        "d:/code/viae/packages/core/dist/_wire-server.d.ts",
-        "d:/code/viae/packages/core/dist/status.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/packages/ws/src/index.ts": [
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/packages/core/dist/index.d.ts"
-      ],
       "d:/code/viae/packages/core/dist/_message-header.d.ts": [
         "d:/code/viae/packages/core/dist/status.d.ts",
         "d:/code/viae/node_modules/@types/node/util.d.ts",
@@ -921,15 +908,229 @@
         "d:/code/viae/node_modules/@types/node/util.d.ts",
         "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
       ],
+      "d:/code/viae/packages/core/dist/index.d.ts": [
+        "d:/code/viae/packages/core/dist/_message-frame.d.ts",
+        "d:/code/viae/packages/core/dist/_message-header.d.ts",
+        "d:/code/viae/packages/core/dist/_wire.d.ts",
+        "d:/code/viae/packages/core/dist/_wire-server.d.ts",
+        "d:/code/viae/packages/core/dist/status.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
       "d:/code/viae/node_modules/@types/events/index.d.ts": [
         "d:/code/viae/node_modules/@types/node/util.d.ts",
         "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/packages/ws/src/index.ts": [
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/packages/core/dist/index.d.ts"
       ],
       "d:/code/viae/node_modules/@types/node/globals.d.ts": [
         "d:/code/viae/node_modules/@types/node/util.d.ts",
         "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
       ],
       "d:/code/viae/node_modules/@types/node/assert.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/async_hooks.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/buffer.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/child_process.d.ts": [
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/net.d.ts",
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/cluster.d.ts": [
+        "d:/code/viae/node_modules/@types/node/child_process.d.ts",
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/net.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/console.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/constants.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/crypto.d.ts": [
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/dgram.d.ts": [
+        "d:/code/viae/node_modules/@types/node/net.d.ts",
+        "d:/code/viae/node_modules/@types/node/dns.d.ts",
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/dns.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/domain.d.ts": [
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/events.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/fs.d.ts": [
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/url.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/http.d.ts": [
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
+        "d:/code/viae/node_modules/@types/node/url.d.ts",
+        "d:/code/viae/node_modules/@types/node/net.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/http2.d.ts": [
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/fs.d.ts",
+        "d:/code/viae/node_modules/@types/node/net.d.ts",
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
+        "d:/code/viae/node_modules/@types/node/tls.d.ts",
+        "d:/code/viae/node_modules/@types/node/url.d.ts",
+        "d:/code/viae/node_modules/@types/node/http.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/https.d.ts": [
+        "d:/code/viae/node_modules/@types/node/tls.d.ts",
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/http.d.ts",
+        "d:/code/viae/node_modules/@types/node/url.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/inspector.d.ts": [
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/module.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/net.d.ts": [
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/dns.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/os.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/path.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/perf_hooks.d.ts": [
+        "d:/code/viae/node_modules/@types/node/async_hooks.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/process.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/punycode.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/querystring.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/readline.d.ts": [
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/repl.d.ts": [
+        "d:/code/viae/node_modules/@types/node/readline.d.ts",
+        "d:/code/viae/node_modules/@types/node/vm.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/stream.d.ts": [
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/string_decoder.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/timers.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/tls.d.ts": [
+        "d:/code/viae/node_modules/@types/node/crypto.d.ts",
+        "d:/code/viae/node_modules/@types/node/dns.d.ts",
+        "d:/code/viae/node_modules/@types/node/net.d.ts",
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/trace_events.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/tty.d.ts": [
+        "d:/code/viae/node_modules/@types/node/net.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/url.d.ts": [
+        "d:/code/viae/node_modules/@types/node/querystring.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/util.d.ts": [
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/v8.d.ts": [
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/vm.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/worker_threads.d.ts": [
+        "d:/code/viae/node_modules/@types/node/vm.d.ts",
+        "d:/code/viae/node_modules/@types/node/events.d.ts",
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/zlib.d.ts": [
+        "d:/code/viae/node_modules/@types/node/stream.d.ts",
         "d:/code/viae/node_modules/@types/node/util.d.ts",
         "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
       ],
@@ -976,11 +1177,23 @@
         "d:/code/viae/node_modules/@types/node/zlib.d.ts",
         "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
       ],
+      "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/node/ts3.2/globals.d.ts": [
+        "d:/code/viae/node_modules/@types/node/globals.d.ts",
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
+      ],
       "d:/code/viae/node_modules/@types/node/ts3.2/index.d.ts": [
         "d:/code/viae/node_modules/@types/node/base.d.ts",
         "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts",
         "d:/code/viae/node_modules/@types/node/ts3.2/globals.d.ts",
         "d:/code/viae/node_modules/@types/node/util.d.ts"
+      ],
+      "d:/code/viae/node_modules/@types/pbf/index.d.ts": [
+        "d:/code/viae/node_modules/@types/node/util.d.ts",
+        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
       ],
       "d:/code/viae/node_modules/@types/ws/index.d.ts": [
         "d:/code/viae/node_modules/@types/node/events.d.ts",
@@ -988,219 +1201,6 @@
         "d:/code/viae/node_modules/@types/node/https.d.ts",
         "d:/code/viae/node_modules/@types/node/net.d.ts",
         "d:/code/viae/node_modules/@types/node/ts3.2/index.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/async_hooks.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/perf_hooks.d.ts": [
-        "d:/code/viae/node_modules/@types/node/async_hooks.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/buffer.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/child_process.d.ts": [
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/net.d.ts",
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/cluster.d.ts": [
-        "d:/code/viae/node_modules/@types/node/child_process.d.ts",
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/net.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/console.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/constants.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/crypto.d.ts": [
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/tls.d.ts": [
-        "d:/code/viae/node_modules/@types/node/crypto.d.ts",
-        "d:/code/viae/node_modules/@types/node/dns.d.ts",
-        "d:/code/viae/node_modules/@types/node/net.d.ts",
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/https.d.ts": [
-        "d:/code/viae/node_modules/@types/node/tls.d.ts",
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/http.d.ts",
-        "d:/code/viae/node_modules/@types/node/url.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/http2.d.ts": [
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/fs.d.ts",
-        "d:/code/viae/node_modules/@types/node/net.d.ts",
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/tls.d.ts",
-        "d:/code/viae/node_modules/@types/node/url.d.ts",
-        "d:/code/viae/node_modules/@types/node/http.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/dgram.d.ts": [
-        "d:/code/viae/node_modules/@types/node/net.d.ts",
-        "d:/code/viae/node_modules/@types/node/dns.d.ts",
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/dns.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/net.d.ts": [
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/dns.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/tty.d.ts": [
-        "d:/code/viae/node_modules/@types/node/net.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/http.d.ts": [
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/url.d.ts",
-        "d:/code/viae/node_modules/@types/node/net.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/domain.d.ts": [
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/events.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/worker_threads.d.ts": [
-        "d:/code/viae/node_modules/@types/node/vm.d.ts",
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/stream.d.ts": [
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/zlib.d.ts": [
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/v8.d.ts": [
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/readline.d.ts": [
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/repl.d.ts": [
-        "d:/code/viae/node_modules/@types/node/readline.d.ts",
-        "d:/code/viae/node_modules/@types/node/vm.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/fs.d.ts": [
-        "d:/code/viae/node_modules/@types/node/stream.d.ts",
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/url.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/inspector.d.ts": [
-        "d:/code/viae/node_modules/@types/node/events.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/module.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/os.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/path.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/process.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/punycode.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/querystring.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/url.d.ts": [
-        "d:/code/viae/node_modules/@types/node/querystring.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/string_decoder.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/timers.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/trace_events.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/util.d.ts": [
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/pbf/index.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/ts3.2/globals.d.ts": [
-        "d:/code/viae/node_modules/@types/node/globals.d.ts",
-        "d:/code/viae/node_modules/@types/node/util.d.ts",
-        "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts": [
-        "d:/code/viae/node_modules/@types/node/util.d.ts"
-      ],
-      "d:/code/viae/node_modules/@types/node/vm.d.ts": [
         "d:/code/viae/node_modules/@types/node/util.d.ts",
         "d:/code/viae/node_modules/@types/node/ts3.2/util.d.ts"
       ]

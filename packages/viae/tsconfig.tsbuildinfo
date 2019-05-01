@@ -1122,15 +1122,15 @@
       "removeComments": true,
       "declaration": true,
       "sourceMap": true,
-      "outDir": "d:/Code/viae/packages/viae/dist",
-      "rootDir": "d:/Code/viae/packages/viae/src/",
+      "outDir": "D:/Code/viae/packages/viae/dist",
+      "rootDir": "D:/Code/viae/packages/viae/src/",
       "composite": true,
       "lib": [
         "lib.es2017.d.ts",
         "lib.dom.d.ts",
         "lib.es2018.asynciterable.d.ts"
       ],
-      "configFilePath": "d:/Code/viae/packages/viae/tsconfig.json"
+      "configFilePath": "D:/Code/viae/packages/viae/tsconfig.json"
     },
     "referencedMap": {
       "d:/code/viae/node_modules/typescript/lib/lib.es5.d.ts": [
@@ -4630,6 +4630,7 @@
       "d:/code/viae/packages/viae/src/middleware/router.ts",
       "d:/code/viae/packages/viae/src/util/uuid.ts",
       "d:/code/viae/packages/viae/src/util/index.ts",
+      "d:/code/viae/packages/viae/src/middleware/data-decoder.ts",
       "d:/code/viae/packages/viae/src/middleware/data-encoder.ts",
       "d:/code/viae/packages/viae/src/middleware/interceptor.ts",
       "d:/code/viae/packages/viae/src/middleware/request.ts",
@@ -4857,8 +4858,7 @@
       "d:/code/viae/node_modules/@types/node/ts3.2/globals.d.ts",
       "d:/code/viae/node_modules/@types/node/ts3.2/index.d.ts",
       "d:/code/viae/node_modules/@types/pbf/index.d.ts",
-      "d:/code/viae/node_modules/@types/ws/index.d.ts",
-      "d:/code/viae/packages/viae/src/middleware/data-decoder.ts"
+      "d:/code/viae/node_modules/@types/ws/index.d.ts"
     ]
   },
   "version": "3.4.5"

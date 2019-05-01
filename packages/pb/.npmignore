@@ -4,6 +4,7 @@
 .nyc_output
 .npmignore
 .travis.yml
+src
 spec
 test
 coverage
@@ -17,4 +18,3 @@ webpack.config.js
 gulpfile.js
 tsconfig*
 tsconfig.tsbuildinfo
-yarn*
