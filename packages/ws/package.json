@@ -1,6 +1,7 @@
 {
   "name": "@viae/ws",
-  "version": "1.0.0",  
+  "version": "1.0.0-rc.1",
+  "private": false,
   "author": "Meirion Hughes <crakinshot@yahoo.com>",
   "license": "MIT",
   "bugs": {
@@ -16,11 +17,11 @@
   "homepage": "https://github.com/viae-io/viae#readme",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
-  
   "dependencies": {
-    "@viae/core" : "^1.0.0"
+    "@viae/core": "^1.0.0-rc.1"
   },
   "scripts": {
     "build": "tsc --build tsconfig.json"
-  }
+  },
+  "gitHead": "54ca5ce506983d52543aebef411a96db1666198a"
 }

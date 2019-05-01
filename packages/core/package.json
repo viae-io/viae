@@ -1,6 +1,7 @@
 {
   "name": "@viae/core",
-  "version": "1.0.0",
+  "version": "1.0.0-rc.1",
+  "private": false,
   "author": "Meirion Hughes <crakinshot@yahoo.com>",
   "license": "MIT",
   "bugs": {
@@ -24,5 +25,6 @@
   },
   "devDependencies": {
     "@types/pbf": "^3.0.1"
-  }
+  },
+  "gitHead": "54ca5ce506983d52543aebef411a96db1666198a"
 }

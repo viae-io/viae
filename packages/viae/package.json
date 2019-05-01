@@ -1,6 +1,7 @@
 {
   "name": "viae",
-  "version": "1.0.0",
+  "version": "1.0.0-rc.1",
+  "private": false,
   "description": "bi-directional binary streaming req/res framework",
   "main": "dist/commonjs/index.js",
   "module": "dist/es2015/index.js",
@@ -37,7 +38,7 @@
     "url": "https://github.com/viae-io/viae/issues"
   },
   "homepage": "https://github.com/viae-io/viae#readme",
-  "devDependencies": {  
+  "devDependencies": {
     "@types/ws": "^4.0.2",
     "chai": "^4.1.2",
     "codecov": "^1.0.1",
@@ -54,8 +55,8 @@
     "ws": "^5.1.1"
   },
   "dependencies": {
-    "@viae/pb": "^1.0.0",
-    "@viae/core": "^1.0.0",
+    "@viae/core": "^1.0.0-rc.1",
+    "@viae/pb": "^1.0.0-rc.1",
     "msgpack-lite": "~0.1.26",
     "path-to-regexp": "0.1.7",
     "reflect-metadata": "^0.1.12",
@@ -84,5 +85,6 @@
     ],
     "sourceMap": true,
     "instrument": true
-  }
+  },
+  "gitHead": "54ca5ce506983d52543aebef411a96db1666198a"
 }
