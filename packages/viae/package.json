@@ -20,7 +20,7 @@
     "url": "git+https://github.com/viae-io/viae.git"
   },
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "access": "public"
   },
   "keywords": [
     "api",
@@ -86,5 +86,5 @@
     "sourceMap": true,
     "instrument": true
   },
-  "gitHead": "54ca5ce506983d52543aebef411a96db1666198a"
+  "gitHead": "6e99bb759a0211ec8f1bff306a7a169b016b10ff"
 }

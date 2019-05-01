@@ -4,15 +4,15 @@
   "private": false,
   "author": "Meirion Hughes <crakinshot@yahoo.com>",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "bugs": {
     "url": "https://github.com/viae-io/viae/issues"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/viae-io/viae.git"
-  },
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
   },
   "homepage": "https://github.com/viae-io/viae#readme",
   "main": "dist/index.js",
@@ -26,5 +26,5 @@
   "devDependencies": {
     "@types/pbf": "^3.0.1"
   },
-  "gitHead": "54ca5ce506983d52543aebef411a96db1666198a"
+  "gitHead": "6e99bb759a0211ec8f1bff306a7a169b016b10ff"
 }
