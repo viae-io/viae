@@ -59,7 +59,7 @@ export class WebSocketWire extends EventEmitter implements ConnectibleWire {
     this.ws.close();
   }
 
-  send(message: ArrayBuffer) {
+  send(message: ArrayBuffer | ArrayBufferView) {
     if (this.ws === undefined || this.state !== "open")
       throw Error("Wire is not open");
 
