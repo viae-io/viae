@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "private": false,
   "description": "bi-directional binary streaming req/res framework",
   "main": "dist/index.js",
@@ -54,8 +54,8 @@
     "ws": "^5.1.1"
   },
   "dependencies": {
-    "@viae/core": "^1.0.0-rc.1",
-    "@viae/pb": "^1.0.0-rc.1",
+    "@viae/core": "^1.0.0-rc.2",
+    "@viae/pb": "^1.0.0-rc.2",
     "msgpack-lite": "~0.1.26",
     "path-to-regexp": "0.1.7",
     "reflect-metadata": "^0.1.12",
