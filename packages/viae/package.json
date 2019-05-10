@@ -3,9 +3,8 @@
   "version": "1.0.0-rc.1",
   "private": false,
   "description": "bi-directional binary streaming req/res framework",
-  "main": "dist/commonjs/index.js",
-  "module": "dist/es2015/index.js",
-  "typings": "dist/commonjs/index.d.ts",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "scripts": {
     "lint": "cross-env tslint --project tsconfig.json --config tslint.json",
     "clean": "cross-env rimraf .tmp .nyc_output coverage dist",
