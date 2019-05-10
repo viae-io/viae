@@ -1,5 +1,3 @@
-import { debug } from "util";
-
 export interface Log {
   debug(message: String, ...args): void;
   info(message: String, ...args): void;
