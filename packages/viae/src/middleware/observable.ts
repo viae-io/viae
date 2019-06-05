@@ -9,7 +9,7 @@ export class ObservableSender extends Rowan<RequestContext> {
     super();
 
     let sub: Subscription;
-    let sid;
+    let sid: string;
 
     this.use(new If(request("SUBSCRIBE"), [
       async (ctx, next) => {

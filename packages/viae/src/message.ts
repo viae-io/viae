@@ -1,4 +1,4 @@
-import { Status, MessageFrame } from '@viae/core'
+import { Status, MessageFrame } from '@viae/core';
 
 /**
  * message

@@ -1,11 +1,11 @@
 import { Rowan, Processor } from "rowan";
 
-import { Context } from "../../viae/src/context";
+import { Context } from "./context";
 import { WireServer } from "@viae/core";
 import { EventEmitter } from "events";
 
-import { Via } from "../../viae/src/via";
-import { Log, ConsoleLog } from "../../viae/src/log";
+import { Via } from "./via";
+import { Log, ConsoleLog } from "./log";
 
 export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
   private _connections = new Array<Via>();

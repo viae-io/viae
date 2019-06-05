@@ -1,7 +1,7 @@
 import { Rowan, If, Middleware } from "rowan";
 import { RequestContext, Context } from "../context";
 import { request } from "./request";
-import { Message } from "..";
+import { Message } from "../message";
 
 /** 
  * Pull-Based Router for an async iterable, intended to be used by an interceptor
