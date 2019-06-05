@@ -1,6 +1,6 @@
 {
   "name": "@viae/core",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "private": false,
   "author": "Meirion Hughes <crakinshot@yahoo.com>",
   "license": "MIT",
@@ -19,10 +19,6 @@
   "typings": "dist/index.d.ts",
   "scripts": {
     "build": "tsc --build tsconfig.json"
-  },
-  "dependencies": {
-  },
-  "devDependencies": {
   },
   "gitHead": "6e99bb759a0211ec8f1bff306a7a169b016b10ff"
 }

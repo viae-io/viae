@@ -1,6 +1,6 @@
 {
   "name": "@viae/pb",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "private": false,
   "author": "Meirion Hughes <crakinshot@yahoo.com>",
   "license": "MIT",
@@ -18,7 +18,7 @@
   "main": "index.js",
   "typings": "index.d.ts",
   "dependencies": {
-    "@viae/core": "^1.0.0-rc.3",
+    "@viae/core": "^1.0.0-rc.4",
     "pbf": "^3.2.0"
   },
   "scripts": {
