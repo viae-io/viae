@@ -9,7 +9,7 @@
     "emitDecoratorMetadata": true,
 
     "declaration": true,
-    "sourceMap": true,
+    "sourceMap": false,
     "composite": true,
 
     "lib": [
@@ -17,12 +17,15 @@
       "dom",
     ],    
   },
-
   "files": [
     "index.ts"
   ],
-
   "exclude": [
     "node_modules" 
+  ],
+  "references": [
+    {
+      "path": "../core/tsconfig.json"
+    },
   ]
 }

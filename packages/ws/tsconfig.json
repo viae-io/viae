@@ -7,13 +7,11 @@
     "newLine": "LF",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-
     "declaration": true,
-    "sourceMap": true,
+    "sourceMap": false,
     "outDir": "./dist",
     "rootDir": "src/",
     "composite": true,
-
     "lib": [
       "es2017",
       "dom",
@@ -23,6 +21,11 @@
     "src"
   ],
   "exclude": [
-    "node_modules" 
+    "node_modules"
+  ],
+  "references": [
+    {
+      "path": "../core/tsconfig.json"
+    },
   ]
 }

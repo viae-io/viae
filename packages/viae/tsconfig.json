@@ -7,25 +7,24 @@
     "newLine": "LF",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "allowSyntheticDefaultImports": true,
-    "removeComments": true,
-   
+    "allowSyntheticDefaultImports": true,    
     "declaration": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "src/",
-    "composite": true,
-
+    "sourceMap": false,  
     "lib": [
       "es2017",
       "dom",
       "esnext.asynciterable"
     ]
   },
-  "include": [
-    "src"
-  ],
   "exclude": [
     "node_modules"
+  ],
+  "references": [
+    {
+      "path": "../core/tsconfig.json"
+    },
+    {
+      "path": "../pb/tsconfig.json"
+    },
   ]
 }

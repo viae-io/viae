@@ -9,7 +9,7 @@
     "emitDecoratorMetadata": true,
 
     "declaration": true,
-    "sourceMap": true,
+    "sourceMap": false,
     "outDir": "./dist",
     "rootDir": "src/",
     "composite": true,

@@ -1,0 +1,27 @@
+{
+	"folders": [
+		{
+			"name": "[root]",
+			"path": "."
+		},
+		{
+			"name": "@viae/core",
+			"path": "packages\\core"
+		},
+		{
+			"name": "@viae/pb",
+			"path": "packages\\pb"
+		},
+		{
+			"name": "@viae/ws",
+			"path": "packages\\ws"
+		},
+		{
+			"path": "packages\\viae"
+		}
+	],
+	"settings": {
+		"git.ignoreLimitWarning": true,
+		"typescript.tsdk": "node_modules\\typescript\\lib"
+	}
+}

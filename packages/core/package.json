@@ -21,10 +21,8 @@
     "build": "tsc --build tsconfig.json"
   },
   "dependencies": {
-    "pbf": "^3.2.0"
   },
   "devDependencies": {
-    "@types/pbf": "^3.0.1"
   },
   "gitHead": "6e99bb759a0211ec8f1bff306a7a169b016b10ff"
 }

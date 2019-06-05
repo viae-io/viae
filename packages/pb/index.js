@@ -20,4 +20,3 @@ class FrameEncoder {
     }
 }
 exports.FrameEncoder = FrameEncoder;
-//# sourceMappingURL=index.js.map

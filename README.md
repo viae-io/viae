@@ -1,6 +1,6 @@
 # Viae
 
-A bi-directional communication framework
+A bi-directional communication framework. 
 
 ![logopng](https://user-images.githubusercontent.com/3584509/31079620-2603bc88-a77e-11e7-92c8-7ac73c165b0b.png)
 
@@ -10,17 +10,77 @@ A bi-directional communication framework
 [![codecov](https://codecov.io/gh/MeirionHughes/viae/branch/master/graph/badge.svg)](https://codecov.io/gh/MeirionHughes/viae)
 [![Stability][stability-image]][stability-url]
 
-## Install
 
-_you must have node.js >= 8.x installed_ 
+Currently still under development. 
 
-* `npm install viae`
+The goal in developing viae was to allow making asynchronous req/res on a single websocket connection and to allow sending objects containing `TypedArrayView` instances. It evolved to facilitate sending and receiving rxjs Observables (stream request, stream response);
 
-## Usage
+## Basic Usage
 
-Check [Documentation](https://github.com/MeirionHughes/viae/wiki) 
+A server is created by instantiating a `Viae` instance and passing a `WebSocketServer` instance to it: 
 
-Currently under development and subject to potential breaking changes between minor versions. 
+```ts
+let server = new WebSocketServer({ port: 8080, host: "0.0.0.0" });
+let viae = new Viae(server);
+```
+
+request middleware can then be added using: 
+
+```ts
+viae.use(async (ctx, next) => {
+  //do something with ctx
+  return next();
+});
+```
+
+A controller-based router is available by using
+
+```ts
+@Controller('chat')
+class ChatRoomController {
+  private _channel = new Subject<string>();
+
+  @Get()
+  join() {
+    return this._channel;
+  }
+
+  @Post()
+  addMsg(@Data() msg: string){
+    this._channel.next(msg);
+    return Status.OK;        
+  }
+}
+
+viae.use(new App({
+  controllers: [new ChatRoomController()]
+}));
+
+```
+
+a client is created by instantiating a `Via` instance and making requests
+
+
+```ts
+let wire = new WebSocket("ws://0.0.0.0:8080");
+let via = new Via({ wire: wire as any });
+
+via.on("open", async () => {
+
+  let joinRes = await via.request("GET", "/chat");
+
+  if (isObservable(joinRes.data)) {
+    joinRes.data.forEach(x => console.log(x));
+  }
+
+  await via.request("POST", "/chat", "hello world...");
+
+  await new Promise((r, _) => setTimeout(r, 100));
+
+  wire.close();
+});
+```
+
 
 ## Build
 

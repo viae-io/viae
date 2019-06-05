@@ -6,6 +6,8 @@ export interface Context {
   id: string;
   connection: IVia<Context>;
 
+  err?: any;
+
   in?: Message<any>;
   out?: Message<any>;
 
