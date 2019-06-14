@@ -12,6 +12,12 @@ export default class BodyEncoder<Ctx extends Context = Context> implements Middl
 
     switch (ctx.out.head.encoding) {
       case undefined:
+        if (ctx.out.data instanceof Uint8Array) {
+          ctx.out.raw = ctx.out.data;
+          ctx.out.head.encoding = "none";
+          ctx["__encoded"] = true;
+          break;
+        }
       case "msgpack":
         ctx.out.head.encoding = "msgpack";
         ctx.out.raw = msgpack.encode(ctx.out.data);
@@ -22,7 +28,7 @@ export default class BodyEncoder<Ctx extends Context = Context> implements Middl
         ctx.out.raw = textToBytes(JSON.stringify(ctx.out.data));
         ctx["__encoded"] = true;
         break;
-      case "none": 
+      case "none":
         ctx.out.raw = ctx.out.data;
         ctx["__encoded"] = true;
         break;

@@ -106,7 +106,6 @@ export class UpgradeIncomingObservable implements Middleware<Context> {
         await connection.send({ id: sid, head: { method: "SUBSCRIBE" } });
 
         return function () {
-          console.log("WHAT WHAT");
           if (dispose) {
             connection.send({ id: sid, head: { method: "UNSUBSCRIBE" } });
             dispose();

@@ -30,7 +30,7 @@ export class Router implements Middleware<Context>, RouterOptions {
   private _rootMatch: (ctx: Context) => string;
 
   constructor(opts?: RouterOptions) {
-    
+
     this.root = opts.root || "";
     this.middleware = opts.middleware || [];
 
@@ -68,6 +68,11 @@ export class Router implements Middleware<Context>, RouterOptions {
     let match = this._rootMatch(ctx);
     if (match) {
       let originalPath = ctx.in.head.path;
+
+      if (ctx.in.head.fullPath === undefined) {
+        ctx.in.head.fullPath = originalPath;
+      }
+
       ctx.in.head.path = originalPath.substr(match.length);
       return Rowan.process(this.middleware, ctx, function () {
         ctx.in.head.path = originalPath;
@@ -148,13 +153,20 @@ export class Router implements Middleware<Context>, RouterOptions {
       });
   }
 
-  static fromController(controller: Object) {
+  static fromController(controller: Object, root?: string) {
+    //Careful not to edit this
     const routerOpts = Reflect.getMetadata("__router", controller);
 
     if (!routerOpts) return undefined;
 
-    const router = new Router(routerOpts);
-    const routesOpts = routerOpts.routes;
+    let opts = Object.assign({}, routerOpts);
+
+    if (typeof (root) == "string") {
+      opts.root = normalise(root, opts.root);
+    }
+
+    const router = new Router(opts);
+    const routesOpts = opts.routes;
     if (routesOpts) {
       for (let routeKey in routesOpts) {
         const route = routesOpts[routeKey];

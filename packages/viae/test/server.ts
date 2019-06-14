@@ -7,7 +7,11 @@ import { map } from 'rxjs/operators';
 import { ViaeError } from '../src/error';
 import { Status } from '@viae/core';
 
-let server = new WebSocketServer({ port: 8080, host: "0.0.0.0" });
+let server = new WebSocketServer({ 
+  port: 8080, 
+  host: "0.0.0.0",
+  perMessageDeflate: false});
+
 let viae = new Viae(server);
 let op = 0;
 
@@ -21,22 +25,14 @@ viae.before((ctx, next) => {
   return next();
 });
 
-@Controller('chat')
-class ChatRoomController {
-  private _channel = new Subject<string>();
-
-  @Get()
-  join() {
-    return this._channel;
-  }
-
+@Controller('root')
+class EchoController {
   @Post()
-  addMsg(@Data() msg: string){
-    this._channel.next(msg);
-    return Status.OK;        
+  echo(@Data() data: any) {
+    return Status.OK;
   }
 }
 
 viae.use(new App({
-  controllers: [new ChatRoomController()]
+  controllers: [new EchoController()]
 }));
