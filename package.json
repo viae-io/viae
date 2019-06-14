@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "bootstrap": "lerna bootstrap",
-    "build": "tsc -b packages/viae packages/ws",
+    "build": "lerna run build",
     "publish:release": "yarn build && lerna publish",
     "publish:canary": "yarn build && lerna publish --canary --preid beta --dist-tag beta ",
     "clean": "rimraf packages/**/dist"
