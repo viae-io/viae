@@ -115,7 +115,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       msg.head.encoding = opts.encoding;
     }
 
-    return this.out.process(new this.CtxCtor({ connection: this as unknown as IVia<C>, out: msg as Message, log: this._log })).catch(function (err){
+    return this.out.process(new this.CtxCtor({ connection: this as unknown as IVia<C>, out: msg as Message, log: this._log })).catch((err) => {
       this._ev.emit("error", err);
     });
   }
@@ -147,7 +147,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
 
     let dispose = this._interceptor.intercept({
       id: msg.id,
-      handlers: [function(ctx, _) {
+      handlers: [function (ctx, _) {
         resolve(ctx.in);
         return Promise.resolve();
       }]
