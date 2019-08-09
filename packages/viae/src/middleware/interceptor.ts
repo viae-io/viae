@@ -41,9 +41,9 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
 
     const middleware = handlers.map(x => Rowan.convertToMiddleware(x));
 
-    //if (this._interceptors.has(id)) {
-    // TODO: figure out what to do if an interceptor exists already
-    //}
+    if (this._interceptors.has(id)) {
+      throw Error("Already intercepting messages for id: " + id);
+    }
 
     this._interceptors.set(id, {
       dispose: dispose,
@@ -67,6 +67,7 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
         return Rowan.process(interceptor.middleware, ctx, next);
       }
     }
+    
     return next();
   };
 

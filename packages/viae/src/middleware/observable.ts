@@ -84,7 +84,7 @@ export class UpgradeIncomingObservable implements Middleware<Context> {
 
     let observable: Observable<any> = Observable.create(async function (observer: Observer<any>) {
       try {
-
+        
         let dispose = connection.intercept(sid, [
           async (ctx: ResponseContext) => {
             let res = ctx.in;

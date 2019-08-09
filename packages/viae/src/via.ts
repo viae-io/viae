@@ -44,7 +44,6 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     const wire = this._wire = opts.wire;
 
     this.CtxCtor = (opts ? opts.Ctx : undefined) || DefaultContext;
-
     this._log = (opts ? opts.log : undefined) || new ConsoleLog();
     this._uuid = (opts ? opts.uuid : undefined) || shortId;
 
