@@ -50,8 +50,6 @@ export class Router implements Middleware<Context>, RouterOptions {
     });
 
     this._rootMatch = (ctx) => {
-      console.log(ctx.in);
-      console.log(exp);
       let match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;
       if (match == null) {
         return;
@@ -67,13 +65,9 @@ export class Router implements Middleware<Context>, RouterOptions {
   }
 
   process(ctx: Context, next: Next): Promise<void> {
-    console.log(ctx.in);
-    console.log("root:", this.root);
-
     let match = this._rootMatch(ctx);
 
     if (match != undefined) {
-      console.log("matched", match);
       let originalPath = ctx.in.head.path;
 
       if (ctx.in.head.fullPath === undefined) {
@@ -125,15 +119,12 @@ export class Router implements Middleware<Context>, RouterOptions {
 
         let match = null;
 
-        console.log("matching route", exp, "to", ctx.in.head.path);
-
         if (path == ctx.in.head.path) {          
           match = [path];
         }
         else {
           match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;          
           if (match == null) {
-            console.log("match not ok");
             return next();
           }
           if (keys.length > 0) {
@@ -144,11 +135,8 @@ export class Router implements Middleware<Context>, RouterOptions {
           }
         }
         if (match == null) {
-          console.log("No Match on path");
           return next();
         }
-
-        console.log("match ok");
 
         let originalPath = ctx.in.head.path;
 
