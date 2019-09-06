@@ -1,10 +1,10 @@
 
 
-import { Rowan, If, Processor, IRowan, Middleware, Next } from 'rowan';
+import { Rowan, Processor, Middleware, Next } from 'rowan';
 import { Context } from '../context';
-import * as pathToRegexp from 'path-to-regexp';
 import { ViaeError } from '../error';
-
+import * as pathToRegexp from 'path-to-regexp';
+import { normalisePath } from '../util/normalise';
 
 export interface RouterOptions {
   /** route root path */
@@ -16,6 +16,8 @@ export interface RouterOptions {
 
   middleware?: Middleware<Context>[];
 };
+
+
 
 export class Router implements Middleware<Context>, RouterOptions {
   /** route base path  */
@@ -34,22 +36,22 @@ export class Router implements Middleware<Context>, RouterOptions {
     this.root = opts.root || "";
     this.middleware = opts.middleware || [];
 
-    this.root = this.root.trim();
+    this.root = normalisePath(this.root);
 
-    if (this.root.startsWith("/") == false) {
-      this.root = "/" + this.root;
-    }
-    if (this.root.endsWith("/") == true) {
-      this.root = this.root.substr(0, this.root.length - 1);
+    if(this.root == ""){
+      this._rootMatch = ()=>"";
+      return;
     }
 
     const keys = [];
     const exp = pathToRegexp(this.root, keys, {
       strict: false,
-      end: false
+      end: false,
     });
 
     this._rootMatch = (ctx) => {
+      console.log(ctx.in);
+      console.log(exp);
       let match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;
       if (match == null) {
         return;
@@ -65,15 +67,21 @@ export class Router implements Middleware<Context>, RouterOptions {
   }
 
   process(ctx: Context, next: Next): Promise<void> {
+    console.log(ctx.in);
+    console.log("root:", this.root);
+
     let match = this._rootMatch(ctx);
-    if (match) {
+
+    if (match != undefined) {
+      console.log("matched", match);
       let originalPath = ctx.in.head.path;
 
       if (ctx.in.head.fullPath === undefined) {
         ctx.in.head.fullPath = originalPath;
       }
 
-      ctx.in.head.path = originalPath.substr(match.length);
+      ctx.in.head.path = normalisePath(originalPath.substr(match.length));
+
       return Rowan.process(this.middleware, ctx, function () {
         ctx.in.head.path = originalPath;
         return next();
@@ -95,23 +103,20 @@ export class Router implements Middleware<Context>, RouterOptions {
     doc?: string,
     end?: boolean;
   }) {
-    if (opts.path.startsWith("/") == false) {
-      opts.path = "/" + opts.path;
-    }
-    if (opts.path.endsWith("/") == true) {
-      opts.path = opts.path.substr(0, opts.path.length - 1);
-    }
-    const path = opts.path;
+    const path = normalisePath(opts.path);
     const keys = [];
+
     const exp = pathToRegexp(path, keys, {
       strict: false,
       end: (opts.end !== undefined) ? opts.end : true
     });
+
     const method = opts.method;
     const processors = opts.process.map(x => Rowan.convertToMiddleware(x));
 
     this.use(
       function (ctx, next): Promise<void> {
+
         if (ctx.in == undefined || ctx.in.head == undefined)
           return next();
 
@@ -120,12 +125,15 @@ export class Router implements Middleware<Context>, RouterOptions {
 
         let match = null;
 
-        if (path == ctx.in.head.path) {
+        console.log("matching route", exp, "to", ctx.in.head.path);
+
+        if (path == ctx.in.head.path) {          
           match = [path];
         }
         else {
-          match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;
+          match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;          
           if (match == null) {
+            console.log("match not ok");
             return next();
           }
           if (keys.length > 0) {
@@ -136,8 +144,11 @@ export class Router implements Middleware<Context>, RouterOptions {
           }
         }
         if (match == null) {
+          console.log("No Match on path");
           return next();
         }
+
+        console.log("match ok");
 
         let originalPath = ctx.in.head.path;
 
@@ -160,10 +171,8 @@ export class Router implements Middleware<Context>, RouterOptions {
     if (!routerOpts) return undefined;
 
     let opts = Object.assign({}, routerOpts);
-
-    if (typeof (root) == "string") {
-      opts.root = normalise(root, opts.root);
-    }
+    
+    opts.root = normalisePath(root, opts.root);
 
     const router = new Router(opts);
     const routesOpts = opts.routes;
@@ -229,13 +238,4 @@ export class Router implements Middleware<Context>, RouterOptions {
     }
     return router;
   }
-}
-
-function normalise(root: string, path: string) {
-  if (path.startsWith("./") == true) {
-    path = path.substr(1);
-  } else if (path.startsWith("/") == false) {
-    path = "/" + path;
-  }
-  return root + path;
 }

@@ -1,6 +1,7 @@
 import { Message, Request, Response } from "./message";
 import { Log } from "./log";
 import { IVia } from "./_via";
+import { Status } from "@viae/core";
 
 export interface Context {
   id: string;
@@ -14,11 +15,11 @@ export interface Context {
   req?: Request<any>;
   res?: Response<any>;
 
-  /*checks to see if inbound message is a request */
-  isReq(outbound?: boolean): this is RequestContext;
+  /*checks to see if inbound message is a request (default inbound = true)*/
+  isReq(inbound?: boolean): this is RequestContext;
 
-  /*checks to see if inbound message is a response */
-  isRes(outbound?: boolean): this is ResponseContext;
+  /*checks to see if inbound message is a response (default inbound = true) */
+  isRes(inbound?: boolean): this is ResponseContext;
 
   [key: string]: any;
 }
@@ -62,7 +63,7 @@ export class DefaultContext implements Context {
     if (req) {
       return {
         id: req.id,
-        head: { status: 401 }
+        head: { status: Status.NotFound }
       };
     }
   }

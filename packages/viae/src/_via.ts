@@ -25,8 +25,12 @@ export interface IVia<T> extends IRowan<T> {
   on(event: "error", cb: (err: Error, ctx: T) => void): void;
 }
 
-export type SendOptions = {
+export interface SendOptions {
   id?: string;
   encoding?: "none" | "msgpack" | "json",
   timeout?: number
 };
+
+export interface CallOptions<T> extends SendOptions {
+  validate?(result: any) : result is T;
+}

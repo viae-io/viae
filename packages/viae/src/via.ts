@@ -13,7 +13,8 @@ import { FrameEncoder } from "@viae/pb";
 import { Log, ConsoleLog } from "./log";
 import { toUint8Array, shortId } from "./util";
 import { UpgradeOutgoingObservable, UpgradeIncomingObservable } from "./middleware/observable";
-import { IVia, SendOptions } from "./_via";
+import { IVia, SendOptions, CallOptions } from "./_via";
+import { normalisePath } from "./util/normalise";
 
 
 /**
@@ -129,6 +130,9 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     path: string,
     data?: any,
     opts?: SendOptions) {
+
+    path = normalisePath(path);
+
     let msg: Partial<Message> = {
       id: (opts && opts.id) ? opts.id : shortId(),
       head: {
@@ -164,6 +168,38 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     finally {
       clearTimeout(clock);
       dispose();
+    }
+  }
+
+  /** 
+   * simplified request/response  - this will deserialise the response data and return it if successful. 
+   * throws an error if the result status is not OK. 
+   **/
+  async call<E = any>(method: string, path: string, data?: any, opts?: CallOptions<E>): Promise<E> {
+    let result = await this.request(method, path, data, opts);
+    switch (Number(result.head.status)) {
+      case Status.NotFound:
+        throw Error(`${method} "${path}" not found`);
+      case Status.Unauthorized:
+        throw Error(`${method} "${path}" not authorised`);
+      case Status.Forbidden:
+        throw Error(`${method} "${path}" forbidden`);
+      case Status.BadRequest:
+        throw Error(`${method} "${path}" bad request`);
+      case Status.Error:
+        let msg = `${method} "${path}" error`;
+        let resultData = result.data;
+        if (resultData != undefined && typeof resultData === "string") {
+          msg += ": " + resultData;
+        }
+        throw Error(msg);
+      case Status.OK:
+      case Status.OkayPartial:
+        let validate = (opts && typeof opts.validate == "function") ? opts.validate : () => true;
+        validate(result.data);
+        return result.data;
+      default:
+        throw Error(`${method} "${path}" unknown status code: ${result.head.status}`)
     }
   }
 
