@@ -26,6 +26,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
   private _wire: Wire;
   private _uuid: () => string;
   private _log: Log;
+  private _timeout: number;
   private _interceptor = new Interceptor();
   private _encoder = new FrameEncoder();
   private _before: Rowan<Context> = new Rowan<Context>();
@@ -39,7 +40,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     return this._wire;
   }
 
-  constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log }, ) {
+  constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log, timeout?:number }, ) {
     super();
 
     const wire = this._wire = opts.wire;
@@ -47,6 +48,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     this.CtxCtor = (opts ? opts.Ctx : undefined) || DefaultContext;
     this._log = (opts ? opts.log : undefined) || new ConsoleLog();
     this._uuid = (opts ? opts.uuid : undefined) || shortId;
+    this._timeout = (opts ? opts.timeout : undefined) || 10000;
 
     this
       /* execute the 'before' pipeline */
@@ -156,7 +158,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       }]
     });
 
-    clock = setTimeout(() => { reject("Request Timeout"); }, (opts ? opts.timeout : undefined) || 3000);
+    clock = setTimeout(() => { reject("Request Timeout"); }, (opts ? opts.timeout : undefined) || this._timeout);
 
     try {
       await this.send(msg, opts);
