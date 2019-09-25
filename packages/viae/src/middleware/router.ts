@@ -173,6 +173,7 @@ export class Router implements Middleware<Context>, RouterOptions {
         let method = route["method"];
         let opts = route["opts"];
         let func = controller[routeKey].bind(controller);
+        let hasNext = routeArgs.find(x=>x.type == "next") !== undefined;
 
         router.route({
           path: path,
@@ -200,14 +201,17 @@ export class Router implements Middleware<Context>, RouterOptions {
 
               try {
                 let result = await func(...args);
-                if (result) {
-                  if (typeof result == "number") {
-                    ctx.out.head.status = result;
-                  } else {
-                    ctx.out.head.status = 200;
-                    ctx.out.data = result;
-                  }
+
+                if(result !== undefined) {
+                  ctx.out.data = result;
                 }
+
+                if (typeof result == "number") {
+                  ctx.out.head.status = result;
+                } else if(hasNext == false) {
+                  ctx.out.head.status = 200;
+                }
+                //else leave the status as is.                 
               } catch (err) {
                 if (typeof err == "number") {
                   ctx.out.head.status = err;

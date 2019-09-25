@@ -40,7 +40,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     return this._wire;
   }
 
-  constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log, timeout?:number }, ) {
+  constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log, timeout?: number }, ) {
     super();
 
     const wire = this._wire = opts.wire;
@@ -66,6 +66,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
         function (err, ctx) {
           ctx.err = err;
           ctx.out.head.status = Status.Error;
+          ctx.out.data = err.message;          
           return Promise.resolve();
         }))
       /* add the lazy data decoder */

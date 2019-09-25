@@ -10,3 +10,9 @@ export * from './app';
 export * from './decorators';
 
 export * from './error';
+
+export * from '@viae/core';
+
+import {Next} from 'rowan';
+
+export type ViaeNext = Next;

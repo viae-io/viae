@@ -34,7 +34,7 @@ export class DefaultContext implements Context {
   connection: IVia<Context>;
 
   in?: Message;
-  out?: Message;
+  out?: Message;  
 
   constructor(init: { connection: IVia<Context>; in?: Message, out?: Message }) {
     this.connection = init.connection;
