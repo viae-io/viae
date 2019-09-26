@@ -2,7 +2,8 @@ export interface Log {
   debug(message: String, ...args): void;
   info(message: String, ...args): void;
   warn(message: String, ...args): void;
-  error(message: String, err: Error, ...args): void;
+  error(message: String,  ...args): void;
+  fatal(message: String,  ...args): void;
 }
 
 const logLevel = {
