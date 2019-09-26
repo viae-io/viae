@@ -75,6 +75,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       .use(new UpgradeIncomingObservable())
       /* intercept id-matching messages */
       .use(this._interceptor);
+      /* ... then any more .use() middleware 
 
     /** Hook onto the wire events*/
     wire.on("message", (data: ArrayBuffer | ArrayBufferView) => {

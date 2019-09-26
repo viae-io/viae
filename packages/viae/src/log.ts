@@ -3,15 +3,13 @@ export interface Log {
   info(message: String, ...args): void;
   warn(message: String, ...args): void;
   error(message: String, err: Error, ...args): void;
-  fatal(message: String, err: Error, ...args): void;
 }
 
-export enum LogLevel {
-  Debug = 0,
-  Info = 1,
-  Warn = 2,
-  Error = 3,
-  Fatal = 4,
+const logLevel = {
+  ["error"]: 1,
+  ["warn"]: 2,
+  ["info"]: 3,
+  ["debug"]: 4,
 }
 
 enum CC {
@@ -43,22 +41,19 @@ enum CC {
 }
 
 export class ConsoleLog implements Log {
-  level = LogLevel.Info;
+  level = logLevel["info"]
 
   debug(message: String, ...args: any[]): void {
-    if (this.level <= LogLevel.Debug) console.log(`${CC.Dim}DEBUG${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
+    if (this.level >= logLevel["debug"]) console.log(`${CC.Dim}DEBUG${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
   }
   info(message: String, ...args: any[]): void {
-    if (this.level <= LogLevel.Info) console.log(`${CC.FgCyan}INFO ${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
+    if (this.level >= logLevel["info"]) console.log(`${CC.FgCyan}INFO ${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
   }
   warn(message: String, ...args: any[]): void {
-    if (this.level <= LogLevel.Warn) console.log(`${CC.FgYellow}WARN ${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
+    if (this.level >= logLevel["warn"]) console.log(`${CC.FgYellow}WARN ${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
   }
   error(message: String, ...args: any[]): void {
-    if (this.level <= LogLevel.Error) console.log(`${CC.FgRed}ERROR${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
-  }
-  fatal(message: String, ...args: any[]): void {
-    if (this.level <= LogLevel.Fatal) console.log(`${CC.BgRed}FATAL${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args); 
+    if (this.level >= logLevel["error"]) console.log(`${CC.FgRed}ERROR${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
   }
 }
 

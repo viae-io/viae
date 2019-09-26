@@ -30,7 +30,7 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
 
       this._connections.push(via);
       this._ev.emit("connection", via);
-      Viae.Log.info("connection", ... (via.wire.meta ? [via.wire.meta] : []));
+      log.info("connection", ... (via.wire.meta ? [via.wire.meta] : []));
     });
   }
 
