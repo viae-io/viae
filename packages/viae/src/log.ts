@@ -7,6 +7,7 @@ export interface Log {
 }
 
 const logLevel = {
+  ["fatal"]: 0,
   ["error"]: 1,
   ["warn"]: 2,
   ["info"]: 3,
@@ -55,6 +56,9 @@ export class ConsoleLog implements Log {
   }
   error(message: String, ...args: any[]): void {
     if (this.level >= logLevel["error"]) console.log(`${CC.FgRed}ERROR${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
+  } 
+  fatal(message: String, ...args: any[]): void {
+    if (this.level >= logLevel["fatal"]) console.log(`${CC.BgRed}FATAL${CC.Reset}`, new Date(), message, args.length > 0 ? "\n" : "", ...args);
   }
 }
 

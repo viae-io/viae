@@ -236,6 +236,13 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     this._ev.on(event, cb);
   }
 
+  off(event: "close", cb: () => void)
+  off(event: "open", cb: () => void)
+  off(event: "error", cb: (err: Error, ctx: C) => void)
+  off(event: string, cb: (...args: any[]) => void) {
+    this._ev.off(event, cb);
+  }
+
   static Log: Log = new ConsoleLog();
 }
 
