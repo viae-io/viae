@@ -15,22 +15,35 @@ export class ObservableSender extends Rowan<RequestContext> {
       async (ctx, next) => {
         if (sub != null) { throw Error("Already observing"); }
         let sid = ctx.in.id;
-        let wire = ctx.connection;
+        let via = ctx.connection;
 
         //Remove default response. 
         delete ctx.out;
 
         sub = observable.pipe(observeOn(asyncScheduler)).subscribe(
           async (next) => {
-            await wire.send({ id: sid, head: { status: 206 }, data: next });
+            try {             
+              await via.send({ id: sid, head: { status: 206 }, data: next });
+            } catch (err) {
+              sub.unsubscribe();
+              dispose();
+            }
           },
           async (err) => {
-            await wire.send({ id: sid, head: { status: 500 }, data: err });
-            dispose();
+            try {
+              await via.send({ id: sid, head: { status: 500 }, data: err });
+            } finally {
+              sub.unsubscribe();
+              dispose();
+            }
           },
           async () => {
-            await wire.send({ id: sid, head: { status: 200 } });
-            dispose();
+            try {
+              await via.send({ id: sid, head: { status: 200 } });
+            } finally {
+              sub.unsubscribe();
+              dispose();
+            }
           });
 
         observable = null;
@@ -59,7 +72,6 @@ export class UpgradeOutgoingObservable implements Middleware<Context> {
     const data = ctx.out.data;
 
     if (isObservable(data)) {
-
       let observable = data;
       let sid = ctx.connection.createId();
       let router = new ObservableSender(observable, function () { dispose(); });
@@ -69,6 +81,7 @@ export class UpgradeOutgoingObservable implements Middleware<Context> {
 
       delete ctx.out.data;
     }
+
     await next();
   }
 }
@@ -83,9 +96,9 @@ export class UpgradeIncomingObservable implements Middleware<Context> {
     const connection = ctx.connection;
 
     let observable: Observable<any> = Observable.create(async function (observer: Observer<any>) {
+      let dispose;      
       try {
-        
-        let dispose = connection.intercept(sid, [
+        dispose = connection.intercept(sid, [
           async (ctx: ResponseContext) => {
             let res = ctx.in;
             let status = res.head.status;
@@ -112,7 +125,8 @@ export class UpgradeIncomingObservable implements Middleware<Context> {
           }
         };
       } catch (err) {
-        console.log(err);
+        dispose();
+        observer.error(err);    
       }
     });
 

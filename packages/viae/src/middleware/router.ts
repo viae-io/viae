@@ -38,8 +38,8 @@ export class Router implements Middleware<Context>, RouterOptions {
 
     this.root = normalisePath(this.root);
 
-    if(this.root == ""){
-      this._rootMatch = ()=>"";
+    if (this.root == "") {
+      this._rootMatch = () => "";
       return;
     }
 
@@ -119,11 +119,11 @@ export class Router implements Middleware<Context>, RouterOptions {
 
         let match = null;
 
-        if (path == ctx.in.head.path) {          
+        if (path == ctx.in.head.path) {
           match = [path];
         }
         else {
-          match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;          
+          match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;
           if (match == null) {
             return next();
           }
@@ -159,7 +159,7 @@ export class Router implements Middleware<Context>, RouterOptions {
     if (!routerOpts) return undefined;
 
     let opts = Object.assign({}, routerOpts);
-    
+
     opts.root = normalisePath(root, opts.root);
 
     const router = new Router(opts);
@@ -173,7 +173,7 @@ export class Router implements Middleware<Context>, RouterOptions {
         let method = route["method"];
         let opts = route["opts"];
         let func = controller[routeKey].bind(controller);
-        let hasNext = routeArgs.find(x=>x.type == "next") !== undefined;
+        let hasNext = routeArgs.find(x => x.type == "next") !== undefined;
 
         router.route({
           path: path,
@@ -202,13 +202,11 @@ export class Router implements Middleware<Context>, RouterOptions {
               try {
                 let result = await func(...args);
 
-                if(result !== undefined) {
+                if (result !== undefined) {
                   ctx.out.data = result;
                 }
 
-                if (typeof result == "number") {
-                  ctx.out.head.status = result;
-                } else if(hasNext == false) {
+                if (hasNext == false) {
                   ctx.out.head.status = 200;
                 }
                 //else leave the status as is.                 

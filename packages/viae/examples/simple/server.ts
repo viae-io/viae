@@ -2,7 +2,7 @@ import { Viae, Router, Context, ViaeNext, } from '../../src';
 import { Server as WebSocketServer } from 'ws';
 import { App } from '../../src/app';
 import { Controller, Get, Data, Param, Post, Ctx, Next } from '../../src/decorators';
-import { Subject, isObservable, Observable } from 'rxjs';
+import { Subject, isObservable, Observable, interval, from } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ViaeError } from '../../src/error';
 import { Status } from '@viae/core';
@@ -30,8 +30,8 @@ viae.before((ctx, next) => {
 @Controller()
 class EchoController {
   @Get("info")
-  echo(@Data() data: any, @Ctx() ctx: Context, @Next() next: ViaeNext) {
-    return next()    
+  echo() {
+    return interval(50);
   }
 }
 

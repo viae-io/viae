@@ -1,4 +1,4 @@
-import { ConnectibleWire } from '@viae/core';
+import { ConnectibleWire, WireState } from '@viae/core';
 import { EventEmitter } from 'events';
 
 export type WebSocketConstructor = {
@@ -7,7 +7,16 @@ export type WebSocketConstructor = {
 
 export class WebSocketWire extends EventEmitter implements ConnectibleWire {
   ws?: WebSocket;
-  state: "opening" | "open" | "closing" | "closed";
+  get url(){ 
+    if(!this.ws){ return undefined }
+    if(this.ws.url) return this.ws.url;
+    if(this.ws["_socket"]) return this.ws["_socket"]["remoteAddress"];
+  }
+
+  get readyState() { 
+    return this.ws ? this.ws.readyState : WireState.CLOSED 
+  }
+
   [index: string]: any;
 
   constructor(private WS: WebSocketConstructor = WebSocket) {
@@ -20,19 +29,14 @@ export class WebSocketWire extends EventEmitter implements ConnectibleWire {
 
   connect(url: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      this.state = "opening";
-
       this.ws = new this.WS(url);
       this.ws.binaryType = 'arraybuffer';
       this.ws.onopen = () => {
         resolve();
-        this.state = "open";
         this.emit("open");
       };
-
       this.ws.onclose = () => {
-        reject("connection closed");
-        this.state = "closed";
+        reject("connection closed");       
         this.emit("close");
         delete this.ws;
       };
@@ -43,7 +47,6 @@ export class WebSocketWire extends EventEmitter implements ConnectibleWire {
 
       this.ws.onerror = (err) => {
         reject(err);
-        this.state = "closed";
         this.emit("error", err);
       };
     })
@@ -53,14 +56,12 @@ export class WebSocketWire extends EventEmitter implements ConnectibleWire {
   close(): void {
     if (this.ws === undefined || this.state === "closing")
       return;
-
-    this.state = "closing";
     this.emit("closing");
     this.ws.close();
   }
 
   send(message: ArrayBuffer | ArrayBufferView) {
-    if (this.ws === undefined || this.state !== "open")
+    if (this.ws === undefined || this.readyState !== WireState.OPEN)
       throw Error("Wire is not open");
 
     this.ws.send(message);

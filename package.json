@@ -12,6 +12,6 @@
     "build": "lerna run build",
     "publish:release": "yarn build && lerna publish",
     "publish:canary": "yarn build && lerna publish --canary --preid beta --dist-tag beta ",
-    "clean": "rimraf packages/**/dist"
+    "clean": "rimraf packages/**/dist && rimraf packages/**/tsconfig.tsbuildinfo"
   }
 }

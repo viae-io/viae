@@ -94,8 +94,8 @@
         "signature": "433d276a0aca643031addac46c8477d3195fb83d6638351d1a3fece298b6c683"
       },
       "d:/code/viae/packages/core/src/_wire.ts": {
-        "version": "d68baef3c85a6264826c08c967a2cffd62a0a3f25f0fe61b59106ea1f1a92229",
-        "signature": "4e2aaa7ee1a609f4582c77ef98ad7e0a7f157ef333b8ba5182c42ff5e78a0616"
+        "version": "e807daf20c1d8c7e00817fbb4a6653bda85cb42d24d6665cc16cb242d6b14efe",
+        "signature": "e6a3a02d5e187019dd08ec0637f3565522cfb95209ace93337f1103abd3167bf"
       },
       "d:/code/viae/packages/core/src/_wire-server.ts": {
         "version": "7666f0baf07ccda9c177fb5410c1f55f503624f1f133dacf06c2b1ed6d343bbe",

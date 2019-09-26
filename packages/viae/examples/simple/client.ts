@@ -1,12 +1,16 @@
 import { Via } from '../../src';
 import * as WebSocket from 'ws';
+import { isObservable, Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
 
-let wire = new WebSocket("ws://0.0.0.0:8080", { perMessageDeflate: false });
-let via = new Via({ wire: wire as any });
+let wire = new WebSocket("ws://0.0.0.0:8080");
+let via = new Via({ wire });
 
-via.on("open", async () => {  
-  //console.log((await via.call("GET", "/")));
-  console.log((await via.request("GET", "/info")));
+via.on("open", async () => {
+  let result = await via.call<Observable<number>>("GET", "/info", undefined, {validate: isObservable})
+
+  await result.pipe(tap(console.log)).toPromise();
+
   wire.close();
 });
 

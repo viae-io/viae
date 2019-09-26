@@ -1,6 +1,6 @@
 import { Rowan, After, AfterIf, Processor, Catch } from "rowan";
 import { EventEmitter } from "events";
-import { Wire, Status } from "@viae/core";
+import { Wire, Status, WireState } from "@viae/core";
 import { Message, isRequest } from './message';
 import { Context, ContextConstructor, DefaultContext } from "./context";
 
@@ -114,13 +114,19 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
    **/
   send(msg: Partial<Message>, opts?: SendOptions) {
     if (!msg.id) msg.id = shortId();
+
     if (opts && opts.encoding) {
       msg.head = msg.head || {};
       msg.head.encoding = opts.encoding;
     }
 
+    if(this._wire == undefined || this._wire.readyState !== WireState.OPEN){
+      throw Error("wire is not open");
+    }
+
     return this.out.process(new this.CtxCtor({ connection: this as unknown as IVia<C>, out: msg as Message, log: this._log })).catch((err) => {
       this._ev.emit("error", err);
+      throw err;
     });
   }
 

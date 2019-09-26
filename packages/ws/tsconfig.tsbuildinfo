@@ -122,8 +122,8 @@
         "signature": "433d276a0aca643031addac46c8477d3195fb83d6638351d1a3fece298b6c683"
       },
       "d:/code/viae/packages/core/dist/_wire.d.ts": {
-        "version": "4e2aaa7ee1a609f4582c77ef98ad7e0a7f157ef333b8ba5182c42ff5e78a0616",
-        "signature": "4e2aaa7ee1a609f4582c77ef98ad7e0a7f157ef333b8ba5182c42ff5e78a0616"
+        "version": "e6a3a02d5e187019dd08ec0637f3565522cfb95209ace93337f1103abd3167bf",
+        "signature": "e6a3a02d5e187019dd08ec0637f3565522cfb95209ace93337f1103abd3167bf"
       },
       "d:/code/viae/packages/core/dist/_wire-server.d.ts": {
         "version": "3816e2cfc7c6128b21ef99081885393e923b43808ca4fc043450362f481d68db",
@@ -138,8 +138,8 @@
         "signature": "400db42c3a46984118bff14260d60cec580057dc1ab4c2d7310beb643e4f5935"
       },
       "d:/code/viae/packages/ws/src/index.ts": {
-        "version": "37352054afc4d0d312450ccdbcb0ca45ef3021e086974d131b3f7ae45c1f575b",
-        "signature": "e6f82d34efc765b5bd1053ac4664b33cc4b3ef7d3c968aeadc82f3d88c621b86"
+        "version": "cbc09e356d524fd2faff1428c3996c3477846ec11f6c0db1c5e70ce00977138f",
+        "signature": "dfce2504be89330285b66b42f7342b5302eb6828b273ce86aa17c826777077d3"
       },
       "d:/code/viae/node_modules/@types/node/globals.d.ts": {
         "version": "e4461b72726848da76a31153b6b01af5e0be3b08dbfa2ec5741ad302eb20f2ed",
