@@ -1,4 +1,4 @@
-import { Rowan, After, AfterIf, Processor, Catch } from "rowan";
+import { Rowan, After, AfterIf, Processor, Catch, Meta } from "rowan";
 import { EventEmitter } from "events";
 import { Wire, Status, WireState } from "@viae/core";
 import { Message, isRequest } from './message';
@@ -25,7 +25,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
   private _ev = new EventEmitter();
   private _wire: Wire;
   private _uuid: () => string;
-  private _log: Log;
+  private _log: Log;  
   private _timeout: number;
   private _interceptor = new Interceptor();
   private _encoder = new FrameEncoder();
@@ -49,7 +49,8 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     this._log = (opts ? opts.log : undefined) || new ConsoleLog();
     this._uuid = (opts ? opts.uuid : undefined) || shortId;
     this._timeout = (opts ? opts.timeout : undefined) || 10000;
-
+    this.meta = {};
+  
     this
       /* execute the 'before' pipeline */
       .use(this._before)

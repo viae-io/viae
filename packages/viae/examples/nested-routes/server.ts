@@ -21,10 +21,15 @@ let viae = new Viae(server);
 
 @Controller("bar")
 class BarController {
-
-  @Get()
-  greet() {
-    return "hello from bar";
+  @Get("*")
+  async greet(@Next() next, @Ctx() ctx: Context) {
+    await next();    
+    if(ctx.out.head.status == Status.NotFound){
+      ctx.out.head.status = Status.OK;
+      ctx.out.data = "hello from bar";
+    }else{
+      ctx.out.data = ctx.out.data + " (via bar)"
+    }
   }
 
   @Get(":id")
