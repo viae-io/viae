@@ -165,9 +165,19 @@ export class Router implements Middleware<Context>, RouterOptions {
     const router = new Router(opts);
     const routesOpts = opts.routes;
     if (routesOpts) {
-      for (let routeKey in routesOpts) {
+      for (let routeKey in routesOpts) {        
         const route = routesOpts[routeKey];
         const routeArgs = route.args || [];
+
+        if(route.controller){
+          let sub = controller[route.controller];
+          router.route({
+            path: "",
+            method: undefined,
+            end: false,
+            process: [Router.fromController(sub, route.root)]})
+          continue;
+        }
 
         let path = route["path"];
         let method = route["method"];

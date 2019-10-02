@@ -149,6 +149,22 @@ export function Controller(root?: string) {
   };
 }
 
+export function Use(root?:string) {
+  return function (target: any, propertyKey: string): void {
+    let router: any = Reflect.getMetadata("__router", target) || {};
+    let routes = router.routes || [];
+    let route = routes[propertyKey] || {};
+
+    route.controller = propertyKey;
+    route.root = root || "";
+
+    routes[propertyKey] = route;
+    router["routes"] = routes;
+
+    Reflect.defineMetadata("__router", router, target);
+  };
+}
+
 const _nolog = new ConsoleLog();
 
 export function Trace() {
