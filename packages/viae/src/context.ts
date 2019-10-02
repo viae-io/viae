@@ -15,6 +15,8 @@ export interface Context {
   req?: Request<any>;
   res?: Response<any>;
 
+  params?: { [key: string]: string }
+
   /*checks to see if inbound message is a request (default inbound = true)*/
   isReq(inbound?: boolean): this is RequestContext;
 
@@ -34,7 +36,7 @@ export class DefaultContext implements Context {
   connection: IVia<Context>;
 
   in?: Message;
-  out?: Message;  
+  out?: Message;
 
   constructor(init: { connection: IVia<Context>; in?: Message, out?: Message }) {
     this.connection = init.connection;
