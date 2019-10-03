@@ -7,6 +7,9 @@ import { Context } from "../context";
  * Adds a Lazy data decoder to the incoming message
  */
 export default class BodyDecoder<Ctx extends Context = Context> implements Middleware<Context> {
+  meta: {
+    type: "BodyDecoder"
+  }
   process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
     if (ctx["__decoded"] === true || !ctx.in || !ctx.in.head || !ctx.in.raw) return next();
 

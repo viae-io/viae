@@ -7,6 +7,9 @@ import { Context } from "../context";
  * Encodes the outgoing message data
  */
 export default class BodyEncoder<Ctx extends Context = Context> implements Middleware<Context> {
+  meta: {
+    type: "BodyEncoder"
+  }
   process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
     if (ctx["__encoded"] === true || !ctx.out || ctx.out.data === undefined || !ctx.out.head) return next();
 

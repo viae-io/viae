@@ -1,6 +1,6 @@
 
 
-import { Rowan, Processor, Middleware, Next } from 'rowan';
+import { Rowan, Processor, Middleware, Next, Meta, If } from 'rowan';
 import { Context } from '../context';
 import { ViaeError } from '../error';
 import * as pathToRegexp from 'path-to-regexp';
@@ -17,8 +17,6 @@ export interface RouterOptions {
   middleware?: Middleware<Context>[];
 };
 
-
-
 export class Router implements Middleware<Context>, RouterOptions {
   /** route base path  */
   root: string;
@@ -29,14 +27,20 @@ export class Router implements Middleware<Context>, RouterOptions {
   /** route middleware */
   middleware: Middleware<Context>[] = [];
 
+  meta: Meta;
+
   private _rootMatch: (ctx: Context) => string;
 
   constructor(opts?: RouterOptions) {
 
     this.root = opts.root || "";
     this.middleware = opts.middleware || [];
-
     this.root = normalisePath(this.root);
+    this.meta = {
+      type: "Router",
+      path: this.root,
+      doc: opts.doc,
+    }
 
     if (this.root == "") {
       this._rootMatch = () => "";
@@ -85,8 +89,8 @@ export class Router implements Middleware<Context>, RouterOptions {
     return next();
   }
 
-  private use(processor: Processor<Context>) {
-    this.middleware.push(Rowan.convertToMiddleware(processor));
+  private use(processor: Processor<Context>, meta?: Meta) {
+    this.middleware.push(Rowan.convertToMiddleware(processor, meta));
   }
 
   route(opts: {
@@ -105,12 +109,14 @@ export class Router implements Middleware<Context>, RouterOptions {
       end: (opts.end !== undefined) ? opts.end : true
     });
 
+    const doc = opts.doc;
     const method = opts.method;
-    const processors = opts.process.map(x => Rowan.convertToMiddleware(x));
+    const middleware = opts.process.map(x => Rowan.convertToMiddleware(x));
 
-    this.use(
-      function (ctx, next): Promise<void> {
-
+    const routeProcessor = {
+      meta: { method, path: opts.path },
+      middleware,
+      process: function (ctx, next): Promise<void> {
         if (ctx.in == undefined || ctx.in.head == undefined)
           return next();
 
@@ -139,17 +145,22 @@ export class Router implements Middleware<Context>, RouterOptions {
         }
 
         let originalPath = ctx.in.head.path;
-
+        let originalMatched = ctx.in.head.matchedPath;
+        ctx.in.head.matchedPath = match[0];
         ctx.in.head.path = originalPath.substr(match[0].length);
-        return Rowan.process(processors, ctx, function () {
+
+        return Rowan.process(middleware, ctx, function () {
           ctx.in.head.path = originalPath;
+          ctx.in.head.matchedPath = originalMatched;
           return next();
-        }).then(() => { ctx.in.head.path = originalPath; })
-          .catch((err) => {
+        }).finally(() => {
             ctx.in.head.path = originalPath;
-            throw err;
+            ctx.in.head.matchedPath = originalMatched;
           });
-      });
+      }
+    }
+
+    this.use(routeProcessor);
   }
 
   static fromController(controller: Object, root?: string) {
@@ -165,17 +176,18 @@ export class Router implements Middleware<Context>, RouterOptions {
     const router = new Router(opts);
     const routesOpts = opts.routes;
     if (routesOpts) {
-      for (let routeKey in routesOpts) {        
+      for (let routeKey in routesOpts) {
         const route = routesOpts[routeKey];
         const routeArgs = route.args || [];
 
-        if(route.controller){
+        if (route.controller) {
           let sub = controller[route.controller];
           router.route({
             path: "",
             method: undefined,
             end: false,
-            process: [Router.fromController(sub, route.root)]})
+            process: [Router.fromController(sub, route.root)]
+          })
           continue;
         }
 
@@ -199,6 +211,8 @@ export class Router implements Middleware<Context>, RouterOptions {
                     return ctx.in.head;
                   case "raw":
                     return ctx.in.raw;
+                  case "path":
+                    return ctx.in.head.matchedPath;
                   case "ctx":
                     return ctx;
                   case "next":

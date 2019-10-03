@@ -28,6 +28,7 @@
     "response",
     "websocket",
     "async-iterable",
+    "rxjs",
     "rowan",
     "ws"
   ],
@@ -59,7 +60,7 @@
     "msgpack-lite": "~0.1.26",
     "path-to-regexp": "0.1.7",
     "reflect-metadata": "^0.1.12",
-    "rowan": "^1.0.1",
+    "rowan": "^1.0.2",
     "rxjs": "^6.3.3"
   },
   "nyc": {

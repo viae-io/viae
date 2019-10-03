@@ -20,6 +20,10 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
 
   private _interceptors = new Map<string, InterceptConfig>();
 
+  meta: {
+    type: "Interceptor"
+  }
+  
   /**
    * intercept any message with a matching id
    * @param id: message id to intercept

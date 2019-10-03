@@ -1,13 +1,9 @@
-import { Viae, Router, Context, ViaeNext, } from '../../src';
+import { Viae, Context } from '../../src';
 import { Server as WebSocketServer } from 'ws';
 import { App } from '../../src/app';
-import { Controller, Get, Data, Param, Post, Ctx, Next, Use } from '../../src/decorators';
-import { Subject, isObservable, Observable, interval, from } from 'rxjs';
-import { map } from 'rxjs/operators';
-import { ViaeError } from '../../src/error';
+import { Controller, Get, Param, Ctx, Next, Use, Path, All } from '../../src/decorators';
 import { Status } from '@viae/core';
-import { userInfo } from 'os';
-import { get } from 'https';
+
 
 
 let server = new WebSocketServer({
@@ -22,12 +18,13 @@ let viae = new Viae(server);
 @Controller("bar")
 class BarController {
   @Get("*")
-  async greet(@Next() next, @Ctx() ctx: Context) {
-    await next();    
-    if(ctx.out.head.status == Status.NotFound){
+  async greet(@Next() next, @Ctx() ctx: Context, @Path() path: string) {
+    console.log("BAR:", path);
+    await next();
+    if (ctx.out.head.status == Status.NotFound) {
       ctx.out.head.status = Status.OK;
       ctx.out.data = "hello from bar";
-    }else{
+    } else {
       ctx.out.data = ctx.out.data + " (via bar)"
     }
   }
@@ -51,10 +48,19 @@ class RayController {
 
 @Controller("foo")
 class FooController {
+
+  @All("*")
+  guard(@Next() next, @Path() path)
+  {
+    console.log("FOO:", path);
+    return next();
+  }
+
   @Get()
   greet() {
     return "hello from foo";
   }
+
   @Use()
   bar: BarController;
 
@@ -68,3 +74,6 @@ viae.use(
     controllers: [new FooController(new BarController())]
   })
 )
+
+
+console.log(Viae.extractRoutes(viae));

@@ -49,7 +49,9 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     this._log = (opts ? opts.log : undefined) || new ConsoleLog();
     this._uuid = (opts ? opts.uuid : undefined) || shortId;
     this._timeout = (opts ? opts.timeout : undefined) || 10000;
-    this.meta = {};
+    this.meta = {
+      type: "Via"
+    };
   
     this
       /* execute the 'before' pipeline */

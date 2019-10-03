@@ -36,4 +36,5 @@ export function toUint8Array(value: ArrayBuffer | ArrayBufferView) {
   }
 }
 
+export * from './normalise';
 export * from './uuid';

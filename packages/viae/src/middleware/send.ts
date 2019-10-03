@@ -7,6 +7,9 @@ import { FrameEncoder } from "@viae/pb";
  */
 export default class Send<Ctx extends Context = Context> implements Middleware<Context> {
   constructor(private _encoder: FrameEncoder) { }
+  meta: {
+    type: "Send"
+  }
   async process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
     let out = ctx.out;
     if (out) {          

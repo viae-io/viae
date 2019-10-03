@@ -88,6 +88,22 @@ export function Raw() {
     Reflect.defineMetadata("__router", router, target);
   };
 }
+/** get the matched path for the route*/
+export function Path() {
+  return function (target: any, propertyKey: string | symbol, index: number) {
+    let router: any = Reflect.getMetadata("__router", target) || {};
+    let routes = router.routes || [];
+    let route = routes[propertyKey] || {};
+
+    route.args = route.args || [];
+    route.args[index] = { type: "path" };
+
+    routes[propertyKey] = route;
+    router["routes"] = routes;
+
+    Reflect.defineMetadata("__router", router, target);
+  };
+}
 
 export function Ctx() {
   return function (target: any, propertyKey: string | symbol, index: number) {

@@ -5078,10 +5078,10 @@ rimraf@~2.1.4:
   optionalDependencies:
     graceful-fs "~1"
 
-rowan@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/rowan/-/rowan-1.0.1.tgz#a05b809c01d810176e1b37af79d332cf6bde03a4"
-  integrity sha512-WDRtKemNkrUAkqNaBMTr6T9ldPC3y+YjQsF8Yb6pzsC7QPDaFRz7nL1k8MmwO5luJfYZvz+3I70Ap/bVpRjTRQ==
+rowan@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/rowan/-/rowan-1.0.2.tgz#f5371c09803186235d3c32effd826ac16d405ba8"
+  integrity sha512-sLB0VlOLRHU9afq3UJq15+3LmAeYiJ28WQALXco31hiz+WX9Si8d4okzwoLoBYuH5nWBL2CPIzpn1JN7CKTPLg==
 
 run-async@^2.2.0:
   version "2.3.0"

@@ -64,6 +64,9 @@ export class ObservableSender extends Rowan<RequestContext> {
 }
 
 export class UpgradeOutgoingObservable implements Middleware<Context> {
+  meta: {
+    type: "OutgoingObservable"
+  }
   async process(ctx: Context, next: () => Promise<void>) {
 
     if (!ctx) return next();
@@ -87,6 +90,9 @@ export class UpgradeOutgoingObservable implements Middleware<Context> {
 }
 
 export class UpgradeIncomingObservable implements Middleware<Context> {
+  meta: {
+    type: "IncomingObservable"
+  }
   process(ctx: Context, next: () => Promise<void>) {
     if (!ctx.in || !ctx.in.head || typeof ctx.in.head["observable"] !== "string") {
       return next();

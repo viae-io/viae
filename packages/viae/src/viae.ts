@@ -1,4 +1,4 @@
-import { Rowan, Processor } from "rowan";
+import { Rowan, Processor, MetaHierarchy } from "rowan";
 
 import { Context } from "./context";
 import { WireServer } from "@viae/core";
@@ -6,6 +6,7 @@ import { EventEmitter } from "events";
 
 import { Via } from "./via";
 import { Log, ConsoleLog } from "./log";
+import { normalisePath } from "./util/normalise";
 
 export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
   private _connections = new Array<Via>();
@@ -15,11 +16,13 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
   constructor(server: WireServer, opts?: { log?: Log, middleware?: Processor<Ctx>[], }) {
     super((opts) ? opts.middleware : undefined);
 
+    this.meta = { type: "Viae" };
+
     server.on("connection", (wire) => {
       let log = opts && opts.log ? opts.log : Viae.Log;
       let via = new Via({ wire: wire, log: log }).before(this._before).use(this);
 
-      if (wire.url == undefined && wire["_socket"]) { 
+      if (wire.url == undefined && wire["_socket"]) {
         (wire as any)["url"] = wire["_socket"]["remoteAddress"]; //+ ":" + wire["_socket"]["remotePort"]
       }
 
@@ -49,4 +52,25 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
   }
 
   static Log: Log = new ConsoleLog();
+
+  static extractRoutes(viae: Viae): { method: string, path: string }[] {
+    function getRoutes(node: MetaHierarchy, root = ""): { method: string, path: string }[] {
+      let routes = [];
+
+      if (node.meta && node.meta.path !== undefined) {
+        root = normalisePath(root, node.meta.path);
+        if (node.meta.method) {
+          routes.push({ method: node.meta.method, path: root });
+        }
+      }
+
+      if (node.children) {
+        for (let child of node.children) {
+          routes.push(...getRoutes(child, root));
+        }
+      }
+      return routes;
+    }
+    return getRoutes(Rowan.hierarchy(viae));
+  }
 }
