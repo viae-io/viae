@@ -17,7 +17,7 @@ The goal in developing viae was to allow making asynchronous req/res on a single
 
 ## Basic Usage
 
-A server is created by instantiating a `Viae` instance and passing a `WebSocketServer` instance to it: 
+A server is created by instantiating a `Viae` instance and passing a `WebSocketServer` (or an alterative IWireServer), instance to it: 
 
 ```ts
 let server = new WebSocketServer({ port: 8080, host: "0.0.0.0" });
@@ -58,22 +58,19 @@ viae.use(new App({
 
 ```
 
-a client is created by instantiating a `Via` instance and making requests
-
+a client is created by instantiating a `Via` instance with a wire and making requests
 
 ```ts
 let wire = new WebSocket("ws://0.0.0.0:8080");
-let via = new Via({ wire: wire as any });
+let via = new Via({ wire });
 
 via.on("open", async () => {
 
-  let joinRes = await via.request("GET", "/chat");
+  let data = await via.call("GET", "/chat");
 
-  if (isObservable(joinRes.data)) {
-    joinRes.data.forEach(x => console.log(x));
-  }
-
-  await via.request("POST", "/chat", "hello world...");
+  data.forEach(x => console.log(x));
+  
+  await via.call("POST", "/chat", "hello world...");
 
   await new Promise((r, _) => setTimeout(r, 100));
 
