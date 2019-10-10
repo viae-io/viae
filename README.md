@@ -11,7 +11,7 @@ A bi-directional communication framework.
 [![Stability][stability-image]][stability-url]
 
 
-Currently still under development. 
+:warning: Currently still under development. :warning:
 
 The goal in developing viae was to allow making asynchronous req/res on a single websocket connection and to allow sending objects containing `TypedArrayView` instances. It evolved to facilitate sending and receiving rxjs Observables (stream request, stream response);
 
