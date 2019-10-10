@@ -163,7 +163,7 @@ export class Router implements Middleware<Context>, RouterOptions {
     this.use(routeProcessor);
   }
 
-  static fromController(controller: Object, root?: string) {
+  static fromController(controller: any, root?: string) {
     //Careful not to edit this
     const routerOpts = Reflect.getMetadata("__router", controller);
 
@@ -171,7 +171,7 @@ export class Router implements Middleware<Context>, RouterOptions {
 
     let opts = Object.assign({}, routerOpts);
 
-    opts.root = normalisePath(root, opts.root);
+    opts.root = normalisePath(root, controller.root || opts.root);
 
     const router = new Router(opts);
     const routesOpts = opts.routes;
