@@ -6,3 +6,4 @@ export * from './iterable';
 export * from './observable';
 export * from './send';
 export * from './request';
+export * from './readable-stream';
