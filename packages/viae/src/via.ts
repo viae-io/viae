@@ -26,7 +26,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
   private _ev = new EventEmitter();
   private _wire: Wire;
   private _uuid: () => string;
-  private _log: Log;  
+  private _log: Log;
   private _timeout: number;
   private _interceptor = new Interceptor();
   private _encoder = new FrameEncoder();
@@ -41,7 +41,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     return this._wire;
   }
 
-  constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log, timeout?: number }, ) {
+  constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log, timeout?: number },) {
     super();
 
     const wire = this._wire = opts.wire;
@@ -53,7 +53,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     this.meta = {
       type: "Via"
     };
-  
+
     this
       /* execute the 'before' pipeline */
       .use(this._before)
@@ -71,7 +71,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
         function (err, ctx) {
           ctx.err = err;
           ctx.out.head.status = Status.Error;
-          ctx.out.data = err.message;          
+          ctx.out.data = err.message;
           return Promise.resolve();
         }))
       /* add the lazy data decoder */
@@ -82,9 +82,9 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       .use(new UpgradeIncomingObservable())
       /* intercept id-matching messages */
       .use(this._interceptor);
-      /* ... then any more .use() middleware 
+    /* ... then any more .use() middleware 
 
-    /** Hook onto the wire events*/
+  /** Hook onto the wire events*/
     wire.on("message", (data: ArrayBuffer | ArrayBufferView) => {
       this._onMessage(data);
     });
@@ -127,7 +127,11 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       msg.head.encoding = opts.encoding;
     }
 
-    if(this._wire == undefined || this._wire.readyState !== WireState.OPEN){
+    if(opts && typeof(opts.head)== "object"){
+      Object.assign(msg.head, opts.head);
+    }
+
+    if (this._wire == undefined || this._wire.readyState !== WireState.OPEN) {
       throw Error("wire is not open");
     }
 
@@ -148,14 +152,11 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     data?: any,
     opts?: SendOptions) {
 
-    path = normalisePath(path);
+    path = normalisePath(path);   
 
     let msg: Partial<Message> = {
       id: (opts && opts.id) ? opts.id : shortId(),
-      head: {
-        method,
-        path
-      }
+      head: { method, path }
     };
 
     if (data) {

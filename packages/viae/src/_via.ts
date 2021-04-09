@@ -2,7 +2,7 @@ import { IRowan, Processor } from "rowan";
 import { Message } from "./message";
 import { Disposer } from "./_disposer";
 import { Log } from "./log";
-import { Wire } from "@viae/core";
+import { MessageHeader, Wire } from "@viae/core";
 
 export interface IVia<T> extends IRowan<T> {
   before(processor: Processor<T>): this;
@@ -28,7 +28,8 @@ export interface IVia<T> extends IRowan<T> {
 export interface SendOptions {
   id?: string;
   encoding?: "none" | "msgpack" | "json",
-  timeout?: number
+  timeout?: number;
+  head?: {[index: string]: any}
 };
 
 export interface CallOptions<T> extends SendOptions {
