@@ -54,7 +54,7 @@
     "typescript": "^3.5.1",
     "web-streams-extensions": "^0.3.0",
     "web-streams-polyfill": "^3.0.0",
-    "ws": "^5.1.1"
+    "ws": "^7.4.6"
   },
   "dependencies": {
     "@viae/core": "^1.3.0",
