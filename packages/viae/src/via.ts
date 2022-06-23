@@ -13,7 +13,8 @@ import { FrameEncoder } from "@viae/pb";
 import { Log, ConsoleLog } from "./log";
 import { toUint8Array, shortId } from "./util";
 import { UpgradeOutgoingObservable, UpgradeIncomingObservable } from "./middleware/observable";
-import { UpgradeOutgoingReadableStream, UpgradeIncomingReadableStream } from "./middleware/readable-stream";
+import { UpgradeIncomingReadableStream } from "./middleware/readable-stream";
+import { UpgradeOutgoingReadableStream } from "./middleware/readable-stream";
 import { IVia, SendOptions, CallOptions } from "./_via";
 import { normalisePath } from "./util/normalise";
 

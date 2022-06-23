@@ -14,7 +14,7 @@ export default class Send<Ctx extends Context = Context> implements Middleware<C
     let out = ctx.out;
     if (out) {          
       let raw = this._encoder.encode(out);
-      ctx.connection.log.debug("Sending", out);
+      //ctx.connection.log.debug("Sending", out);
       ctx.connection.wire.send(raw);
     }    
   }
