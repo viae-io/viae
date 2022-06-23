@@ -28,6 +28,7 @@ viae.before((ctx, next) => {
 class EchoController {
   @Get("echo")
   echo(@Data() data: ReadableStream) {
+    console.log("echo return");
     return data;
   }
 }

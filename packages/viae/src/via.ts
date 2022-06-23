@@ -70,8 +70,10 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       .use(new Catch(
         function (err, ctx) {
           ctx.err = err;
-          ctx.out.head.status = Status.Error;
-          ctx.out.data = err.message;
+          if (ctx.out && ctx.out.head) {
+            ctx.out.head.status = Status.Error;
+            ctx.out.data = err.message;
+          }
           return Promise.resolve();
         }))
       /* add the lazy data decoder */
@@ -127,7 +129,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       msg.head.encoding = opts.encoding;
     }
 
-    if(opts && typeof(opts.head)== "object"){
+    if (opts && typeof (opts.head) == "object") {
       Object.assign(msg.head, opts.head);
     }
 
@@ -152,7 +154,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     data?: any,
     opts?: SendOptions) {
 
-    path = normalisePath(path);   
+    path = normalisePath(path);
 
     let msg: Partial<Message> = {
       id: (opts && opts.id) ? opts.id : shortId(),
