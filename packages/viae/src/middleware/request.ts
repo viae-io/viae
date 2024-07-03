@@ -1,5 +1,5 @@
 
-import * as pathToRegexp from 'path-to-regexp';
+import { pathToRegexp } from 'path-to-regexp';
 import { Context } from '../context';
 
 /* the message is a request with a path matching the parameter */

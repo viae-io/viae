@@ -1,6 +1,6 @@
 {
   "name": "@viae/pb",
-  "version": "1.3.0",
+  "version": "2.0.0-beta.1",
   "private": false,
   "author": "Meirion Hughes <crakinshot@yahoo.com>",
   "license": "MIT",
@@ -17,14 +17,15 @@
   "homepage": "https://github.com/viae-io/viae#readme",
   "main": "index.js",
   "typings": "index.d.ts",
-  "dependencies": {
+  "devDependencies": {
     "@viae/core": "^1.3.0",
-    "pbf": "^3.2.0"
+    "pbf": "lastest",
+    "typescript": "lastest"
   },
   "scripts": {
     "build:pb": "pbf ./pb.proto > pb.js",
     "build:ts": "tsc --build tsconfig.json",
-    "build": "yarn build:pb && yarn build:ts"
+    "build": "npm run build:pb && npm run build:ts"
   },
   "gitHead": "6e99bb759a0211ec8f1bff306a7a169b016b10ff"
 }

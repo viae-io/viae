@@ -20,6 +20,6 @@ export interface Wire {
   on(event: "error", cb: (err: any) => void): void;
 }
 
-export interface ConnectibleWire extends Wire {
+export interface ConnectableWire extends Wire {
   connect(url: string): Promise<void>;
 }

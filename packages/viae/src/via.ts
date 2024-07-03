@@ -12,7 +12,6 @@ import Send from "./middleware/send";
 import { FrameEncoder } from "@viae/pb";
 import { Log, ConsoleLog } from "./log";
 import { toUint8Array, shortId } from "./util";
-import { UpgradeOutgoingObservable, UpgradeIncomingObservable } from "./middleware/observable";
 import { UpgradeOutgoingReadableStream, UpgradeIncomingReadableStream } from "./middleware/readable-stream";
 import { IVia, SendOptions, CallOptions } from "./_via";
 import { normalisePath } from "./util/normalise";
@@ -62,7 +61,6 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
         this.out
           .use(new AfterIf(function (ctx) { return Promise.resolve(!!ctx.out); }, [
             new UpgradeOutgoingReadableStream(),
-            new UpgradeOutgoingObservable(),
             new DataEncoder(),
             new Send(this._encoder)
           ]))
@@ -78,8 +76,6 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       .use(new DataDecoder())
       /* convert data into readable-stream  */
       .use(new UpgradeIncomingReadableStream())
-      /* convert data to an observable */
-      .use(new UpgradeIncomingObservable())
       /* intercept id-matching messages */
       .use(this._interceptor);
     /* ... then any more .use() middleware 

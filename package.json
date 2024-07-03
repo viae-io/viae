@@ -2,16 +2,18 @@
   "name": "viae",
   "private": true,
   "devDependencies": {
-    "lerna": "^3.13.2"
+    "lerna": "^8"
   },
-  "workspaces": [
-    "packages/*"
-  ],
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ]
+  },
   "scripts": {
     "bootstrap": "lerna bootstrap",
     "build": "lerna run build",
     "publish:release": "yarn build && lerna publish",
     "publish:canary": "yarn build && lerna publish --canary --preid beta --dist-tag beta ",
-    "clean": "rimraf packages/**/dist && rimraf packages/**/tsconfig.tsbuildinfo"
+    "clean": "rimraf --glob packages/**/dist && rimraf --glob packages/**/tsconfig.tsbuildinfo"
   }
 }

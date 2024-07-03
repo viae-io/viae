@@ -1,11 +1,11 @@
-import { ConnectibleWire, WireState } from '@viae/core';
+import { ConnectableWire, WireState } from '@viae/core';
 import { EventEmitter } from 'events';
 
 export type WebSocketConstructor = {
   new(...args: any[]): WebSocket;
 };
 
-export class WebSocketWire extends EventEmitter implements ConnectibleWire {
+export class WebSocketWire extends EventEmitter implements ConnectableWire {
   ws?: WebSocket;
   get url(){ 
     if(!this.ws){ return undefined }

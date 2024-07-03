@@ -11,9 +11,7 @@ A bi-directional communication framework.
 [![Stability][stability-image]][stability-url]
 
 
-:warning: Currently still under development. :warning:
-
-The goal in developing viae was to allow making asynchronous req/res on a single websocket connection and to allow sending objects containing `TypedArrayView` instances. It evolved to facilitate sending and receiving rxjs Observables (stream request, stream response);
+The goal in developing viae was to allow making asynchronous req/res on a single websocket connection and to allow sending objects containing `TypedArrayView` instances. It evolved to facilitate sending and receiving nested streams. Its opinionated as to the default encoder (msgpack) but json and cbor can be used too. 
 
 ## Basic Usage
 

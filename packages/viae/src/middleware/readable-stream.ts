@@ -108,7 +108,7 @@ export class UpgradeIncomingReadableStream implements Middleware<Context> {
         }
       },
       async start(controller) {
-        let streamer = new Promise(async (resolve, reject) => {
+        let streamer = new Promise<void>(async (resolve, reject) => {
           dispose = connection.intercept(sid, [
             async (ctx: ResponseContext) => {
               let res = ctx.in;

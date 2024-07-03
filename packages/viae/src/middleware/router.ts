@@ -3,7 +3,7 @@
 import { Rowan, Processor, Middleware, Next, Meta, If } from 'rowan';
 import { Context } from '../context';
 import { ViaeError } from '../error';
-import * as pathToRegexp from 'path-to-regexp';
+import { pathToRegexp } from 'path-to-regexp';
 import { normalisePath } from '../util/normalise';
 
 export interface RouterOptions {
@@ -154,102 +154,12 @@ export class Router implements Middleware<Context>, RouterOptions {
           ctx.in.head.matchedPath = originalMatched;
           return next();
         }).finally(() => {
-            ctx.in.head.path = originalPath;
-            ctx.in.head.matchedPath = originalMatched;
-          });
+          ctx.in.head.path = originalPath;
+          ctx.in.head.matchedPath = originalMatched;
+        });
       }
     }
 
     this.use(routeProcessor);
-  }
-
-  static fromController(controller: any, root?: string) {
-    //Careful not to edit this
-    const routerOpts = Reflect.getMetadata("__router", controller);
-
-    if (!routerOpts) return undefined;
-
-    let opts = Object.assign({}, routerOpts);
-
-    opts.root = normalisePath(root, controller.root || opts.root);
-
-    const router = new Router(opts);
-    const routesOpts = opts.routes;
-    if (routesOpts) {
-      for (let routeKey in routesOpts) {
-        const route = routesOpts[routeKey];
-        const routeArgs = route.args || [];
-
-        if (route.controller) {
-          let sub = controller[route.controller];
-          router.route({
-            path: "",
-            method: undefined,
-            end: false,
-            process: [Router.fromController(sub, route.root)]
-          })
-          continue;
-        }
-
-        let path = route["path"];
-        let method = route["method"];
-        let opts = route["opts"];
-        let func = controller[routeKey].bind(controller);
-        let hasNext = routeArgs.find(x => x.type == "next") !== undefined;
-
-        router.route({
-          path: path,
-          method: method,
-          end: opts.end,
-          process: [
-            async function (ctx, next) {
-              let args = routeArgs.map(x => {
-                switch (x.type) {
-                  case "data":
-                    return ctx.in.data;
-                  case "head":
-                    return ctx.in.head;
-                  case "raw":
-                    return ctx.in.raw;
-                  case "path":
-                    return ctx.in.head.matchedPath;
-                  case "ctx":
-                    return ctx;
-                  case "next":
-                    return next;
-                  case "param":
-                    return x.opt ? new x.ctor(ctx.params[x.opt]).valueOf() : ctx.params;
-                };
-                return undefined;
-              });
-
-              try {
-                let result = await func(...args);
-
-                if (result !== undefined) {
-                  ctx.out.data = result;
-                }
-
-                if (hasNext == false) {
-                  ctx.out.head.status = 200;
-                }
-                //else leave the status as is.                 
-              } catch (err) {
-                if (typeof err == "number") {
-                  ctx.out.head.status = err;
-                }
-                else if (err instanceof ViaeError) {
-                  ctx.out.head.status = err.status;
-                  ctx.out.data = err.message;
-                }
-                else {
-                  throw err;
-                }
-              }
-            }]
-        });
-      }
-    }
-    return router;
   }
 }

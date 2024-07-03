@@ -1,5 +1,6 @@
 import { Middleware } from "rowan";
-import * as msgpack from 'msgpack-lite';
+import { encode as cborEncode, decode as cborDecode } from 'cbor-x';
+import { pack as msgpackEncode, unpack as msgpackDecode} from 'msgpackr';
 import { textToBytes } from '../util';
 import { Context } from "../context";
 
@@ -23,7 +24,12 @@ export default class BodyEncoder<Ctx extends Context = Context> implements Middl
         }
       case "msgpack":
         ctx.out.head.encoding = "msgpack";
-        ctx.out.raw = msgpack.encode(ctx.out.data);
+        ctx.out.raw = msgpackEncode(ctx.out.data);
+        ctx["__encoded"] = true;
+        break;  
+      case "cbor":
+        ctx.out.head.encoding = "msgpack";
+        ctx.out.raw = cborEncode(ctx.out.data);
         ctx["__encoded"] = true;
         break;
       case "json":
