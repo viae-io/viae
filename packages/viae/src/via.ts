@@ -10,7 +10,8 @@ import Interceptor from "./middleware/interceptor";
 import Send from "./middleware/send";
 
 import { FrameEncoder } from "@viae/pb";
-import { Log, ConsoleLog } from "./log";
+import { Log } from "./log";
+import { pino } from 'pino';
 import { toUint8Array, shortId } from "./util";
 import { UpgradeOutgoingReadableStream, UpgradeIncomingReadableStream } from "./middleware/readable-stream";
 import { IVia, SendOptions, CallOptions } from "./_via";
@@ -40,13 +41,15 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     return this._wire;
   }
 
+  static Log = pino();
+
   constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log, timeout?: number },) {
     super();
 
     const wire = this._wire = opts.wire;
 
     this.CtxCtor = (opts ? opts.Ctx : undefined) || DefaultContext;
-    this._log = (opts ? opts.log : undefined) || new ConsoleLog();
+    this._log = (opts ? opts.log : undefined) || Via.Log;
     this._uuid = (opts ? opts.uuid : undefined) || shortId;
     this._timeout = (opts ? opts.timeout : undefined) || 10000;
     this.meta = {
@@ -100,14 +103,35 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     return this._log;
   }
 
+  get ready() {
+    return new Promise<void>((r, x) => {
+      if (this._wire.readyState == WireState.OPEN) {
+        return r();
+      }
+      const handlerOpen = () => {
+        this._wire.off("open", handlerOpen);
+        this._wire.off("error", handlerError);
+        r();
+      }
+      const handlerError = (err) => {
+        this._wire.off("open", handlerOpen);
+        this._wire.off("error", handlerError);
+        x(err);
+      }
+
+      this._wire.on("open", handlerOpen);
+      this._wire.on("error", handlerError);
+    })
+  }
+
   private _onMessage(data: ArrayBuffer | ArrayBufferView) {
     const msg = this._encoder.decode(toUint8Array(data));
     const ctx = new this.CtxCtor({ connection: this as IVia<C>, in: msg, log: this._log });
 
-    this._log.debug("Received", msg);
+    this._log.trace({msg},"Received Message");
 
     this.process(ctx as C).catch(err => {
-      this._log.error("Unhandled Error", err);
+      this._log.error({err}, "Unhandled Error");
       this._ev.emit("error", err);
     });
   }
@@ -123,7 +147,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       msg.head.encoding = opts.encoding;
     }
 
-    if(opts && typeof(opts.head)== "object"){
+    if (opts && typeof (opts.head) == "object") {
       Object.assign(msg.head, opts.head);
     }
 
@@ -148,7 +172,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     data?: any,
     opts?: SendOptions) {
 
-    path = normalisePath(path);   
+    path = normalisePath(path);
 
     let msg: Partial<Message> = {
       id: (opts && opts.id) ? opts.id : shortId(),
@@ -189,7 +213,8 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
    * simplified request/response  - this will deserialise the response data and return it if successful. 
    * throws an error if the result status is not OK. 
    **/
-  async call<E = any>(method: string, path: string, data?: any, opts?: CallOptions<E>): Promise<E> {
+  async call<E = any>(opts: CallOptions<E>): Promise<E> {
+    const { method, path, data } = opts;
     let result = await this.request(method, path, data, opts);
     switch (Number(result.head.status)) {
       case Status.NotFound:
@@ -252,7 +277,5 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
   off(event: string, cb: (...args: any[]) => void) {
     this._ev.off(event, cb);
   }
-
-  static Log: Log = new ConsoleLog();
 }
 

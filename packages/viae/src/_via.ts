@@ -27,11 +27,14 @@ export interface IVia<T> extends IRowan<T> {
 
 export interface SendOptions {
   id?: string;
-  encoding?: "none" | "msgpack" | "json",
+  encoding?: "none" | "msgpack" | "json" | "cbor",
   timeout?: number;
   head?: {[index: string]: any}
 };
 
 export interface CallOptions<T> extends SendOptions {
+  method: string, 
+  path: string, 
+  data?: any,
   validate?(result: any) : result is T;
 }

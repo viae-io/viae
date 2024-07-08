@@ -13,8 +13,16 @@
       "es2017",
       "dom",
       "esnext.asynciterable"
+    ], 
+    "types": [
+      "@types/node",
+      "@types/mocha",
+      "@types/chai"
     ]
   },
+  "include": [
+    "src/**/*", "test/**/*"
+  ],
   "exclude": [
     "node_modules"
   ],

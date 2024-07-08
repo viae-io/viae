@@ -27,7 +27,7 @@ export interface Context {
 }
 
 export interface ContextConstructor<C extends Context = Context> {
-  new(init: { connection: IVia<C>; in: Message<any>, log: Log }): C;
+  new(init: { connection: IVia<C>; in: Message<any>, log: Log, }): C;
   new(init: { connection: IVia<C>; out: Message<any>, log: Log }): C;
 }
 
@@ -39,10 +39,7 @@ export class DefaultContext implements Context {
   out?: Message;
 
   constructor(init: { connection: IVia<Context>; in?: Message, out?: Message }) {
-    this.connection = init.connection;
-
-    this.out = init.out;
-    this.in = init.in;
+    Object.assign(this, init);
 
     if (this.isReq()) {
       this.out = this.defaultResponse(this.in);

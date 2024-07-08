@@ -18,7 +18,7 @@
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "dependencies": {
-    "@viae/core": "^2.0.0",
+    "@viae/core": "^2.0.0-beta.1",
     "typescript": "latest"
   },
   "scripts": {

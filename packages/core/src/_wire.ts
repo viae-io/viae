@@ -18,6 +18,10 @@ export interface Wire {
   on(event: "open", cb: () => void): void;
   on(event: "close", cb: () => void): void;
   on(event: "error", cb: (err: any) => void): void;
+  off(event: "message", cb: (data: ArrayBuffer | ArrayBufferView) => void): void;
+  off(event: "open", cb: () => void): void;
+  off(event: "close", cb: () => void): void;
+  off(event: "error", cb: (err: any) => void): void;
 }
 
 export interface ConnectableWire extends Wire {

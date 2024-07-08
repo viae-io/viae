@@ -5,7 +5,9 @@ import { WireServer } from "@viae/core";
 import { EventEmitter } from "events";
 
 import { Via } from "./via";
-import { Log, ConsoleLog } from "./log";
+import { Log } from "./log";
+import { pino } from 'pino';
+
 import { normalisePath } from "./util/normalise";
 
 export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
@@ -51,7 +53,7 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
     return this;
   }
 
-  static Log: Log = new ConsoleLog();
+  static Log: Log = pino();
 
   static extractRoutes(viae: Viae): { method: string, path: string }[] {
     function getRoutes(node: MetaHierarchy, root = ""): { method: string, path: string }[] {

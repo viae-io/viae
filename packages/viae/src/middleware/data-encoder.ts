@@ -1,6 +1,6 @@
 import { Middleware } from "rowan";
 import { encode as cborEncode, decode as cborDecode } from 'cbor-x';
-import { pack as msgpackEncode, unpack as msgpackDecode} from 'msgpackr';
+import { pack as msgpackEncode, unpack as msgpackDecode } from 'msgpackr';
 import { textToBytes } from '../util';
 import { Context } from "../context";
 
@@ -15,6 +15,7 @@ export default class BodyEncoder<Ctx extends Context = Context> implements Middl
     if (ctx["__encoded"] === true || !ctx.out || ctx.out.data === undefined || !ctx.out.head) return next();
 
     switch (ctx.out.head.encoding) {
+      default:
       case undefined:
         if (ctx.out.data instanceof Uint8Array) {
           ctx.out.raw = ctx.out.data;
@@ -22,13 +23,14 @@ export default class BodyEncoder<Ctx extends Context = Context> implements Middl
           ctx["__encoded"] = true;
           break;
         }
+      //roll over and default to: 
       case "msgpack":
         ctx.out.head.encoding = "msgpack";
         ctx.out.raw = msgpackEncode(ctx.out.data);
         ctx["__encoded"] = true;
-        break;  
+        break; 
       case "cbor":
-        ctx.out.head.encoding = "msgpack";
+        ctx.out.head.encoding = "cbor";
         ctx.out.raw = cborEncode(ctx.out.data);
         ctx["__encoded"] = true;
         break;
@@ -41,7 +43,7 @@ export default class BodyEncoder<Ctx extends Context = Context> implements Middl
         ctx.out.raw = ctx.out.data;
         ctx["__encoded"] = true;
         break;
-      default:
+
     }
     return next();
   }

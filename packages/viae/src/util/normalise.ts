@@ -3,7 +3,8 @@ export function normalisePath(...join: string[]) {
   for(let next of join){
     if(typeof (next) != "string" || next.length <= 0){
       continue;
-    }
+    }  
+
     if(path.endsWith("/") == false){
       path += "/";
     }
