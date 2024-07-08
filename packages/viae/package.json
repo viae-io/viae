@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "2.0.0-beta.2",
+  "version": "2.0.3",
   "private": false,
   "description": "bi-directional binary streaming req/res framework",
   "main": "dist/index.js",
@@ -53,8 +53,8 @@
     "ws": "latest"
   },
   "dependencies": {
-    "@viae/core": "^2.0.0-beta.2",
-    "@viae/pb": "^2.0.0-beta.2",
+    "@viae/core": "^2.0.3",
+    "@viae/pb": "^2.0.3",
     "cbor-x": "^1.5.9",
     "msgpackr": "^1.10.2",
     "path-to-regexp": "^6",
