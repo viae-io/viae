@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.2",
   "private": false,
   "description": "bi-directional binary streaming req/res framework",
   "main": "dist/index.js",
@@ -42,25 +42,25 @@
     "@types/ws": "latest",
     "c8": "latest",
     "chai": "latest",
-    "mocha": "latest",
     "concurrently": "latest",
     "cross-env": "latest",
+    "mocha": "latest",
     "rimraf": "latest",
-    "typescript": "latest",
     "tsx": "latest",
+    "typescript": "latest",
     "web-streams-extensions": "latest",
     "web-streams-polyfill": "latest",
     "ws": "latest"
   },
   "dependencies": {
-    "@viae/core": "^2.0.0-beta.1",
-    "@viae/pb": "^2.0.0-beta.1",
+    "@viae/core": "^2.0.0-beta.2",
+    "@viae/pb": "^2.0.0-beta.2",
     "cbor-x": "^1.5.9",
     "msgpackr": "^1.10.2",
     "path-to-regexp": "^6",
+    "pino": "^9",
     "reflect-metadata": "~0.2.2",
-    "rowan": "^2.0.0",
-    "pino": "^9"
+    "rowan": "^2.0.0"
   },
   "nyc": {
     "include": [
