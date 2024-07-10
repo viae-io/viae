@@ -1,4 +1,4 @@
-import { Api, Viae, } from '../src';
+import { Api, Viae, } from '../../src';
 import { Server as WebSocketServer } from 'ws';
 import { Status } from '@viae/core';
 
@@ -30,10 +30,10 @@ class EchoController {
 const api = new Api();
 
 api.get({
-  path: "/", handler(opt) {
-    return Status.OK
+  path: "/echo", 
+  handler(opt) {
+    return opt.data;
   },
 })
-
 
 viae.use(api);

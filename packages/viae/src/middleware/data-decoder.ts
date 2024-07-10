@@ -1,42 +1,38 @@
 import { Middleware } from "rowan";
-import { bytesToText } from '../util';
+import { Codex } from '../util';
 import { Context } from "../context";
-import { encode as cborEncode, decode as cborDecode } from 'cbor-x';
-import { pack as msgpackEncode, unpack as msgpackDecode} from 'msgpackr';
+
 
 /**
  * Adds a Lazy data decoder to the incoming message
  */
-export default class BodyDecoder<Ctx extends Context = Context> implements Middleware<Context> {
+export default class BodyDecoder implements Middleware<Context> {
+  constructor(private _codex: Codex) {
+    if(_codex == null){
+      throw Error("body decoder must be initialized with a codex");
+    }
+  }
+
   meta: {
     type: "BodyDecoder"
   }
   process(ctx: Context, next: (ctx?: Context) => Promise<void>): Promise<void> {
+
     if (ctx["__decoded"] === true || !ctx.in || !ctx.in.head || !ctx.in.raw) return next();
+    const codex = this._codex;
+
 
     Object.defineProperty(ctx.in, "data", {
       configurable: true,
       get: function () {
         delete ctx.in.data;
-        switch (ctx.in.head.encoding) {
-          case "msgpack":
-            ctx.in.data = msgpackDecode(ctx.in.raw);
-            ctx["__decoded"] = true;
-            break;
-          case "cbor":
-            ctx.in.data = cborDecode(ctx.in.raw);
-            ctx["__decoded"] = true;
-            break;
-          case "json":
-            ctx.in.data = JSON.parse(bytesToText(ctx.in.raw));
-            ctx["__decoded"] = true;
-            break;
-          case "none":
-            ctx.in.data = ctx.in.raw;
-            ctx["__decoded"] = true;
-            break;
-          case undefined:
+        let encoder = codex[ctx.in.head.encoding];
+
+        if(encoder){
+          ctx.in.data = encoder.decode(ctx.in.raw);
+          ctx["__decoded"] = true;
         }
+        
         return ctx.in.data;
       }
     });

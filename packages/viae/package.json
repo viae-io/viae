@@ -54,6 +54,7 @@
   },
   "dependencies": {
     "@viae/core": "^2.0.3",
+    "web-streams-extensions": "latest",
     "@viae/pb": "^2.0.3",
     "cbor-x": "^1.5.9",
     "msgpackr": "^1.10.2",

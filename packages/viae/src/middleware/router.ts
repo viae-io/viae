@@ -200,7 +200,7 @@ export class Api implements Middleware<Context> {
   
       this._router.route({
         path,
-        method: "GET",
+        method: method,
         end,
         process: [
           async function (ctx, next) {
@@ -249,8 +249,7 @@ export class Api implements Middleware<Context> {
     this.post = methodFn("POST");
     this.put = methodFn("PUT");
     this.delete = methodFn("DELETE");
-    this.subscribe = methodFn("SUBSCIBE");
-
+    this.subscribe = methodFn("SUBSCRIBE");
   }
 
   all: ApiFn;

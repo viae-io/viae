@@ -1,4 +1,4 @@
-import { Via } from '../src';
+import { Via } from '../../src';
 import WebSocket from 'ws';
 
 let wire = new WebSocket("ws://0.0.0.0:8080", { perMessageDeflate: false });
@@ -7,27 +7,29 @@ let via = new Via({ wire: wire as any });
 async function measure(name: string, elmt: number, cb: () => Promise<void>) {
   let entry: any[] = [];
 
-  console.log(name + " x"+elmt);
+  console.log(name + " x" + elmt);
 
-  for (let i = 0; i < 100; i++) {
+  let N = 100;
+  for (let i = 0; i < N; i++) {
     let start = new Date();
 
     await cb();
 
-    let took = ((new Date().getTime() - start.getTime()) / 1000);
+    let took = ((new Date().getTime() - start.getTime()));
 
     entry.push(took);
   }
 
   let slowest = entry.sort()[0];
-  let fastest = entry.sort().reverse()[0];
-  let average = entry.reduce((p, c) => p + c / 100, 0);
-  let elmtPerSec = (elmt) / average;
+  let fastest = entry.sort().reverse()[0] ;
+  let average = entry.reduce((p, c) => p + (c / N) , 0);
+  let elmtPerSec = ((elmt) / average) * 1000;
 
 
-  console.log(" min: " + slowest + " sec");
-  console.log(" max: " + fastest + " sec");
-  console.log(" avg: " + average + " sec");
+  console.log(" min: " + slowest + " ms");
+  console.log(" max: " + fastest + " ms");
+  console.log(" avg: " + average + " ms");
+  console.log(" avg(elmt): " + (average/elmt) + " ms");
   console.log(" tps: " + elmtPerSec);
 }
 
@@ -67,7 +69,7 @@ via.on("open", async () => {
   await measure("uint8array as none", 1000, async () => {
     let cache: any[] = [];
     for (let i = 0; i < 1000; i++) {
-      cache.push(via.request("POST", "/root", new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])));
+      cache.push(via.request("POST", "/root", new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), {encoding: "none"}));
     }
     await Promise.all(cache);
   });
@@ -84,7 +86,7 @@ via.on("open", async () => {
     let cache: Array<Promise<any>> = [];
 
     for (let j = 0; j < 1000; j++) {
-      cache.push(via.request("POST", "/root", data1));
+      cache.push(via.request("POST", "/root", data1, {encoding: "none"}));
     }
 
     await Promise.all(cache);
@@ -95,7 +97,7 @@ via.on("open", async () => {
     let cache: Array<Promise<any>> = [];
 
     for (let i = 0; i < 1000; i++) {
-      cache.push(via.request("POST", "/root", data2));
+      cache.push(via.request("POST", "/root", data2, {encoding: "none"}));
     }
     await Promise.all(cache);
   });
@@ -104,7 +106,7 @@ via.on("open", async () => {
     let cache: Array<Promise<any>> = [];
 
     for (let i = 0; i < 1000; i++) {
-      cache.push(via.request("POST", "/root", data3));
+      cache.push(via.request("POST", "/root", data3, {encoding: "none"}));
     }
     await Promise.all(cache);
   });
@@ -113,7 +115,7 @@ via.on("open", async () => {
     let cache: Array<Promise<any>> = [];
 
     for (let j = 0; j < 100; j++) {
-      cache.push(via.request("POST", "/root", data4));
+      cache.push(via.request("POST", "/root", data4, {encoding: "none"}));
     }
 
     await Promise.all(cache);
@@ -124,7 +126,7 @@ via.on("open", async () => {
     let cache: Array<Promise<any>> = [];
 
     for (let i = 0; i < 100; i++) {
-      cache.push(via.request("POST", "/root", data5));
+      cache.push(via.request("POST", "/root", data5, {encoding: "none"}));
     }
     await Promise.all(cache);
   });
@@ -133,7 +135,7 @@ via.on("open", async () => {
     let cache: Array<Promise<any>> = [];
 
     for (let i = 0; i < 100; i++) {
-      cache.push(via.request("POST", "/root", data6, { timeout: 5000 }));
+      cache.push(via.request("POST", "/root", data6, { encoding: "none", timeout: 5000 }));
     }
     await Promise.all(cache);
   });

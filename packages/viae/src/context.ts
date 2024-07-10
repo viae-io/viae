@@ -3,7 +3,7 @@ import { Log } from "./log";
 import { IVia } from "./_via";
 import { Status } from "@viae/core";
 
-export interface Context {
+export interface Context  {
   id: string;
   connection: IVia<Context>;
 
@@ -62,7 +62,8 @@ export class DefaultContext implements Context {
     if (req) {
       return {
         id: req.id,
-        head: { status: Status.NotFound }
+        head: { status: Status.NotFound },
+        [Symbol.dispose]:()=>{}
       };
     }
   }
