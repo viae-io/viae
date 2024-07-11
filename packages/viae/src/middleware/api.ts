@@ -1,6 +1,6 @@
 
 
-import { Middleware, Next } from 'rowan';
+import { Middleware, Next, Processor } from 'rowan';
 import { Context } from '../context';
 import { ViaeError } from '../error';
 import { MessageHeader } from '@viae/core';
@@ -134,8 +134,16 @@ export class Api<C extends Context = Context> implements Middleware<C> {
   delete: ApiFn;
   subscribe: ApiFn;
 
-  use(path: string, api: Middleware<Context>) {
-    this._router.route({ path, method: null, process: [api] })
+  use(processor: Processor<C>) 
+  use(path: string, api: Middleware<C>)
+  use(arg1: string | Processor<C>, arg2?: Middleware<C>) {
+    if(typeof arg1 == "string"){
+      let path = arg1; 
+      let api = arg2; 
+      this._router.route({ path, method: null, process: [api] })
+    }else{   
+      this._router.use(arg1);
+    }
   }
 
   process(ctx: Context, next: Next): Promise<void> {

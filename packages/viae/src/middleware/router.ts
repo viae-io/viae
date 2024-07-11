@@ -87,7 +87,7 @@ export class Router implements Middleware<Context>, RouterOptions {
     return next();
   }
 
-  private use(processor: Processor<Context>, meta?: Meta) {
+  use(processor: Processor<Context>, meta?: Meta) {
     this.middleware.push(Rowan.convertToMiddleware(processor, meta));
   }
 
