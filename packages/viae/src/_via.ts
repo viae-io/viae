@@ -22,7 +22,7 @@ export interface IVia<T> extends IRowan<T> {
     method: string,
     path: string,
     data: any,
-    opts?: O & { validate?(value: any): value is R }): Promise<RequestResponse<O['accept'] extends "stream" ? ReadableStream<R> : R>>;
+    opts?: O & { validate?(value: any): value is R }): Promise<RequestResponse & O['accept'] extends "stream" ? {data: ReadableStream<R>} :  O['accept'] extends "object" ? {data: R} : {}> ;
 
   send(msg: Partial<Message<any>>, opts?: SendOptions): Promise<void>;
   intercept(id: string, handlers: Processor<T>[]): Disposer;

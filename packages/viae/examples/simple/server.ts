@@ -31,8 +31,12 @@ const api = new Api();
 
 api.get({
   path: "/echo", 
+  accept: "object",
+  validate(value): asserts value is string {
+    if (typeof value != "string") throw Error("value is not a string");
+  },
   handler(opt) {
-    return opt.data;
+    return opt.data
   },
 })
 

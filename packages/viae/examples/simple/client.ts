@@ -13,17 +13,20 @@ import { access } from 'fs';
 
   via.on("open", async () => {
     {
-      using result = await via.request(
+      await using result = await via.request(
         "GET",
         "/echo",
         new ReadableStream({ start(controller) { controller.enqueue("hello"), controller.close(); } }),
         {
-          accept: "none"
+          accept: "stream",
+          validate(value): value is string {
+            return true
+          },
         }
       )
-
       if (result.ok) {
-        let payloads = result.data
+        let payloads = await toArray(result.data);
+        console.log(payloads);
       }
     }
 

@@ -30,6 +30,7 @@ export interface RequestResponse<T = any> extends Response<T>, Disposable {
  */
 export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C> {
   private _ev = new EventEmitter();
+  private _active: Context[] = [];
   private _wire: Wire;
   private _uuid: () => string;
   private _log: Log;
@@ -45,6 +46,10 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
 
   get wire() {
     return this._wire;
+  }
+
+  get active() {
+    return this._active;
   }
 
   static Log = pino();
@@ -76,8 +81,11 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       .use(new Catch(
         function (err, ctx) {
           ctx.err = err;
-          ctx.out.head.status = Status.Error;
-          ctx.out.data = err.message;
+          opts.log.error({err}, "error during processing");
+          if (ctx.out) {
+            ctx.out.head.status = Status.Error;
+            ctx.out.data = err.message;
+          }      
           return Promise.resolve();
         }))
       /* add the lazy data decoder */
@@ -87,8 +95,8 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       /* intercept id-matching messages */
       .use(this._interceptor);
     /* ... then any more .use() middleware 
-
-  /** Hook onto the wire events*/
+    
+    /** Hook onto the wire events*/
     wire.on("message", (data: ArrayBuffer | ArrayBufferView) => {
       this._onMessage(data);
     });
@@ -133,12 +141,20 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     const msg = this._encoder.decode(toUint8Array(data));
     const ctx = new this.CtxCtor({ connection: this as IVia<C>, in: msg, log: this._log });
 
-    this._log.trace({ msg }, "received message");
+    this._active.push(ctx);
 
-    this.process(ctx as C).catch(err => {
-      this._log.error({ err, ctx }, "unhandled error");
-      this._ev.emit("error", err);
-    });
+    this.process(ctx as C)
+      .then(() => {
+        return ctx.complete;
+      })
+      .catch(err => {
+        this._log.error({ err, ctx }, "unhandled error");
+        this._ev.emit("error", err);
+      }).finally(() => {
+        let index = this._active.indexOf(ctx);
+        this._active.splice(index, 1);
+        return ctx[Symbol.asyncDispose]();
+      })
   }
 
   /**
@@ -160,10 +176,16 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       throw Error("wire is not open");
     }
 
-    return this.out.process(new this.CtxCtor({ connection: this as unknown as IVia<C>, out: msg as Message, log: this._log })).catch((err) => {
-      this._ev.emit("error", err);
-      throw err;
-    });
+    let ctx = new this.CtxCtor({ connection: this as unknown as IVia<C>, out: msg as Message, log: this._log });
+    return this.out.process(ctx)
+      .then(() => ctx.complete)
+      .catch((err) => {
+        this._ev.emit("error", err);
+        throw err;
+      })
+      .finally(() => {
+        return ctx[Symbol.asyncDispose]()
+      });
   }
 
   /**
@@ -174,8 +196,8 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
   async request<R, O extends RequestOptions>(
     method: string,
     path: string,
-    data: any,
-    opts?: O & { validate?(value: any): value is R }): Promise<RequestResponse<O['accept'] extends "stream" ? ReadableStream<R> : R>>{
+    data?: any,
+    opts?: O & { validate?(value: any): value is R }): Promise<RequestResponse & (O['accept'] extends "stream" ? { data: ReadableStream<R> } : O['accept'] extends "object" ? { data: R } : {})> {
 
     path = normalisePath(path)
 
@@ -195,7 +217,17 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       id: msg.id,
       handlers: [function (ctx, _) {
         const status = ctx.in.head.status;
-        resolve(Object.assign(ctx.in, { ok: status >= 200 && status < 300 }));
+        resolve(
+          Object.assign(
+            {
+              ok: status >= 200 && status < 300,
+              [Symbol.asyncDispose]() {
+                return ctx.complete.then(_ => ctx[Symbol.asyncDispose]())
+              }
+            },
+            ctx.in,
+          ));
+
         return Promise.resolve();
       }]
     });
@@ -204,7 +236,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
 
     try {
       await this.send(msg, opts);
-      return await promise;
+      return await promise as any;
     }
     catch (err) {
       throw err;

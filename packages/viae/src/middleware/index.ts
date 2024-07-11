@@ -5,3 +5,4 @@ export * from './interceptor';
 export * from './send';
 export * from './request';
 export * from './readable-stream';
+export * from './api'

@@ -13,6 +13,8 @@ let op = 0;
 
 setInterval(() => {
   console.log(`${op} tps`);
+  console.log("connections: " + viae.connections.length);
+  console.log("active ctx: " + viae.connections.map(x=>x.active.length).reduce((p, c)=>p+c, 0))
   op = 0;
 }, 1000);
 
