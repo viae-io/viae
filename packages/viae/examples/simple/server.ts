@@ -1,4 +1,4 @@
-import { Api, Viae, } from '../src';
+import { Api, Viae, } from '../../src';
 import { Server as WebSocketServer } from 'ws';
 import { Status } from '@viae/core';
 
@@ -30,10 +30,14 @@ class EchoController {
 const api = new Api();
 
 api.get({
-  path: "/", handler(opt) {
-    return Status.OK
+  path: "/echo", 
+  accept: "object",
+  validate(value): asserts value is string {
+    if (typeof value != "string") throw Error("value is not a string");
+  },
+  handler(opt) {
+    return opt.data
   },
 })
-
 
 viae.use(api);

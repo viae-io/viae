@@ -4,10 +4,18 @@ import { Rowan, If, Middleware } from "rowan";
 import { request } from "./request";
 
 export class ReadableStreamSender extends Rowan<RequestContext> {
+  private _complete: Promise<void>;
   constructor(readable: ReadableStream<any>, dispose: () => void) {
     super();
 
     let reader: ReadableStreamDefaultReader<any>
+
+    let resolve, reject;
+
+    this._complete = new Promise<void>((r, x)=>{
+      resolve = r;
+      reject = x;
+    })
 
     this.use(new If(request("START"), [
       async (ctx, next) => {
@@ -23,13 +31,16 @@ export class ReadableStreamSender extends Rowan<RequestContext> {
               let next = await reader.read();
               if (next.done) {
                 await via.send({ id: sid, head: { status: 200 } });
-                reader = null;
+                dispose();
+                resolve();
+                reader = null;                
               } else {
                 await via.send({ id: sid, head: { status: 206 }, data: next.value });
               }
             }
           } catch (err) {
             await via.send({ id: sid, head: { status: 500 }, data: err });
+            reject(err);
           }
         }
 
@@ -44,9 +55,14 @@ export class ReadableStreamSender extends Rowan<RequestContext> {
         if (reader) {
           reader.cancel();
           reader = null;
-        }
+        }        
         ctx.send({ head: { status: 200 } });
+        reject("aborted");
       }]));
+  }
+
+  get complete(){
+    return this._complete
   }
 }
 
@@ -56,7 +72,6 @@ export function isReadableStream(obj: any): obj is ReadableStream<any> {
   if (obj.getReader != null) return true;
   return false;
 }
-
 
 export class UpgradeOutgoingReadableStream implements Middleware<Context> {
   meta: {
@@ -75,6 +90,8 @@ export class UpgradeOutgoingReadableStream implements Middleware<Context> {
       let sid = ctx.connection.createId();
       let router = new ReadableStreamSender(readable, function () { dispose(); });
       let dispose = ctx.connection.intercept(sid, [router]);
+
+      ctx.tasks.push({ name: "ReadableStreamSender", complete: router.complete },  )
 
       head["readable"] = sid;
 
@@ -99,6 +116,11 @@ export class UpgradeIncomingReadableStream implements Middleware<Context> {
 
     let dispose;
 
+    //TODO: this needs reworking to incorporate a buffer 
+    // for incoming instead of pushing them directly into the controller. 
+    // with a buffer, it should be possible to use the pull mechanic 
+    // instead of free-flowing without backpressure
+
     ctx.in.data = new ReadableStream({
       async cancel() {
         if (dispose) {
@@ -116,9 +138,9 @@ export class UpgradeIncomingReadableStream implements Middleware<Context> {
               let data = res.data;
               if (status == 206) {                
                 controller.enqueue(data);
-                //if(controller.desiredSize <= 0){
-                //  await connection.send({ id: sid, head: { method: "THROTTLE" } });
-                //}                
+                /*if(controller.desiredSize <= 0){
+                  await connection.send({ id: sid, head: { method: "THROTTLE" } });
+                }*/               
               } else if (status == 500) {
                 reject(data);
               } else {
@@ -133,7 +155,7 @@ export class UpgradeIncomingReadableStream implements Middleware<Context> {
         await streamer;
         if (dispose()) { dispose(); dispose = null };
       }
-    },{highWaterMark: 32})
+    }, new CountQueuingStrategy({highWaterMark: 32})) 
 
     return next();
   }

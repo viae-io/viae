@@ -1,7 +1,7 @@
 import { Rowan, After, AfterIf, Processor, Catch, Meta } from "rowan";
 import { EventEmitter } from "events";
 import { Wire, Status, WireState } from "@viae/core";
-import { Message, isRequest } from './message';
+import { Message, Response, isRequest } from './message';
 import { Context, ContextConstructor, DefaultContext } from "./context";
 
 import DataDecoder from "./middleware/data-decoder";
@@ -12,11 +12,17 @@ import Send from "./middleware/send";
 import { FrameEncoder } from "@viae/pb";
 import { Log } from "./log";
 import { pino } from 'pino';
-import { toUint8Array, shortId } from "./util";
+import { toUint8Array, shortId, Codex } from "./util";
 import { UpgradeOutgoingReadableStream, UpgradeIncomingReadableStream } from "./middleware/readable-stream";
-import { IVia, SendOptions, CallOptions } from "./_via";
+import { IVia, SendOptions, CallOptions, RequestOptions, InferRequestResponseData } from "./_via";
 import { normalisePath } from "./util/normalise";
 
+
+
+
+export interface RequestResponse<T = any> extends Response<T>, Disposable {
+  ok: boolean;
+}
 
 /**
  * Via
@@ -24,6 +30,7 @@ import { normalisePath } from "./util/normalise";
  */
 export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C> {
   private _ev = new EventEmitter();
+  private _active: Context[] = [];
   private _wire: Wire;
   private _uuid: () => string;
   private _log: Log;
@@ -41,13 +48,16 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     return this._wire;
   }
 
+  get active() {
+    return this._active;
+  }
+
   static Log = pino();
 
-  constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log, timeout?: number },) {
+  constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log, timeout?: number, codex?: Codex },) {
     super();
-
     const wire = this._wire = opts.wire;
-
+    const codex = (opts ? opts.codex : undefined) || Codex.createDefault();
     this.CtxCtor = (opts ? opts.Ctx : undefined) || DefaultContext;
     this._log = (opts ? opts.log : undefined) || Via.Log;
     this._uuid = (opts ? opts.uuid : undefined) || shortId;
@@ -64,26 +74,29 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
         this.out
           .use(new AfterIf(function (ctx) { return Promise.resolve(!!ctx.out); }, [
             new UpgradeOutgoingReadableStream(),
-            new DataEncoder(),
+            new DataEncoder(codex),
             new Send(this._encoder)
           ]))
       ]))
       .use(new Catch(
         function (err, ctx) {
           ctx.err = err;
-          ctx.out.head.status = Status.Error;
-          ctx.out.data = err.message;
+          opts.log.error({err}, "error during processing");
+          if (ctx.out) {
+            ctx.out.head.status = Status.Error;
+            ctx.out.data = err.message;
+          }      
           return Promise.resolve();
         }))
       /* add the lazy data decoder */
-      .use(new DataDecoder())
+      .use(new DataDecoder(codex))
       /* convert data into readable-stream  */
       .use(new UpgradeIncomingReadableStream())
       /* intercept id-matching messages */
       .use(this._interceptor);
     /* ... then any more .use() middleware 
-
-  /** Hook onto the wire events*/
+    
+    /** Hook onto the wire events*/
     wire.on("message", (data: ArrayBuffer | ArrayBufferView) => {
       this._onMessage(data);
     });
@@ -128,12 +141,20 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     const msg = this._encoder.decode(toUint8Array(data));
     const ctx = new this.CtxCtor({ connection: this as IVia<C>, in: msg, log: this._log });
 
-    this._log.trace({msg},"Received Message");
+    this._active.push(ctx);
 
-    this.process(ctx as C).catch(err => {
-      this._log.error({err}, "Unhandled Error");
-      this._ev.emit("error", err);
-    });
+    this.process(ctx as C)
+      .then(() => {
+        return ctx.complete;
+      })
+      .catch(err => {
+        this._log.error({ err, ctx }, "unhandled error");
+        this._ev.emit("error", err);
+      }).finally(() => {
+        let index = this._active.indexOf(ctx);
+        this._active.splice(index, 1);
+        return ctx[Symbol.asyncDispose]();
+      })
   }
 
   /**
@@ -155,10 +176,16 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       throw Error("wire is not open");
     }
 
-    return this.out.process(new this.CtxCtor({ connection: this as unknown as IVia<C>, out: msg as Message, log: this._log })).catch((err) => {
-      this._ev.emit("error", err);
-      throw err;
-    });
+    let ctx = new this.CtxCtor({ connection: this as unknown as IVia<C>, out: msg as Message, log: this._log });
+    return this.out.process(ctx)
+      .then(() => ctx.complete)
+      .catch((err) => {
+        this._ev.emit("error", err);
+        throw err;
+      })
+      .finally(() => {
+        return ctx[Symbol.asyncDispose]()
+      });
   }
 
   /**
@@ -166,13 +193,13 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
    * @param msg 
    * @param opts 
    */
-  async request(
+  async request<R, O extends RequestOptions>(
     method: string,
     path: string,
     data?: any,
-    opts?: SendOptions) {
+    opts?: O & { validate?(value: any): value is R }): Promise<RequestResponse & (O['accept'] extends "stream" ? { data: ReadableStream<R> } : O['accept'] extends "object" ? { data: R } : {})> {
 
-    path = normalisePath(path);
+    path = normalisePath(path)
 
     let msg: Partial<Message> = {
       id: (opts && opts.id) ? opts.id : shortId(),
@@ -183,13 +210,24 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       msg.data = data;
     }
 
-    let reject, resolve, promise = new Promise<Message>((r, x) => { resolve = r; reject = x; });
+    let reject, resolve, promise = new Promise<RequestResponse>((r, x) => { resolve = r; reject = x; });
     let clock;
 
     let dispose = this._interceptor.intercept({
       id: msg.id,
       handlers: [function (ctx, _) {
-        resolve(ctx.in);
+        const status = ctx.in.head.status;
+        resolve(
+          Object.assign(
+            {
+              ok: status >= 200 && status < 300,
+              [Symbol.asyncDispose]() {
+                return ctx.complete.then(_ => ctx[Symbol.asyncDispose]())
+              }
+            },
+            ctx.in,
+          ));
+
         return Promise.resolve();
       }]
     });
@@ -198,7 +236,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
 
     try {
       await this.send(msg, opts);
-      return await promise;
+      return await promise as any;
     }
     catch (err) {
       throw err;
@@ -210,17 +248,17 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
   }
 
   /** 
-   * simplified request/response  - this will deserialise the response data and return it if successful. 
+   * simplified request/response  - this will deserialize the response data and return it if successful. 
    * throws an error if the result status is not OK. 
    **/
-  async call<E = any>(opts: CallOptions<E>): Promise<E> {
+  /*async call<E = any>(opts: CallOptions<E>): Promise<E> {
     const { method, path, data } = opts;
     let result = await this.request(method, path, data, opts);
     switch (Number(result.head.status)) {
       case Status.NotFound:
         throw Error(`${method} "${path}" not found`);
       case Status.Unauthorized:
-        throw Error(`${method} "${path}" not authorised`);
+        throw Error(`${method} "${path}" not authorized`);
       case Status.Forbidden:
         throw Error(`${method} "${path}" forbidden`);
       case Status.BadRequest:
@@ -240,7 +278,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       default:
         throw Error(`${method} "${path}" unknown status code: ${result.head.status}`)
     }
-  }
+  }*/
 
   /**
    * intercept an id-specific message 

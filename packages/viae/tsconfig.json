@@ -10,7 +10,7 @@
     "declaration": true,
     "sourceMap": false,  
     "lib": [
-      "es2017",
+      "ESNext",
       "dom",
       "esnext.asynciterable"
     ], 

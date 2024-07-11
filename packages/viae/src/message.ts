@@ -1,4 +1,4 @@
-import { Status, MessageFrame } from '@viae/core';
+import { Status, MessageFrame, MessageHeader } from '@viae/core';
 
 /**
  * message
@@ -9,6 +9,7 @@ export interface Message<T = any> extends MessageFrame {
 }
 
 export interface Response<Body = any> extends Message<Body> {
+  data?: Body;
   head: {
     status: Status;
   };

@@ -3,15 +3,26 @@ import { Message } from "./message";
 import { Disposer } from "./_disposer";
 import { Log } from "./log";
 import { MessageHeader, Wire } from "@viae/core";
+import { RequestResponse } from "./via";
+
+
+export interface RequestOptions extends SendOptions {
+  accept?: "object" | "stream" 
+}
+
+export type InferRequestResponseData<R, O extends RequestOptions> =
+  O extends { type: "stream" } ? ReadableStream<R> :
+  O extends { type: "object" } ? R :
+  unknown;
 
 export interface IVia<T> extends IRowan<T> {
   before(processor: Processor<T>): this;
 
-  request(
+  request<R, O extends RequestOptions>(
     method: string,
     path: string,
     data: any,
-    opts?: SendOptions): Promise<Message>;
+    opts?: O & { validate?(value: any): value is R }): Promise<RequestResponse & O['accept'] extends "stream" ? {data: ReadableStream<R>} :  O['accept'] extends "object" ? {data: R} : {}> ;
 
   send(msg: Partial<Message<any>>, opts?: SendOptions): Promise<void>;
   intercept(id: string, handlers: Processor<T>[]): Disposer;
@@ -29,12 +40,12 @@ export interface SendOptions {
   id?: string;
   encoding?: "none" | "msgpack" | "json" | "cbor",
   timeout?: number;
-  head?: {[index: string]: any}
+  head?: { [index: string]: any }
 };
 
 export interface CallOptions<T> extends SendOptions {
-  method: string, 
-  path: string, 
+  method: string,
+  path: string,
   data?: any,
-  validate?(result: any) : result is T;
+  validate?(result: any): result is T;
 }

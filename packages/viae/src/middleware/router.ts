@@ -2,10 +2,8 @@
 
 import { Rowan, Processor, Middleware, Next, Meta, If, IRowan } from 'rowan';
 import { Context } from '../context';
-import { ViaeError } from '../error';
 import { pathToRegexp } from 'path-to-regexp';
 import { normalisePath } from '../util/normalise';
-import { MessageHeader } from '@viae/core';
 
 export interface RouterOptions {
   /** route root path */
@@ -125,7 +123,6 @@ export class Router implements Middleware<Context>, RouterOptions {
 
         let match = null;
 
-
         if (path == ctx.in.head.path) {
           match = [path];
         }
@@ -166,105 +163,3 @@ export class Router implements Middleware<Context>, RouterOptions {
   }
 }
 
-
-
-export interface HandlerOptions {
-  data: any,
-  head: MessageHeader,
-  raw: Uint8Array,
-  path: string,
-  ctx: Context,
-  params: Record<string, string>
-  next?: Next
-}
-
-export type ApiRouteOptions = {
-  path: string,
-  end?: true,
-  next?: true,
-  handler: (opt: HandlerOptions) => any
-}
-
-export type ApiFn = <O extends ApiRouteOptions>(opts: O) => void
-
-export class Api implements Middleware<Context> {
-  private _router: Router;
-  constructor(protected root?: string) {
-    this._router = new Router();
-
-    const methodFn = (method: string) =>  <O extends ApiRouteOptions>(opts: O)=> {
-      const { path, handler } = opts;
-  
-      let isNext = opts.next != undefined ? true : false;
-      let end = opts.end != undefined ? true : false;
-  
-      this._router.route({
-        path,
-        method: "GET",
-        end,
-        process: [
-          async function (ctx, next) {
-            let args: any = {
-              data: ctx.in.data,
-              head: ctx.in.head,
-              raw: ctx.in.raw,
-              path: ctx.in.head.matchedPath,
-              ctx: ctx,
-              params: ctx.params
-            };
-  
-            if (isNext) {
-              args.next = next
-            }
-  
-            try {
-              const result = await handler(args);
-  
-              if (result !== undefined) {
-                ctx.out.data = result;
-              }
-  
-              if (isNext == false) {
-                ctx.out.head.status = 200;
-              }
-            } catch (err) {
-              if (typeof err == "number") {
-                ctx.out.head.status = err;
-              }
-              else if (err instanceof ViaeError) {
-                ctx.out.head.status = err.status;
-                ctx.out.data = err.message;
-              }
-              else {
-                throw err;
-              }
-            }
-          }
-        ]
-      })
-    }
-
-    this.all = methodFn(null);
-    this.get = methodFn("GET");
-    this.post = methodFn("POST");
-    this.put = methodFn("PUT");
-    this.delete = methodFn("DELETE");
-    this.subscribe = methodFn("SUBSCIBE");
-
-  }
-
-  all: ApiFn;
-  get: ApiFn;
-  post: ApiFn;
-  put: ApiFn;
-  delete: ApiFn;
-  subscribe: ApiFn;
-
-  use(path: string, api: Middleware<Context>) {
-    this._router.route({ path, method: null, process: [api] })
-  }
-
-  process(ctx: Context, next: Next): Promise<void> {
-    return this._router.process(ctx, next);
-  }
-}
