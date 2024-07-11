@@ -52,7 +52,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     return this._active;
   }
 
-  static Log = pino();
+  static Log: Log = pino();
 
   constructor(opts: { wire: Wire, Ctx?: ContextConstructor, uuid?: () => string, log?: Log, timeout?: number, codex?: Codex },) {
     super();

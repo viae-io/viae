@@ -7,12 +7,12 @@ import { MessageHeader } from '@viae/core';
 import { isReadableStream } from './readable-stream';
 import { Router } from './router';
 
-export interface HandlerOptions<D> {
+export interface HandlerOptions<D, C extends Context = Context> {
   data: D,
   head: MessageHeader,
   raw: Uint8Array,
   path: string,
-  ctx: Context,
+  ctx: C,
   params: Record<string, string>
   next?: Next
 }
@@ -20,18 +20,18 @@ export type ApiAcceptOptions = {
   type: "object" | "stream"
 }
 
-export type ApiRouteOptions<R, A extends "stream" | "object"> = {
+export type ApiRouteOptions<R, A extends "stream" | "object", C extends Context = Context> = {
   path: string,
   end?: true,
   next?: true,
   accept?: A,
   validate?(value: any): asserts value is R,
-  handler: (opt: HandlerOptions<A extends "stream" ? ReadableStream<R> : R>) => any
+  handler: (opt: HandlerOptions<A extends "stream" ? ReadableStream<R> : R, C>) => any
 }
 
 export type ApiFn = <R, A extends "stream" | "object" >(opts: ApiRouteOptions<R, A>) => void
 
-export class Api implements Middleware<Context> {
+export class Api<C extends Context = Context> implements Middleware<C> {
   private _router: Router;
   constructor(protected root?: string) {
     this._router = new Router();
@@ -53,7 +53,7 @@ export class Api implements Middleware<Context> {
               head: ctx.in.head,
               raw: ctx.in.raw,
               path: ctx.in.head.matchedPath,
-              ctx: ctx,
+              ctx: ctx as C,
               params: ctx.params
             };
 
