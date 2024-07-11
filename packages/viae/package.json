@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "2.1.0-beta.2",
+  "version": "2.1.0-beta.3",
   "private": false,
   "description": "bi-directional binary streaming req/res framework",
   "main": "dist/index.js",

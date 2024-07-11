@@ -108,7 +108,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       this._ev.emit("close");
     });
     wire.on("error", (err) => {
-      this._ev.emit("error");
+      this._ev.emit("error", err);
     });
   }
 
