@@ -28,9 +28,9 @@ export class Viae<Ctx extends Context = Context> extends Rowan<Context> {
       let log = opts && opts.log ? opts.log : Viae.Log;
       let via = new Via({ wire: wire, log: log }).before(this._before).use(this);
 
-      if (wire.url == undefined && wire["_socket"]) {
-        (wire as any)["url"] = wire["_socket"]["remoteAddress"]; //+ ":" + wire["_socket"]["remotePort"]
-      }
+      //if (wire.url == undefined && wire["_socket"]) {
+      //  (wire as any)["url"] = wire["_socket"]["remoteAddress"]; //+ ":" + wire["_socket"]["remotePort"]
+      //}
 
       wire.on("close", () => {
         this._connections.splice(this._connections.indexOf(via), 1);
