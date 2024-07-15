@@ -1,6 +1,7 @@
 import { Context } from '../context';
 import { Rowan, Processor, Middleware } from 'rowan';
 import { Disposer } from '../_disposer';
+import { Log } from '../log';
 
 type InterceptConfig<Ctx extends Context = Context> = {
   dispose: () => void,
@@ -23,6 +24,9 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
   meta: {
     type: "Interceptor"
   }
+
+  constructor(private _log: Log){
+  }
   
   /**
    * intercept any message with a matching id
@@ -32,6 +36,7 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
    */
   intercept(opt: InterceptOptions): () => void {
     const { id, handlers } = opt;
+    const log = this._log;
 
     if (id == undefined) throw Error("id cannot be undefined");
     if (id.length == 0) throw Error("id cannot be empty");
@@ -40,6 +45,7 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
 
     const dispose: Disposer = () => {
       //console.log("disposed interceptor for", id);
+      log.trace("intercept dispose " + id) ;   
       this._interceptors.delete(id);
     };
 
@@ -48,7 +54,7 @@ export default class Interceptor<Ctx extends Context = Context> implements Middl
     if (this._interceptors.has(id)) {
       throw Error("Already intercepting messages for id: " + id);
     }
-
+    log.trace("intercepting " + id);
     this._interceptors.set(id, {
       dispose: dispose,
       timestamp: Date.now(),

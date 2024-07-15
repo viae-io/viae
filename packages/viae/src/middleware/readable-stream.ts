@@ -2,6 +2,7 @@
 import { Context, RequestContext, ResponseContext } from '../context';
 import { Rowan, If, Middleware } from "rowan";
 import { request } from "./request";
+import { WireState } from '@viae/core';
 
 export class ReadableStreamSender extends Rowan<RequestContext> {
   private _complete: Promise<void>;
@@ -12,7 +13,7 @@ export class ReadableStreamSender extends Rowan<RequestContext> {
 
     let resolve, reject;
 
-    this._complete = new Promise<void>((r, x)=>{
+    this._complete = new Promise<void>((r, x) => {
       resolve = r;
       reject = x;
     })
@@ -33,13 +34,21 @@ export class ReadableStreamSender extends Rowan<RequestContext> {
                 await via.send({ id: sid, head: { status: 200 } });
                 dispose();
                 resolve();
-                reader = null;                
+                reader = null;
               } else {
                 await via.send({ id: sid, head: { status: 206 }, data: next.value });
               }
             }
           } catch (err) {
-            await via.send({ id: sid, head: { status: 500 }, data: err });
+            if (via.wire.readyState == WireState.OPEN) {
+              try {
+                await via.send({ id: sid, head: { status: 500 }, data: err });
+              } catch (_err) { }
+            } try {
+              if (reader) {
+                reader.cancel();
+              }
+            } catch (_err) { }
             reject(err);
           }
         }
@@ -53,21 +62,22 @@ export class ReadableStreamSender extends Rowan<RequestContext> {
     this.use(new If(request("ABORT"), [
       async (ctx, next) => {
         if (reader) {
-          reader.cancel();
+          reader.cancel(); // this feeds back to the read that its cancelled
           reader = null;
-        }        
+        }
         ctx.send({ head: { status: 200 } });
-        reject("aborted");
+        //resolve gracefully
+        resolve();
       }]));
   }
 
-  get complete(){
+  get complete() {
     return this._complete
   }
 }
 
 export function isReadableStream(obj: any): obj is ReadableStream<any> {
-  if ( obj == null) return false;
+  if (obj == null) return false;
   if (obj instanceof ReadableStream) return true;
   if (obj.getReader != null) return true;
   return false;
@@ -84,14 +94,14 @@ export class UpgradeOutgoingReadableStream implements Middleware<Context> {
     const head = ctx.out.head;
     const data = ctx.out.data;
 
-    if (isReadableStream(data)) { 
+    if (isReadableStream(data)) {
 
       let readable = data;
       let sid = ctx.connection.createId();
       let router = new ReadableStreamSender(readable, function () { dispose(); });
       let dispose = ctx.connection.intercept(sid, [router]);
 
-      ctx.tasks.push({ name: "ReadableStreamSender", complete: router.complete },  )
+      ctx.tasks.push({ name: "ReadableStreamSender", complete: router.complete },)
 
       head["readable"] = sid;
 
@@ -136,11 +146,11 @@ export class UpgradeIncomingReadableStream implements Middleware<Context> {
               let res = ctx.in;
               let status = res.head.status;
               let data = res.data;
-              if (status == 206) {                
+              if (status == 206) {
                 controller.enqueue(data);
                 /*if(controller.desiredSize <= 0){
                   await connection.send({ id: sid, head: { method: "THROTTLE" } });
-                }*/               
+                }*/
               } else if (status == 500) {
                 reject(data);
               } else {
@@ -155,7 +165,7 @@ export class UpgradeIncomingReadableStream implements Middleware<Context> {
         await streamer;
         if (dispose()) { dispose(); dispose = null };
       }
-    }, new CountQueuingStrategy({highWaterMark: 32})) 
+    }, new CountQueuingStrategy({ highWaterMark: 32 }))
 
     return next();
   }

@@ -1,6 +1,8 @@
 export enum Status {
   // Informational 
 
+  Processing = 102,
+
   // Success 
 
   OK = 200,

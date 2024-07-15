@@ -114,20 +114,29 @@ export class Router implements Middleware<Context>, RouterOptions {
     const routeProcessor = {
       meta: { method, path: opts.path },
       middleware,
-      process: function (ctx, next): Promise<void> {
-        if (ctx.in == undefined || ctx.in.head == undefined)
-          return next();
+      process: function (ctx: Context, next): Promise<void> {
+        const log = ctx.connection.log;
 
-        if (method && ctx.in.head.method !== method)
+        if (ctx.in == undefined || ctx.in.head == undefined){
+          log.trace("in undefined, in.head undefined");
           return next();
+        }
+
+        if (method != undefined && ctx.in.head.method !== method){
+          log.trace(`${method} !== ${ctx.in.head.method}`);
+          return next();
+        } 
+        log.trace(`${method} === ${ctx.in.head.method}`);
 
         let match = null;
 
         if (path == ctx.in.head.path) {
+          log.trace(`${path} == ${ctx.in.head.path}`);
           match = [path];
         }
         else {
           match = (ctx.in.head.path) ? exp.exec(ctx.in.head.path) : null;
+          log.trace({match}, `available matches for ${ctx.in.head.path}`);
           if (match == null) {
             return next();
           }
@@ -140,21 +149,26 @@ export class Router implements Middleware<Context>, RouterOptions {
         }
 
         if (match == null) {
+          log.trace("no match, nexting");
           return next();
         }
 
+        log.trace("matched - processing");
         let originalPath = ctx.in.head.path;
         let originalMatched = ctx.in.head.matchedPath;
         ctx.in.head.matchedPath = match[0];
-        ctx.in.head.path = originalPath.substr(match[0].length);
-
+        ctx.in.head.path = originalPath.substring(match[0].length);
+        let restored = false;
         return Rowan.process(middleware, ctx, function () {
           ctx.in.head.path = originalPath;
           ctx.in.head.matchedPath = originalMatched;
+          restored = true;
           return next();
         }).finally(() => {
-          ctx.in.head.path = originalPath;
-          ctx.in.head.matchedPath = originalMatched;
+          if (!restored) {
+            ctx.in.head.path = originalPath;
+            ctx.in.head.matchedPath = originalMatched;
+          }
         });
       }
     }

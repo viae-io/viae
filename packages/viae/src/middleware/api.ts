@@ -31,23 +31,25 @@ export type ApiRouteOptions<R, A extends "stream" | "object", C extends Context 
 
 export type ApiFn = <R, A extends "stream" | "object" >(opts: ApiRouteOptions<R, A>) => void
 
-export class Api<C extends Context = Context> implements Middleware<C> {
-  private _router: Router;
-  constructor(protected root?: string) {
-    this._router = new Router();
+export class Api<C extends Context = Context> extends Router {
+
+  constructor(root?: string) {
+    super({ root: root || "/" });
 
     const methodFn = (method: string) => <R, A extends "stream" | "object">(opts: ApiRouteOptions<R, A>) => {
       const { path, handler } = opts;
 
-      let isNext = opts.next != undefined ? true : false;
+      let isNext = (opts.next === true) ? true : false;
       let end = opts.end != undefined ? true : false;
 
-      this._router.route({
+      super.route({
         path,
-        method: method,
+        method,
         end,
         process: [
           async function (ctx, next) {
+            const log = ctx.connection.log;
+
             let args: any = {
               data: ctx.in.data,
               head: ctx.in.head,
@@ -57,6 +59,14 @@ export class Api<C extends Context = Context> implements Middleware<C> {
               params: ctx.params
             };
 
+            log.debug({
+              method: method,
+              end,
+              path: args.path,
+              params: args.params,
+              data: args.data,
+            }, "processing api route");
+
             if (isNext) {
               args.next = next
             }
@@ -65,11 +75,19 @@ export class Api<C extends Context = Context> implements Middleware<C> {
               if (opts.accept) {
                 if (opts.accept == "stream") {
                   if (!isReadableStream(args.data)) {
+                    log.debug({
+                      method: method,
+                      path: args.path,
+                    }, "failed accept check");
                     throw new ViaeError(400, "invalid argument. expected stream");
                   }
                 }
                 if (opts.accept == "object") {
-                  if(args.data = null || isReadableStream(args.data)) {
+                  if (args.data === undefined || isReadableStream(args.data)) {
+                    log.debug({
+                      method: method,
+                      path: args.path,
+                    }, "failed accept check");
                     throw new ViaeError(400, "invalid argument. expected object");
                   }
                 }
@@ -77,14 +95,32 @@ export class Api<C extends Context = Context> implements Middleware<C> {
 
               if (opts.validate) {
                 if (!isReadableStream(args.data)) {
-                  try { opts.validate(args.data) } catch (err) {
+                  try {
+                    opts.validate(args.data);
+                  } catch (err) {
+                    log.debug({
+                      method: method,
+                      end,
+                      path: args.path,
+                      params: args.params,
+                      data: args.data,
+                      err
+                    }, "failed validation");
                     throw new ViaeError(400, err!.message ? err!.message : "unknown validation error");
                   }
                 } else {
                   args.data = args.data.pipeThrough(new TransformStream({
                     transform(chunk, controller) {
-                      try { opts.validate(chunk)}
+                      try { opts.validate(chunk) }
                       catch (err) {
+                        log.debug({
+                          method: method,
+                          end,
+                          path: args.path,
+                          params: args.params,
+                          data: args.data,
+                          err
+                        }, "failed validation");
                         throw new ViaeError(400, err!.message ? err!.message : "unknown validation error");
                       }
                       controller.enqueue(chunk);
@@ -95,6 +131,8 @@ export class Api<C extends Context = Context> implements Middleware<C> {
 
               const result = await handler(args);
 
+              log.debug({ result }, "handler returned")
+
               if (result !== undefined) {
                 ctx.out.data = result;
               }
@@ -102,6 +140,7 @@ export class Api<C extends Context = Context> implements Middleware<C> {
               if (isNext == false) {
                 ctx.out.head.status = 200;
               }
+
             } catch (err) {
               if (typeof err == "number") {
                 ctx.out.head.status = err;
@@ -134,19 +173,15 @@ export class Api<C extends Context = Context> implements Middleware<C> {
   delete: ApiFn;
   subscribe: ApiFn;
 
-  use(processor: Processor<C>) 
+  use(processor: Processor<C>)
   use(path: string, api: Middleware<C>)
   use(arg1: string | Processor<C>, arg2?: Middleware<C>) {
-    if(typeof arg1 == "string"){
-      let path = arg1; 
-      let api = arg2; 
-      this._router.route({ path, method: null, process: [api] })
-    }else{   
-      this._router.use(arg1);
+    if (typeof arg1 == "string") {
+      let path = arg1;
+      let api = arg2;
+      super.route({ path, method: null, process: [api] })
+    } else {
+      super.use(arg1);
     }
-  }
-
-  process(ctx: Context, next: Next): Promise<void> {
-    return this._router.process(ctx, next);
   }
 }

@@ -35,7 +35,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
   private _uuid: () => string;
   private _log: Log;
   private _timeout: number;
-  private _interceptor = new Interceptor();
+  private _interceptor: Interceptor;
   private _encoder = new FrameEncoder();
   private _before: Rowan<Context> = new Rowan<Context>();
   private CtxCtor: ContextConstructor;
@@ -59,12 +59,14 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
     const wire = this._wire = opts.wire;
     const codex = (opts ? opts.codex : undefined) || Codex.createDefault();
     this.CtxCtor = (opts ? opts.Ctx : undefined) || DefaultContext;
-    this._log = (opts ? opts.log : undefined) || Via.Log;
+    this._log = (opts ? opts.log : undefined) || Via.Log;   
+    this._interceptor = new Interceptor(this._log);
     this._uuid = (opts ? opts.uuid : undefined) || shortId;
-    this._timeout = (opts ? opts.timeout : undefined) || 10000;
+    this._timeout = (opts ? opts.timeout : undefined) || 60000;
     this.meta = {
       type: "Via"
     };
+    const self = this;
 
     this
       /* execute the 'before' pipeline */
@@ -81,11 +83,11 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       .use(new Catch(
         function (err, ctx) {
           ctx.err = err;
-          opts.log.error({err}, "error during processing");
+          self._log.error({ err }, "error during processing");
           if (ctx.out) {
             ctx.out.head.status = Status.Error;
             ctx.out.data = err.message;
-          }      
+          }
           return Promise.resolve();
         }))
       /* add the lazy data decoder */
@@ -217,16 +219,27 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       id: msg.id,
       handlers: [function (ctx, _) {
         const status = ctx.in.head.status;
+
+        if (status == Status.OkayPartial) {
+          clearTimeout(clock);
+          clock = setTimeout(() => { reject("Request Timeout"); }, 2 * 60 * 1000);
+          return;
+        }
+
         resolve(
-          Object.assign(
-            {
-              ok: status >= 200 && status < 300,
-              [Symbol.asyncDispose]() {
-                return ctx.complete.then(_ => ctx[Symbol.asyncDispose]())
-              }
+          {
+            ok: status >= 200 && status < 300,
+            get data() { return ctx.in.data },
+            [Symbol.asyncDispose]() {
+              return ctx.complete.then(_ => ctx[Symbol.asyncDispose]())
             },
-            ctx.in,
-          ));
+            res: ctx.in
+          }
+        );
+
+
+
+        dispose();
 
         return Promise.resolve();
       }]
