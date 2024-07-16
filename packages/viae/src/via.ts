@@ -208,7 +208,7 @@ export class Via<C extends Context = Context> extends Rowan<C> implements IVia<C
       head: { method, path }
     };
 
-    if (data) {
+    if (data !== undefined) {
       msg.data = data;
     }
 
