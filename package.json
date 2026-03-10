@@ -1,19 +1,41 @@
 {
   "name": "viae",
-  "private": true,
-  "devDependencies": {
-    "lerna": "^8"
-  },
-  "workspaces": {
-    "packages": [
-      "packages/*"
-    ]
-  },
+  "version": "3.0.0-beta.0",
+  "private": false,
+  "type": "module",
+  "description": "bi-directional binary streaming req/res framework",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "scripts": {
-    "bootstrap": "lerna bootstrap",
-    "build": "lerna run build",
-    "publish:release": "npm run  build && lerna publish",
-    "publish:canary": "npm run build && lerna publish --canary --preid beta --dist-tag beta ",
-    "clean": "rimraf --glob packages/**/dist && rimraf --glob packages/**/tsconfig.tsbuildinfo"
+    "clean": "cross-env rimraf .tmp .nyc_output coverage dist",
+    "test": "node --import tsx/esm --no-warnings --test test/**/*.spec.ts",
+    "bench": "node --experimental-strip-types --experimental-transform-types --no-warnings bench/codec.bench.ts",
+    "build": "tsc --build tsconfig.build.json",
+    "prepublishOnly": "npm run build"
+  },
+  "author": "Meirion Hughes <crakinshot@yahoo.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chai": "latest",
+    "@types/mocha": "latest",
+    "@types/node": "^22.19.15",
+    "@types/ws": "latest",
+    "c8": "latest",
+    "chai": "latest",
+    "cross-env": "latest",
+    "mocha": "^11.3.0",
+    "rimraf": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "ws": "latest"
+  },
+  "dependencies": {
+    "cbor-x": "^1.6.3",
+    "path-to-regexp": "^6",
+    "pino": "^9",
+    "rowan": "^2.1.0"
+  },
+  "peerDependencies": {
+    "cbor-extract": "^2.2.1"
   }
 }

@@ -1,5 +1,0 @@
-{
-  "git.ignoreLimitWarning": true,
-  "typescript.tsdk": "node_modules\\typescript\\lib",
-  "javascript.implicitProjectConfig.experimentalDecorators": true
-}

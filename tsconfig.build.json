@@ -14,9 +14,9 @@
     "resolveJsonModule": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "skipLibCheck": true,
-    "noEmit": true
+    "rootDir": "./src",
+    "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test"]
 }
