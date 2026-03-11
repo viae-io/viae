@@ -184,13 +184,18 @@ export class Via extends Rowan<Context> implements IVia {
 
     const ctx = new DefaultContext({ connection: this, in: msg as Message, log: this._log });
     ctx.out = msg as Message;
-    return this.out.process(ctx)
+    const sent = this.out.process(ctx);
+    /* Task completion (e.g. stream pump) and disposal run in the background so
+       that send() resolves as soon as the message is on the wire.  This avoids
+       deadlocking when the caller still needs to consume a response stream
+       before the outgoing pump can finish (e.g. request-level echo). */
+    sent
       .then(() => ctx.complete)
       .catch((err) => {
         this._ev.emit("error", err);
-        throw err;
       })
       .finally(() => (ctx as DefaultContext)[Symbol.asyncDispose]());
+    return sent;
   }
 
   async request<R>(
@@ -301,7 +306,11 @@ class Send implements Middleware<Context> {
         data: out.data,
       };
       const bytes = this._encoder.encode(frame);
-      ctx.connection.wire.send(bytes);
+      // encode() returns a subarray view into the pool, valid only until the next
+      // encode() call. The ws library shares the underlying ArrayBuffer rather than
+      // copying it, so the TCP socket can be holding a reference to pool memory that
+      // the next encode() would overwrite. Slice to take ownership before sending.
+      ctx.connection.wire.send(bytes.slice());
     }
     return next();
   }

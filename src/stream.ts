@@ -4,27 +4,30 @@ import { Status } from "./status.js";
 /**
  * WHATWG-aligned backpressure streaming protocol.
  *
- * Consumer → Producer:
- *   START(desiredSize: N)  – confirms the stream is open; grants N initial pull slots
- *   PULL(desiredSize: M)   – grants M more slots (one per chunk consumed, mirrors pull())
+ * Consumer > Producer:
+ *   START(desiredSize: N)  – opens the stream; sets the producer's initial credit to N
+ *   PULL(desiredSize: M)   – sets the producer's credit to M (consumer's controller.desiredSize)
  *   COMPLETE               – acknowledges a terminal frame; producer may now clean up
  *   CANCEL(data?: reason)  – consumer-side abort; mirrors ReadableStream cancel(reason)
  *
- * Producer → Consumer:
+ * Producer > Consumer:
  *   { status: 206, data }  – one chunk (Partial)
  *   { status: 200 }        – stream complete (normal)
  *   { status: 500, data }  – stream error
  *   CANCEL(data?: reason)  – producer-side abort (e.g. source errored before terminal sent)
  *
+ * Credit model (SET, not additive):
+ *   The producer maintains a `credit` counter, initially 0.
+ *   On START or PULL the producer sets credit = desiredSize.
+ *   The producer sends while credit > 0 (decrementing per chunk) and blocks at 0.
+ *   The consumer sends PULL with its ReadableStream controller.desiredSize when
+ *   its internal BlockingQueue is empty and it is about to wait for more data.
+ *   The consumer's ReadableStream uses a highWaterMark of 32 by default.
+ *
  * The producer holds its sid interceptor open after sending the terminal frame
  * until it receives COMPLETE (or CANCEL, or transport close).  This absorbs any
  * in-flight PULL frames that arrive after the terminal, preventing them from
  * being misrouted as new requests.
- *
- * The consumer side uses a BlockingQueue so that pull() is only ever called for
- * chunks that have actually arrived.  Once the queue closes (terminal received),
- * the next pull() gets done:true and calls controller.close() — after which the
- * ReadableStream never calls pull() again, guaranteeing no stray PULL frames.
  */
 
 const DEFAULT_WINDOW = 32;
@@ -80,6 +83,10 @@ class BlockingQueue<T> {
     this._waiters = [];
   }
 
+  get isEmpty(): boolean {
+    return this._chunks.length === 0;
+  }
+
   next(): Promise<IteratorResult<T, undefined>> {
     if (this._chunks.length > 0) return Promise.resolve({ value: this._chunks.shift()!, done: false });
     if (this._hasError) return Promise.reject(this._error);
@@ -91,10 +98,10 @@ class BlockingQueue<T> {
 /**
  * Create a ReadableStream backed by a remote multiplexed stream.
  *
- * pull() blocks on the BlockingQueue, so PULL is only ever sent for chunks
- * that have been truly consumed.  When the terminal arrives the queue closes,
- * the pending pull() resolves with done:true, and controller.close() is called —
- * no further pull() (and therefore no stray PULL frame) is possible after that point.
+ * When pull() is called and the BlockingQueue is empty, a PULL frame is sent
+ * with the controller's current desiredSize so the producer knows how much
+ * capacity the consumer has.  pull() then blocks on queue.next() until a
+ * chunk (or terminal) arrives.
  */
 export function createIncomingStream<T = unknown>(
   sid: string,
@@ -107,7 +114,7 @@ export function createIncomingStream<T = unknown>(
   const dispose = transport.intercept(sid, async (msg: Message) => {
     const status = msg.head.status;
     if (status === Status.Partial) {
-      queue.push(msg.data as T);
+      queue.push(msg.data as T);      
     } else if (status === Status.Error) {
       try {
         await transport.send({ id: sid, head: { method: "COMPLETE" } });
@@ -142,20 +149,24 @@ export function createIncomingStream<T = unknown>(
     },
     async pull(controller) {
       try {
+        /* When the queue is drained, tell the producer how much room we have
+           before blocking — this prevents starvation when credit hits 0. */
+        if (queue.isEmpty) {
+          const desiredSize = controller.desiredSize;
+          if (desiredSize != null && desiredSize > 0) {
+            try {
+              await transport.send({ id: sid, head: { method: "PULL", desiredSize } });
+            } catch (err) {
+              if (!transport.closed) throw err;
+            }
+          }
+        }
         const result = await queue.next();
         if (cancelled) return;
         if (result.done) {
           controller.close();
         } else {
           controller.enqueue(result.value);
-          /* One chunk consumed → grant one more pull slot (mirrors WHATWG pull()) */
-          try {
-            await transport.send({ id: sid, head: { method: "PULL", desiredSize: 1 } });
-          } catch (err) {
-            /* Transport closed between chunk arrival and PULL send:
-               producer will clean up via the transport close event. */
-            if (!transport.closed) throw err;
-          }
         }
       } catch (err) {
         if (!cancelled) controller.error(err);
@@ -197,7 +208,7 @@ export function createOutgoingStream(
   const dispose = transport.intercept(sid, (msg: Message) => {
     const method = msg.head.method;
     if (method === "START" || method === "PULL") {
-      credit += (msg.head.desiredSize as number) || 0;
+      credit = (msg.head.desiredSize as number) || 0;
       if (waitingForCredit && credit > 0) {
         const fn = waitingForCredit;
         waitingForCredit = undefined;

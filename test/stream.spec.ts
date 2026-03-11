@@ -427,4 +427,154 @@ describe("Stream", () => {
       wire.close();
     }
   });
+
+  it("should handle 10000 repeated requests with a 1KB payload", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+    const ITERATIONS = 10_000;
+    const PAYLOAD_SIZE = 1024;
+
+    api.post({
+      path: "/echo",
+      handler: ({ data }) => data
+    });
+
+    viae.use(api);
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      for (let i = 0; i < ITERATIONS; i++) {
+        const payload = crypto.getRandomValues(new Uint8Array(PAYLOAD_SIZE));
+        const result = await via.request<Uint8Array>("POST", "/echo", payload);
+        assert.equal(result.ok, true);
+        assert.deepEqual(result.data, payload);
+      }
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should handle a single streaming request with 10000 chunks of 1KB", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+    const CHUNKS = 10_000;
+    const CHUNK_SIZE = 1024;
+
+    api.post({
+      path: "/echo-stream",
+      accept: "stream",
+      handler: ({ data }) => data
+    });
+
+    viae.use(api);
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      let sent = 0;
+      const outgoing = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (sent < CHUNKS) {
+            controller.enqueue(new Uint8Array(CHUNK_SIZE).fill(sent % 256));
+            sent++;
+          } else {
+            controller.close();
+          }
+        }
+      });
+
+      const result = await via.request<ReadableStream<Uint8Array>>("POST", "/echo-stream", outgoing, { accept: "stream" });
+      assert.equal(result.ok, true);
+
+      const reader = (result.data as ReadableStream<Uint8Array>).getReader();
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        assert.equal((value as Uint8Array).length, CHUNK_SIZE);
+        assert.equal((value as Uint8Array)[0], received % 256);
+        received++;
+      }
+
+      assert.equal(received, CHUNKS);
+    } finally {
+      wire.close();
+    }
+  });
+
+  // ── Size / chunk-size matrix ─────────────────────────────────────────────
+  // Each scenario sends the full payload as a ReadableStream split into
+  // fixed-size chunks, then echoes it back as a stream and verifies every byte.
+
+  const KB = 1024;
+  const MB = 1024 * KB;
+  const streamScenarios: { totalBytes: number; chunkSize: number }[] = [
+    { totalBytes:   5 * KB, chunkSize:   2 * KB },
+    { totalBytes:   8 * KB, chunkSize:   4 * KB },
+    { totalBytes:  16 * KB, chunkSize:   4 * KB },
+    { totalBytes:  16 * KB, chunkSize:   8 * KB },
+    { totalBytes:  32 * KB, chunkSize:   8 * KB },
+    { totalBytes:  32 * KB, chunkSize:  16 * KB },
+    { totalBytes:  64 * KB, chunkSize:  16 * KB },
+    { totalBytes: 128 * KB, chunkSize:  32 * KB },
+    { totalBytes: 256 * KB, chunkSize:  64 * KB },
+    { totalBytes: 512 * KB, chunkSize: 128 * KB },
+    { totalBytes:    1 * MB, chunkSize: 256 * KB },
+  ];
+
+  for (const { totalBytes, chunkSize } of streamScenarios) {
+    const label = `${totalBytes / KB}KB total / ${chunkSize / KB}KB chunks`;
+
+    it(`should stream ${label} (upload + echo)`, async () => {
+      const viae = new Viae(server);
+      const api = new Api("/");
+
+      api.post({
+        path: "/echo-bin",
+        accept: "stream",
+        handler: ({ data }) => data,
+      });
+
+      viae.use(api);
+      const { via, wire } = await createTestClient(port);
+
+      try {
+        // Build a deterministic payload
+        const payload = new Uint8Array(totalBytes);
+        for (let i = 0; i < totalBytes; i++) payload[i] = i & 0xff;
+
+        let offset = 0;
+        const outgoing = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (offset >= totalBytes) { controller.close(); return; }
+            const end = Math.min(offset + chunkSize, totalBytes);
+            controller.enqueue(payload.slice(offset, end));
+            offset = end;
+          },
+        });
+
+        const result = await via.request<ReadableStream<Uint8Array>>(
+          "POST", "/echo-bin", outgoing, { accept: "stream" }
+        );
+        assert.equal(result.ok, true);
+
+        const reader = (result.data as ReadableStream<Uint8Array>).getReader();
+        const parts: Uint8Array[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          parts.push(value as Uint8Array);
+        }
+
+        // Reassemble and compare
+        const received = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+        let pos = 0;
+        for (const p of parts) { received.set(p, pos); pos += p.length; }
+
+        assert.equal(received.length, totalBytes);
+        assert.deepEqual(received, payload);
+      } finally {
+        wire.close();
+      }
+    });
+  }
 });

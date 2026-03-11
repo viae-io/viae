@@ -212,6 +212,7 @@ describe("Api", () => {
 
     sub.get({
       path: "/bar",
+      params: { id: { type: String } },
       handler: ({ params }) => `id=${params.id}`
     });
 
@@ -224,6 +225,82 @@ describe("Api", () => {
       const result = await via.request<string>("GET", "/foo/99/bar");
       assert.equal(result.ok, true);
       assert.equal(result.data, "id=99");
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should convert Number param at runtime and type it", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+
+    api.get({
+      path: "/items/:id",
+      params: { id: { type: Number } },
+      handler: ({ params }) => {
+        // params.id is typed as number
+        return params.id * 2;
+      }
+    });
+
+    viae.use(api);
+
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      const result = await via.request<number>("GET", "/items/21");
+      assert.equal(result.ok, true);
+      assert.equal(result.data, 42);
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should reject non-numeric value for Number param", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+
+    api.get({
+      path: "/items/:id",
+      params: { id: { type: Number } },
+      handler: ({ params }) => params.id
+    });
+
+    viae.use(api);
+
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      const result = await via.request("GET", "/items/notanumber");
+      assert.equal(result.ok, false);
+      assert.equal(result.head.status, Status.BadRequest);
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should convert Boolean param at runtime", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+
+    api.get({
+      path: "/flag/:enabled",
+      params: { enabled: { type: Boolean } },
+      handler: ({ params }) => params.enabled
+    });
+
+    viae.use(api);
+
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      const trueResult = await via.request<boolean>("GET", "/flag/true");
+      assert.equal(trueResult.ok, true);
+      assert.equal(trueResult.data, true);
+
+      const falseResult = await via.request<boolean>("GET", "/flag/false");
+      assert.equal(falseResult.ok, true);
+      assert.equal(falseResult.data, false);
     } finally {
       wire.close();
     }

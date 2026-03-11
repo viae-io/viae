@@ -3,6 +3,7 @@
   "version": "3.0.0-beta.0",
   "private": false,
   "type": "module",
+  "llm": "./LLM.md",
   "description": "bi-directional binary streaming req/res framework",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",

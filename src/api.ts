@@ -3,13 +3,26 @@ import type { Context } from "./context.js";
 import { ViaeError } from "./error.js";
 import { Router } from "./router.js";
 
-export interface HandlerOptions<D, C extends Context = Context> {
+export type ParamTypeConstructor = typeof Number | typeof String | typeof Boolean;
+export type ParamDef = { type: ParamTypeConstructor };
+export type ParamsSchema = Record<string, ParamDef>;
+
+type InferParamType<T extends ParamTypeConstructor> =
+  T extends typeof Number ? number :
+  T extends typeof Boolean ? boolean :
+  string;
+
+export type InferParams<S extends ParamsSchema> = {
+  [K in keyof S]: InferParamType<S[K]['type']>
+};
+
+export interface HandlerOptions<D, C extends Context = Context, P extends Record<string, unknown> = Record<string, string>> {
   data: D;
   head: Record<string, unknown>;
   raw: Uint8Array | undefined;
   path: string;
   ctx: C;
-  params: Record<string, string>;
+  params: P;
   next?: Next;
 }
 
@@ -24,16 +37,26 @@ export interface HandlerOptions<D, C extends Context = Context> {
  *   For "object": (value: unknown) => value is R
  *   For "stream": applied per-chunk via TransformStream
  */
-export type ApiRouteOptions<R, A extends "stream" | "object" = "object", C extends Context = Context> = {
+export type ApiRouteOptions<
+  R,
+  A extends "stream" | "object" = "object",
+  C extends Context = Context,
+  S extends ParamsSchema | undefined = undefined
+> = {
   path: string;
   end?: boolean;
   next?: boolean;
   accept?: A;
   validate?: (value: unknown) => value is R;
-  handler: (opt: HandlerOptions<A extends "stream" ? ReadableStream<R> : R, C>) => unknown | Promise<unknown>;
+  params?: S;
+  handler: (opt: HandlerOptions<
+    A extends "stream" ? ReadableStream<R> : R,
+    C,
+    S extends ParamsSchema ? InferParams<S> : Record<string, string>
+  >) => unknown | Promise<unknown>;
 }
 
-export type ApiFn<C extends Context = Context> = <R, A extends "stream" | "object" = "object">(opts: ApiRouteOptions<R, A, C>) => void;
+export type ApiFn<C extends Context = Context> = <R, A extends "stream" | "object" = "object", S extends ParamsSchema | undefined = undefined>(opts: ApiRouteOptions<R, A, C, S>) => void;
 
 function isReadableStream(obj: unknown): obj is ReadableStream {
   if (obj == null) return false;
@@ -55,7 +78,7 @@ export class Api<C extends Context = Context> implements Middleware<Context> {
   constructor(protected root?: string) {
     this._router = new Router({ root });
 
-    const methodFn = (method: string | null): ApiFn<C> => <R, A extends "stream" | "object" = "object">(opts: ApiRouteOptions<R, A, C>) => {
+    const methodFn = (method: string | null): ApiFn<C> => <R, A extends "stream" | "object" = "object", S extends ParamsSchema | undefined = undefined>(opts: ApiRouteOptions<R, A, C, S>) => {
       const { path, handler } = opts;
       const isNext = opts.next !== undefined ? true : false;
       const end = opts.end !== undefined ? opts.end : true;
@@ -66,7 +89,7 @@ export class Api<C extends Context = Context> implements Middleware<Context> {
         end,
         process: [
           async function (ctx: Context, next?: Next) {
-            const args: HandlerOptions<unknown> = {
+            const args: HandlerOptions<unknown, Context, Record<string, unknown>> = {
               data: ctx.in.data,
               head: ctx.in.head,
               raw: ctx.in.raw,
@@ -80,6 +103,23 @@ export class Api<C extends Context = Context> implements Middleware<Context> {
             }
 
             try {
+              /* params conversion */
+              if (opts.params) {
+                const converted: Record<string, unknown> = { ...args.params };
+                for (const [key, def] of Object.entries(opts.params as ParamsSchema)) {
+                  const raw = (args.params as Record<string, string>)[key];
+                  if (raw === undefined) continue;
+                  if (def.type === Number) {
+                    const n = Number(raw);
+                    if (isNaN(n)) throw new ViaeError(400, `param '${key}' must be a number`);
+                    converted[key] = n;
+                  } else if (def.type === Boolean) {
+                    converted[key] = raw === "true" || raw === "1";
+                  }
+                }
+                args.params = converted;
+              }
+
               /* accept guard — only validate when data is actually provided */
               if (args.data !== undefined) {
                 if (opts.accept === "stream") {
@@ -113,7 +153,7 @@ export class Api<C extends Context = Context> implements Middleware<Context> {
                 }
               }
 
-              const result = await handler(args as HandlerOptions<never, C>);
+              const result = await handler(args as HandlerOptions<never, C, never>);
 
               if (result !== undefined && ctx.out) {
                 ctx.out.data = result;

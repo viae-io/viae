@@ -125,12 +125,39 @@ root.use("/api", nested);
 |---|---|---|
 | `path` | `string` | Path pattern (path-to-regexp v6 syntax) |
 | `handler` | `function` | Called with `{ data, head, raw, path, params, ctx }` |
+| `params` | `ParamsSchema` | Per-param type descriptors — coerces and types path params (see below) |
 | `validate` | `(v) => v is R` | Type guard run before handler; rejects with `400` on failure |
 | `accept` | `"object" \| "stream"` | Expected data shape — `"stream"` receives a `ReadableStream` |
 | `end` | `boolean` | Whether the match must be terminal (default `true`) |
 | `next` | `boolean` | Whether `next()` is passed to the handler |
 
 Methods available: `api.get`, `api.post`, `api.put`, `api.delete`, `api.all`, `api.subscribe`.
+
+### Param types
+
+Path parameters are strings by default. Supply a `params` schema to coerce them at runtime and have them typed correctly in the handler:
+
+```ts
+api.get({
+  path: "/items/:id",
+  params: { id: { type: Number } },
+  handler: ({ params }) => params.id * 2, // params.id is typed as number
+});
+
+api.get({
+  path: "/flag/:enabled",
+  params: { enabled: { type: Boolean } },
+  handler: ({ params }) => params.enabled, // typed as boolean; "true"/"1" > true
+});
+```
+
+Supported types:
+
+| `type` | Coercion | Rejects with `400` if |
+|---|---|---|
+| `Number` | `Number(raw)` | `isNaN` |
+| `Boolean` | `"true"` / `"1"` > `true`, anything else > `false` | — |
+| `String` | no-op (default) | — |
 
 ### Nested routers
 
@@ -148,7 +175,7 @@ sub.get({
 root.use("/", sub);
 viae.use(root);
 
-// GET /foo/42/bar  →  "id is 42"
+// GET /foo/42/bar  >  "id is 42"
 ```
 
 ### Validation
@@ -201,7 +228,7 @@ api.get({
 
 ## Streaming
 
-Return a `ReadableStream` from a handler to stream chunks to the consumer. The framework multiplexes it over the existing connection using a WHATWG-aligned backpressure protocol.
+Return a `ReadableStream` from a handler to stream chunks to the consumer. The framework multiplexes it over the existing connection using a credit-based backpressure protocol. Credits are set (not additive) — on each `PULL` the consumer tells the producer its current `controller.desiredSize`, so the producer always has an accurate view of consumer capacity. The default window is 32 chunks.
 
 ### Server — streaming response
 
@@ -250,7 +277,7 @@ Cancelling the consumer propagates back to the producer:
 
 ```ts
 await reader.cancel(new Error("no longer needed"));
-// → producer's ReadableStream cancel(reason) is called with the reason
+// > producer's ReadableStream cancel(reason) is called with the reason
 ```
 
 A producer error propagates forward to the consumer:
