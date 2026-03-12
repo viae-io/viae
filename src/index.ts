@@ -9,7 +9,7 @@ export { Router, type RouterOptions } from "./router.js";
 export { Interceptor } from "./interceptor.js";
 export { ViaeError } from "./error.js";
 export { FrameEncoder, encodeFrame, decodeFrame, encodeData, decodeData, type Frame, type Codex, type Encoder, defaultCodex } from "./codec.js";
-export { createIncomingStream, createOutgoingStream, type StreamTransport, type StreamSender } from "./stream.js";
+export { createIncomingStream, createOutgoingStream, type StreamTransport, type StreamSender, type StreamOptions } from "./stream.js";
 export { shortId } from "./util.js";
 export { normalisePath } from "./normalise.js";
 export type { Log } from "./log.js";

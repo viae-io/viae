@@ -9,7 +9,7 @@ import type { Log } from "./log.js";
 import { consoleLog } from "./log.js";
 import { shortId } from "./util.js";
 import { type Codex, FrameEncoder } from "./codec.js";
-import { createOutgoingStream, createIncomingStream, type StreamTransport } from "./stream.js";
+import { createOutgoingStream, createIncomingStream, type StreamTransport, type StreamOptions } from "./stream.js";
 
 function toUint8Array(data: ArrayBuffer | ArrayBufferView): Uint8Array {
   if (data instanceof Uint8Array) return data;
@@ -39,6 +39,8 @@ export interface ViaOptions {
   log?: Log;
   timeout?: number;
   codex?: Codex;
+  /** Options forwarded to the stream layer (timeouts, highWaterMark). */
+  streamOptions?: StreamOptions;
 }
 
 export interface SendOptions {
@@ -71,6 +73,7 @@ export class Via extends Rowan<Context> implements IVia {
   private _interceptor = new Interceptor();
   private _before: Rowan<Context> = new Rowan<Context>();
   private _encoder: FrameEncoder;
+  private _streamOptions: StreamOptions | undefined;
 
   readonly out: Rowan<Context> = new Rowan<Context>();
 
@@ -87,13 +90,14 @@ export class Via extends Rowan<Context> implements IVia {
     this._uuid = opts.uuid || shortId;
     this._timeout = opts.timeout || 10000;
     this._encoder = opts.codex ? new FrameEncoder(opts.codex) : new FrameEncoder();
+    this._streamOptions = opts.streamOptions;
 
     this
       .use(this._before)
       .use(new After([
         this.out
           .use(new AfterIf((ctx: Context) => Promise.resolve(!!ctx.out), [
-            new OutgoingStreamUpgrade(),
+            new OutgoingStreamUpgrade(this._streamOptions),
             new Send(this._encoder)
           ]))
       ]))
@@ -106,7 +110,7 @@ export class Via extends Rowan<Context> implements IVia {
         }
         return Promise.resolve();
       }))
-      .use(new IncomingStreamUpgrade())
+      .use(new IncomingStreamUpgrade(this._streamOptions))
       .use(this._interceptor);
 
     wire.on("message", (data: ArrayBuffer | ArrayBufferView) => {
@@ -321,6 +325,7 @@ class Send implements Middleware<Context> {
  * with credit-based backpressure. Replaces the data with a stream id header.
  */
 class OutgoingStreamUpgrade implements Middleware<Context> {
+  constructor(private _opts?: StreamOptions) {}
   process(ctx: Context, next: Next): Promise<void> {
     if (!ctx.out || !isReadableStream(ctx.out.data)) return next();
 
@@ -329,7 +334,7 @@ class OutgoingStreamUpgrade implements Middleware<Context> {
 
     const sender = createOutgoingStream(readable, transport, (value: unknown) => {
       return { data: value };
-    });
+    }, this._opts);
 
     ctx.out.head.sid = sender.sid;
     delete ctx.out.data;
@@ -345,12 +350,13 @@ class OutgoingStreamUpgrade implements Middleware<Context> {
  * with credit-based backpressure that pulls from the multiplexed stream.
  */
 class IncomingStreamUpgrade implements Middleware<Context> {
+  constructor(private _opts?: StreamOptions) {}
   process(ctx: Context, next: Next): Promise<void> {
     const sid = ctx.in.head.sid as string | undefined;
     if (!sid) return next();
 
     const transport = (ctx.connection as Via)._asTransport();
-    ctx.in.data = createIncomingStream(sid, transport);
+    ctx.in.data = createIncomingStream(sid, transport, this._opts);
 
     return next();
   }

@@ -31,6 +31,33 @@ import { Status } from "./status.js";
  */
 
 const DEFAULT_WINDOW = 32;
+const DEFAULT_READ_TIMEOUT = 30_000;
+const DEFAULT_IDLE_TIMEOUT = 30_000;
+const DEFAULT_COMPLETE_ACK_TIMEOUT = 5_000;
+
+export interface StreamOptions {
+  /** Internal queue highWaterMark for the consumer ReadableStream. Default: 32. */
+  highWaterMark?: number;
+  /**
+   * Max ms the producer waits for a consumer PULL (credit) before aborting the
+   * stream with an error.  Catches consumers that stop reading.
+   * Default: 30_000. Set to 0 to disable.
+   */
+  readTimeout?: number;
+  /**
+   * Max ms the consumer waits for the next chunk from the producer before
+   * cancelling the stream.  Resets on every received chunk.
+   * Catches producers that stall without sending a terminal frame.
+   * Default: 30_000. Set to 0 to disable.
+   */
+  idleTimeout?: number;
+  /**
+   * Max ms to wait for the consumer's COMPLETE acknowledgment after the
+   * producer sends the terminal frame.  The interceptor is cleaned up once
+   * the timeout expires regardless.  Default: 5_000. Set to 0 to disable.
+   */
+  completeAckTimeout?: number;
+}
 
 export interface StreamSender {
   readonly sid: string;
@@ -106,16 +133,47 @@ class BlockingQueue<T> {
 export function createIncomingStream<T = unknown>(
   sid: string,
   transport: StreamTransport,
-  highWaterMark = DEFAULT_WINDOW,
+  options?: StreamOptions,
 ): ReadableStream<T> {
+  const highWaterMark = options?.highWaterMark ?? DEFAULT_WINDOW;
+  const idleTimeout = options?.idleTimeout ?? DEFAULT_IDLE_TIMEOUT;
+
   const queue = new BlockingQueue<T>();
   let cancelled = false;
+
+  // ── Idle timer: fires if no chunk or terminal arrives within idleTimeout ms.
+  // Resets on every Partial received.  Catches stalled/dead producers.
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function resetIdleTimer(): void {
+    if (idleTimeout <= 0) return;
+    if (idleTimer !== undefined) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (cancelled) return;
+      const err = new Error(`stream idle timeout: no data from producer within ${idleTimeout}ms`);
+      // Do NOT set cancelled=true here: pull()'s catch checks !cancelled to decide
+      // whether to call controller.error(). Setting it here would suppress that call
+      // and leave reader.read() hanging forever.
+      idleTimer = undefined;
+      dispose();
+      queue.abort(err);
+      if (!transport.closed) {
+        transport.send({ id: sid, head: { method: "CANCEL" }, data: err.message }).catch(() => {});
+      }
+    }, idleTimeout);
+  }
+
+  function clearIdleTimer(): void {
+    if (idleTimer !== undefined) { clearTimeout(idleTimer); idleTimer = undefined; }
+  }
 
   const dispose = transport.intercept(sid, async (msg: Message) => {
     const status = msg.head.status;
     if (status === Status.Partial) {
-      queue.push(msg.data as T);      
+      resetIdleTimer(); // reset idle window on every received chunk
+      queue.push(msg.data as T);
     } else if (status === Status.Error) {
+      clearIdleTimer();
       try {
         await transport.send({ id: sid, head: { method: "COMPLETE" } });
       } finally {
@@ -124,10 +182,12 @@ export function createIncomingStream<T = unknown>(
       }
     } else if (msg.head.method === "CANCEL") {
       /* Producer-side abort — treat as an error on the consumer */
+      clearIdleTimer();
       dispose();
       queue.abort(msg.data ?? new Error("stream cancelled by producer"));
     } else {
       /* Status.OK or any other terminal status */
+      clearIdleTimer();
       try {
         await transport.send({ id: sid, head: { method: "COMPLETE" } });
       } finally {
@@ -141,7 +201,9 @@ export function createIncomingStream<T = unknown>(
     async start(controller) {
       try {
         await transport.send({ id: sid, head: { method: "START", desiredSize: highWaterMark } });
+        resetIdleTimer(); // start idle window once the stream is open
       } catch (err) {
+        clearIdleTimer();
         dispose();
         queue.abort(err);
         controller.error(err);
@@ -174,6 +236,7 @@ export function createIncomingStream<T = unknown>(
     },
     async cancel(reason?: unknown) {
       cancelled = true;
+      clearIdleTimer();
       queue.abort(reason ?? new Error("stream cancelled"));
       dispose();
       if (!transport.closed) {
@@ -196,7 +259,11 @@ export function createOutgoingStream(
   readable: ReadableStream,
   transport: StreamTransport,
   encodeChunk: (value: unknown) => Partial<Message>,
+  options?: StreamOptions,
 ): StreamSender {
+  const readTimeout = options?.readTimeout ?? DEFAULT_READ_TIMEOUT;
+  const completeAckTimeout = options?.completeAckTimeout ?? DEFAULT_COMPLETE_ACK_TIMEOUT;
+
   const sid = transport.createId();
   let credit = 0;
   let waitingForCredit: (() => void) | undefined;
@@ -231,9 +298,45 @@ export function createOutgoingStream(
 
   const reader = readable.getReader();
 
+  /**
+   * Blocks until the consumer grants credit (via START or PULL).
+   * If readTimeout > 0, rejects after that many ms — catches consumers
+   * that stop reading and never send a PULL.
+   * Also unblocks cleanly when the transport closes (treated as cancellation).
+   */
   function waitForCredit(): Promise<void> {
     if (credit > 0 || cancelled) return Promise.resolve();
-    return new Promise<void>(resolve => { waitingForCredit = resolve; });
+    return new Promise<void>((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let offClose: (() => void) | undefined;
+
+      const cleanup = () => {
+        if (timer !== undefined) { clearTimeout(timer); timer = undefined; }
+        offClose?.(); offClose = undefined;
+      };
+
+      waitingForCredit = () => {
+        cleanup();
+        resolve();
+      };
+
+      if (readTimeout > 0) {
+        timer = setTimeout(() => {
+          waitingForCredit = undefined;
+          cleanup();
+          reject(new Error(`stream read timeout: consumer did not read within ${readTimeout}ms`));
+        }, readTimeout);
+      }
+
+      // When the transport closes while we are blocked, treat it as a cancellation
+      // so the pump loop exits cleanly via the `if (cancelled) break` check.
+      offClose = transport.onClose?.(() => {
+        waitingForCredit = undefined;
+        cleanup();
+        cancelled = true;
+        resolve();
+      });
+    });
   }
 
   const complete = (async () => {
@@ -268,9 +371,10 @@ export function createOutgoingStream(
           sentTerminal = true;
         } catch {
           /* error-status send failed; attempt best-effort CANCEL if transport is still open.
-             If transport is closed the consumer will clean up via the close event. */
+             If transport is closed the consumer will clean up via the close event.
+             Swallow any send error — this is last-resort cleanup and must not propagate. */
           if (!transport.closed) {
-            await transport.send({ id: sid, head: { method: "CANCEL" }, data: message });
+            await transport.send({ id: sid, head: { method: "CANCEL" }, data: message }).catch(() => {});
           }
         }
       }
@@ -284,12 +388,22 @@ export function createOutgoingStream(
 
     if (sentTerminal) {
       /* Keep the interceptor alive (to absorb in-flight PULLs) until the
-         consumer acknowledges the terminal frame, or the transport closes. */
+         consumer acknowledges the terminal frame, or the transport closes.
+         A completeAckTimeout caps how long we hold the interceptor open —
+         prevents leaks when the consumer crashes after receiving the terminal. */
       offClose = transport.onClose?.(() => resolveComplete());
       try {
-        await completeAck;
+        if (completeAckTimeout > 0) {
+          await Promise.race([
+            completeAck,
+            new Promise<void>(resolve => setTimeout(resolve, completeAckTimeout)),
+          ]);
+        } else {
+          await completeAck;
+        }
       } finally {
         offClose?.();
+        dispose(); // idempotent — ensures interceptor is freed even on timeout
       }
     }
   })();

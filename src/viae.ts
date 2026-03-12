@@ -5,6 +5,7 @@ import type { Context } from "./context.js";
 import { Via } from "./via.js";
 import type { Log } from "./log.js";
 import { consoleLog } from "./log.js";
+import type { StreamOptions } from "./stream.js";
 
 /**
  * Viae - server that accepts wire connections and creates Via instances.
@@ -23,14 +24,14 @@ export class Viae extends Rowan<Context> {
 
   constructor(
     server: WireServer,
-    opts?: { log?: Log; middleware?: Processor<Context>[] },
+    opts?: { log?: Log; middleware?: Processor<Context>[]; streamOptions?: StreamOptions },
   ) {
     super(opts?.middleware);
 
     server.on("connection", (wire: Wire) => {
       const log = opts?.log || Viae.Log;
 
-      const via = new Via({ wire, log });
+      const via = new Via({ wire, log, streamOptions: opts?.streamOptions });
       via.before(this._before);
       via.use(this);
 
