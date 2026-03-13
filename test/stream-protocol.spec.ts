@@ -113,32 +113,10 @@ function withTimeout<T>(promise: Promise<T>, label: string, ms = 1000): Promise<
 
 describe("Stream protocol — createOutgoingStream (producer)", () => {
 
-  it("should time out when consumer stops sending PULL (read timeout)", async () => {
-    const transport = new MockTransport();
-    const sender = createOutgoingStream(
-      makeInfiniteStream(), transport, v => ({ data: v }),
-      // short completeAckTimeout so we don't wait 5s for consumer to ack the error frame
-      { readTimeout: 150, completeAckTimeout: 100 }
-    );
-
-    // Grant 3 initial credits — producer sends 3 chunks then stalls
-    await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 3 } } as Message);
-
-    // Never grant more credit → read timeout fires
-    await withTimeout(sender.complete, "complete after read timeout");
-
-    assert.equal(transport.sentPartials().length, 3, "should send exactly 3 chunks before timeout");
-    assert.equal(transport.sentErrors().length, 1, "should send one error frame on timeout");
-    assert.ok(
-      String(transport.sentErrors()[0].data).includes("read timeout"),
-      `error message: ${transport.sentErrors()[0].data}`
-    );
-  });
-
   it("should not unblock when consumer sends PULL with desiredSize: 0", async () => {
     const transport = new MockTransport();
     const sender = createOutgoingStream(
-      makeCountingStream(5), transport, v => ({ data: v }), { readTimeout: 150 }
+      makeCountingStream(5), transport, v => ({ data: v }), {}
     );
 
     // Grant 1 credit — producer consumes 1 chunk
@@ -160,7 +138,7 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     const transport = new MockTransport();
     const sender = createOutgoingStream(
       makeCountingStream(5), transport, v => ({ data: v }),
-      { readTimeout: 150, completeAckTimeout: 100 }
+      { readTimeout: 150, drainTimeout: 0 }
     );
 
     // START with zero credits — producer should stall immediately, then time out
@@ -179,7 +157,7 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
       cancel() { cancelled = true; }
     });
 
-    const sender = createOutgoingStream(readable, transport, v => ({ data: v }), { readTimeout: 500 });
+    const sender = createOutgoingStream(readable, transport, v => ({ data: v }), {});
 
     await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 2 } } as Message);
     await tick(20);
@@ -195,8 +173,8 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     const transport = new MockTransport();
     const sender = createOutgoingStream(
       makeInfiniteStream(), transport, v => ({ data: v }),
-      // keepReadTimeout absent — we rely on the onClose hook in waitForCredit instead
-      { readTimeout: 0 }
+      // onClose hook in waitForCredit handles transport closure
+      {}
     );
 
     // One credit consumed, then transport closes before any PULL arrives
@@ -220,9 +198,8 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
 
     const sender = createOutgoingStream(
       makeCountingStream(10), transport, v => ({ data: v }),
-      // short completeAckTimeout: the Error frame (send #4) succeeds, so sentTerminal=true and
-      // the pump waits for a COMPLETE ack — cap that wait so the test finishes quickly.
-      { readTimeout: 500, completeAckTimeout: 100 }
+      // drainTimeout: 0 so the test finishes immediately after terminal is sent
+      { drainTimeout: 0 }
     );
 
     await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 10 } } as Message);
@@ -230,23 +207,22 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     await withTimeout(sender.complete.catch(() => {}), "complete after send failure");
   });
 
-  it("should resolve complete when consumer sends COMPLETE early (before terminal)", async () => {
+  it("should resolve complete as soon as terminal is sent (no ACK required)", async () => {
     const transport = new MockTransport();
     const sender = createOutgoingStream(
-      makeCountingStream(1), transport, v => ({ data: v }), {}
+      makeCountingStream(1), transport, v => ({ data: v }), { drainTimeout: 0 }
     );
 
     await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 5 } } as Message);
-    // Immediately acknowledge — consumer may have crashed right after receiving the response header
-    await transport.inject({ id: sender.sid, head: { method: "COMPLETE" } } as Message);
-
-    await withTimeout(sender.complete, "complete after early COMPLETE");
+    // complete should resolve once the terminal OK is sent — no COMPLETE ACK needed
+    await withTimeout(sender.complete, "complete without ACK");
+    assert.equal(transport.sentOKs().length, 1, "terminal OK should have been sent");
   });
 
   it("should ignore unknown/garbage frame methods on its sid", async () => {
     const transport = new MockTransport();
     const sender = createOutgoingStream(
-      makeCountingStream(3), transport, v => ({ data: v }), { readTimeout: 500 }
+      makeCountingStream(3), transport, v => ({ data: v }), {}
     );
 
     await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 5 } } as Message);
@@ -257,12 +233,6 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
 
     // Producer should still finish the 3 items normally
     await tick(30);
-    const okFrames = transport.sentOKs();
-    if (okFrames.length > 0) {
-      // Terminal sent; send COMPLETE so the interceptor can clean up
-      await transport.inject({ id: sender.sid, head: { method: "COMPLETE" } } as Message);
-    }
-
     await withTimeout(sender.complete, "complete after unknown methods");
     assert.equal(transport.sentPartials().length, 3, "should still deliver all 3 chunks");
     assert.equal(transport.sentErrors().length, 0, "no error from unknown frames");
@@ -271,7 +241,7 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
   it("should handle consumer re-sending START (duplicate START) by updating credit", async () => {
     const transport = new MockTransport();
     const sender = createOutgoingStream(
-      makeCountingStream(10), transport, v => ({ data: v }), { readTimeout: 500 }
+      makeCountingStream(10), transport, v => ({ data: v }), {}
     );
 
     // First START: 2 credits consumed
@@ -287,24 +257,19 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     // Normal PULL to finish
     await transport.inject({ id: sender.sid, head: { method: "PULL", desiredSize: 10 } } as Message);
     await tick(30);
-    // OK terminal sent — ack it
-    const okFrames = transport.sentOKs();
-    assert.equal(okFrames.length, 1);
-    await transport.inject({ id: sender.sid, head: { method: "COMPLETE" } } as Message);
+    assert.equal(transport.sentOKs().length, 1, "terminal OK sent");
     await withTimeout(sender.complete, "complete after duplicate START");
   });
 
-  it("should time out completeAck when consumer sends terminal but never COMPLETE", async () => {
+  it("should resolve complete when terminal sent (drain window, no COMPLETE ACK)", async () => {
     const transport = new MockTransport();
     const sender = createOutgoingStream(
-      makeCountingStream(1), transport, v => ({ data: v }), { completeAckTimeout: 100 }
+      makeCountingStream(1), transport, v => ({ data: v }), { drainTimeout: 0 }
     );
 
     await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 5 } } as Message);
-    // Drain the 1 chunk + terminal
-    await tick(50);
-    // Producer sent OK but consumer never sends COMPLETE → completeAckTimeout frees the interceptor
-    await withTimeout(sender.complete, "complete despite missing COMPLETE ack");
+    // Drain the 1 chunk + terminal — complete resolves immediately, no ACK needed
+    await withTimeout(sender.complete, "complete with drain window");
     assert.equal(transport.sentOKs().length, 1, "terminal OK should have been sent");
   });
 });
@@ -367,7 +332,7 @@ describe("Stream protocol — createIncomingStream (consumer)", () => {
     assert.ok(elapsed < 600,  `idle fired too late: ${elapsed}ms`);
   });
 
-  it("should abort and send COMPLETE when producer sends an error frame", async () => {
+  it("should abort stream when producer sends an error frame", async () => {
     const sid = "error-1";
     const transport = new MockTransport();
     const stream = createIncomingStream(sid, transport, { idleTimeout: 0 });
@@ -384,9 +349,9 @@ describe("Stream protocol — createIncomingStream (consumer)", () => {
       }
     );
 
-    assert.ok(
-      transport.sent.find(m => (m.head as any)?.method === "COMPLETE"),
-      "should send COMPLETE acknowledging the error terminal"
+    assert.equal(
+      transport.sent.filter(m => (m.head as any)?.method === "COMPLETE").length, 0,
+      "consumer should NOT send COMPLETE — no ACK in protocol"
     );
   });
 
@@ -503,7 +468,7 @@ describe("Stream protocol — end-to-end bad-actor scenarios", () => {
     const ws = new WebSocket(`ws://localhost:${port}`);
     const { WebSocketWire } = await import("../src/index.js");
     const wire = WebSocketWire.wrap(ws as unknown as globalThis.WebSocket);
-    const via = new Via({ wire, log: noopLog, streamOptions: { idleTimeout: 200, readTimeout: 0 } });
+    const via = new Via({ wire, log: noopLog, streamOptions: { idleTimeout: 200 } });
     await via.ready;
 
     try {
@@ -526,58 +491,6 @@ describe("Stream protocol — end-to-end bad-actor scenarios", () => {
           return true;
         }
       );
-    } finally {
-      wire.close();
-    }
-  });
-
-  it("should fire server readTimeout when client stops reading", async () => {
-    // Server has a short read timeout; client gets a stream but stops reading after initial credits.
-    const viae = new Viae(server, {
-      log: noopLog,
-      streamOptions: { readTimeout: 200, idleTimeout: 0, completeAckTimeout: 200 },
-    });
-    const api = new Api("/");
-
-    api.get({
-      path: "/infinite",
-      handler: () => makeInfiniteStream(),
-    });
-    viae.use(api);
-
-    // Client with tiny highWaterMark so initial credits are exhausted quickly
-    const ws = new WebSocket(`ws://localhost:${port}`);
-    const { WebSocketWire } = await import("../src/index.js");
-    const wire = WebSocketWire.wrap(ws as unknown as globalThis.WebSocket);
-    const via = new Via({ wire, log: noopLog, streamOptions: { highWaterMark: 2, idleTimeout: 0 } });
-    await via.ready;
-
-    try {
-      const result = await via.request<ReadableStream<number>>("GET", "/infinite", undefined, { accept: "stream" });
-      assert.equal(result.ok, true);
-
-      const reader = (result.data as ReadableStream<number>).getReader();
-
-      // Intentionally stop reading — server's credit eventually hits 0 and times out.
-      // Give the server enough time to send its error frame.
-      await tick(500);
-
-      // Drain items until we hit the read-timeout error.
-      // The exact number of buffered items before the error is timing-dependent.
-      let gotError = false;
-      for (let attempt = 0; attempt < 20; attempt++) {
-        try {
-          const { done } = await withTimeout(reader.read(), "read", 800);
-          if (done) break; // shouldn't happen, but safe
-        } catch (err) {
-          const msg = String(err);
-          if (msg.includes("read timeout") || msg.includes("stream error")) {
-            gotError = true;
-          }
-          break;
-        }
-      }
-      assert.equal(gotError, true, "stream should eventually error with read timeout");
     } finally {
       wire.close();
     }

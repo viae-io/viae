@@ -6,42 +6,43 @@ import { Status } from "./status.js";
  *
  * Consumer > Producer:
  *   START(desiredSize: N)  – opens the stream; sets the producer's initial credit to N
- *   PULL(desiredSize: M)   – sets the producer's credit to M (consumer's controller.desiredSize)
- *   COMPLETE               – acknowledges a terminal frame; producer may now clean up
+ *   PULL(desiredSize: M)   – sets the producer's credit to M; sent only when the consumer
+ *                            is genuinely blocking (queue empty, no terminal seen yet)
  *   CANCEL(data?: reason)  – consumer-side abort; mirrors ReadableStream cancel(reason)
  *
  * Producer > Consumer:
  *   { status: 206, data }  – one chunk (Partial)
- *   { status: 200 }        – stream complete (normal)
- *   { status: 500, data }  – stream error
+ *   { status: 200 }        – stream complete (normal terminal)
+ *   { status: 500, data }  – stream error (error terminal)
  *   CANCEL(data?: reason)  – producer-side abort (e.g. source errored before terminal sent)
  *
  * Credit model (SET, not additive):
  *   The producer maintains a `credit` counter, initially 0.
  *   On START or PULL the producer sets credit = desiredSize.
  *   The producer sends while credit > 0 (decrementing per chunk) and blocks at 0.
- *   The consumer sends PULL with its ReadableStream controller.desiredSize when
- *   its internal BlockingQueue is empty and it is about to wait for more data.
+ *   The consumer sends PULL only at the exact moment queue.next() is about to suspend
+ *   (buffer empty, queue not yet closed) — this is the only safe point where we know
+ *   we need more data and haven't already seen the terminal.
  *   The consumer's ReadableStream uses a highWaterMark of 32 by default.
  *
- * The producer holds its sid interceptor open after sending the terminal frame
- * until it receives COMPLETE (or CANCEL, or transport close).  This absorbs any
- * in-flight PULL frames that arrive after the terminal, preventing them from
- * being misrouted as new requests.
+ * Drain window:
+ *   After sending the terminal frame the producer keeps the sid interceptor open for
+ *   drainTimeout ms.  This silently absorbs any single in-flight PULL that raced ahead
+ *   of the terminal (sent before the consumer saw it).  No consumer ACK is required.
  */
 
 const DEFAULT_WINDOW = 32;
-const DEFAULT_READ_TIMEOUT = 30_000;
 const DEFAULT_IDLE_TIMEOUT = 30_000;
-const DEFAULT_COMPLETE_ACK_TIMEOUT = 5_000;
+const DEFAULT_DRAIN_TIMEOUT = 100;
 
 export interface StreamOptions {
   /** Internal queue highWaterMark for the consumer ReadableStream. Default: 32. */
   highWaterMark?: number;
   /**
-   * Max ms the producer waits for a consumer PULL (credit) before aborting the
-   * stream with an error.  Catches consumers that stop reading.
-   * Default: 30_000. Set to 0 to disable.
+   * Max ms the producer waits for the consumer's initial START (or first PULL)
+   * before aborting.  Catches callers that request a stream but never consume it.
+   * Only applied on the very first credit wait; subsequent PULL waits (normal
+   * backpressure) are not limited.  Default: 30_000. Set to 0 to disable.
    */
   readTimeout?: number;
   /**
@@ -52,11 +53,12 @@ export interface StreamOptions {
    */
   idleTimeout?: number;
   /**
-   * Max ms to wait for the consumer's COMPLETE acknowledgment after the
-   * producer sends the terminal frame.  The interceptor is cleaned up once
-   * the timeout expires regardless.  Default: 5_000. Set to 0 to disable.
+   * Ms the producer keeps the sid interceptor alive after sending the terminal
+   * frame (drain window).  This silently absorbs any in-flight PULL that raced
+   * ahead of the terminal.  No consumer ACK is required or expected.
+   * Default: 2_000. Set to 0 to disable.
    */
-  completeAckTimeout?: number;
+  drainTimeout?: number;
 }
 
 export interface StreamSender {
@@ -114,10 +116,22 @@ class BlockingQueue<T> {
     return this._chunks.length === 0;
   }
 
-  next(): Promise<IteratorResult<T, undefined>> {
+  /** True once close() or abort() has been called — no more data will arrive. */
+  get isDone(): boolean {
+    return this._closed;
+  }
+
+  /**
+   * Returns the next item.  If the queue is empty and not yet closed, suspends
+   * until a chunk, terminal, or error arrives.  `onWait` is called synchronously
+   * just before suspending — use it to request more data from the producer.
+   */
+  next(onWait?: () => void): Promise<IteratorResult<T, undefined>> {
     if (this._chunks.length > 0) return Promise.resolve({ value: this._chunks.shift()!, done: false });
     if (this._hasError) return Promise.reject(this._error);
     if (this._closed) return Promise.resolve({ value: undefined, done: true });
+    // About to block — notify caller so it can request more data.
+    onWait?.();
     return new Promise((resolve, reject) => this._waiters.push({ resolve, reject }));
   }
 }
@@ -174,12 +188,8 @@ export function createIncomingStream<T = unknown>(
       queue.push(msg.data as T);
     } else if (status === Status.Error) {
       clearIdleTimer();
-      try {
-        await transport.send({ id: sid, head: { method: "COMPLETE" } });
-      } finally {
-        dispose();
-        queue.abort(msg.data ?? new Error("stream error"));
-      }
+      dispose();
+      queue.abort(msg.data ?? new Error("stream error"));
     } else if (msg.head.method === "CANCEL") {
       /* Producer-side abort — treat as an error on the consumer */
       clearIdleTimer();
@@ -188,12 +198,8 @@ export function createIncomingStream<T = unknown>(
     } else {
       /* Status.OK or any other terminal status */
       clearIdleTimer();
-      try {
-        await transport.send({ id: sid, head: { method: "COMPLETE" } });
-      } finally {
-        dispose();
-        queue.close();
-      }
+      dispose();
+      queue.close();
     }
   });
 
@@ -211,19 +217,16 @@ export function createIncomingStream<T = unknown>(
     },
     async pull(controller) {
       try {
-        /* When the queue is drained, tell the producer how much room we have
-           before blocking — this prevents starvation when credit hits 0. */
-        if (queue.isEmpty) {
+        const result = await queue.next(() => {
+          /* Called only when the queue is empty AND not yet closed — we are
+             genuinely about to block.  Send PULL to request more data.
+             At this exact point it is safe: if the terminal had already been
+             received the queue would be closed and onWait would not fire. */
           const desiredSize = controller.desiredSize;
-          if (desiredSize != null && desiredSize > 0) {
-            try {
-              await transport.send({ id: sid, head: { method: "PULL", desiredSize } });
-            } catch (err) {
-              if (!transport.closed) throw err;
-            }
+          if (desiredSize != null && desiredSize > 0 && !transport.closed) {
+            transport.send({ id: sid, head: { method: "PULL", desiredSize } }).catch(() => {});
           }
-        }
-        const result = await queue.next();
+        });
         if (cancelled) return;
         if (result.done) {
           controller.close();
@@ -261,21 +264,20 @@ export function createOutgoingStream(
   encodeChunk: (value: unknown) => Partial<Message>,
   options?: StreamOptions,
 ): StreamSender {
-  const readTimeout = options?.readTimeout ?? DEFAULT_READ_TIMEOUT;
-  const completeAckTimeout = options?.completeAckTimeout ?? DEFAULT_COMPLETE_ACK_TIMEOUT;
+  const readTimeout = options?.readTimeout ?? DEFAULT_IDLE_TIMEOUT;
+  const drainTimeout = options?.drainTimeout ?? DEFAULT_DRAIN_TIMEOUT;
 
   const sid = transport.createId();
   let credit = 0;
+  let hasReceivedCredit = false;
   let waitingForCredit: (() => void) | undefined;
   let cancelled = false;
-
-  let resolveComplete!: () => void;
-  const completeAck = new Promise<void>(r => { resolveComplete = r; });
 
   const dispose = transport.intercept(sid, (msg: Message) => {
     const method = msg.head.method;
     if (method === "START" || method === "PULL") {
       credit = (msg.head.desiredSize as number) || 0;
+      if (credit > 0) hasReceivedCredit = true;
       if (waitingForCredit && credit > 0) {
         const fn = waitingForCredit;
         waitingForCredit = undefined;
@@ -287,21 +289,19 @@ export function createOutgoingStream(
       const fn = waitingForCredit;
       waitingForCredit = undefined;
       fn?.();
-      resolveComplete();
       reader.cancel(msg.data).catch(() => {});
       dispose();
-    } else if (method === "COMPLETE") {
-      resolveComplete();
-      dispose();
     }
+    /* Any other frame (including stray PULLs during drain window) is silently ignored. */
   });
 
   const reader = readable.getReader();
 
   /**
    * Blocks until the consumer grants credit (via START or PULL).
-   * If readTimeout > 0, rejects after that many ms — catches consumers
-   * that stop reading and never send a PULL.
+   * If readTimeout > 0 and this is the very first credit wait (i.e. START or
+   * the first PULL has never arrived), rejects after that many ms — catches
+   * callers that request a stream but forget to consume it.
    * Also unblocks cleanly when the transport closes (treated as cancellation).
    */
   function waitForCredit(): Promise<void> {
@@ -320,7 +320,7 @@ export function createOutgoingStream(
         resolve();
       };
 
-      if (readTimeout > 0) {
+      if (!hasReceivedCredit && readTimeout > 0) {
         timer = setTimeout(() => {
           waitingForCredit = undefined;
           cleanup();
@@ -341,7 +341,7 @@ export function createOutgoingStream(
 
   const complete = (async () => {
     let sentTerminal = false;
-    let offClose: (() => void) | undefined;
+    let offClose: (() => void) | undefined = undefined;
 
     try {
       while (!cancelled) {
@@ -382,28 +382,24 @@ export function createOutgoingStream(
       if (!sentTerminal) {
         /* Cancelled or error with closed wire — clean up immediately */
         dispose();
-        resolveComplete(); /* idempotent */
       }
     }
 
     if (sentTerminal) {
-      /* Keep the interceptor alive (to absorb in-flight PULLs) until the
-         consumer acknowledges the terminal frame, or the transport closes.
-         A completeAckTimeout caps how long we hold the interceptor open —
-         prevents leaks when the consumer crashes after receiving the terminal. */
-      offClose = transport.onClose?.(() => resolveComplete());
-      try {
-        if (completeAckTimeout > 0) {
-          await Promise.race([
-            completeAck,
-            new Promise<void>(resolve => setTimeout(resolve, completeAckTimeout)),
-          ]);
-        } else {
-          await completeAck;
-        }
-      } finally {
+      /* Keep the interceptor alive for a short drain window to silently absorb
+         any in-flight PULL that raced ahead of the terminal.  No consumer ACK
+         is required — we just wait a fixed interval then clean up. */
+      let drainTimer: ReturnType<typeof setTimeout> | undefined;
+      const cleanup = () => {
+        if (drainTimer !== undefined) { clearTimeout(drainTimer); drainTimer = undefined; }
         offClose?.();
-        dispose(); // idempotent — ensures interceptor is freed even on timeout
+        dispose();
+      };
+      offClose = transport.onClose?.(() => cleanup());
+      if (drainTimeout > 0) {
+        drainTimer = setTimeout(cleanup, drainTimeout);
+      } else {
+        cleanup();
       }
     }
   })();
