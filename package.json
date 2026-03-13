@@ -35,8 +35,5 @@
     "path-to-regexp": "^6",
     "pino": "^9",
     "rowan": "^2.1.0"
-  },
-  "peerDependencies": {
-    "cbor-extract": "^2.2.1"
   }
 }
