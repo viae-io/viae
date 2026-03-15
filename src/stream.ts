@@ -31,32 +31,25 @@ import { Status } from "./status.js";
  */
 
 const DEFAULT_WINDOW = 32;
-const DEFAULT_READ_TIMEOUT = 30_000;
-const DEFAULT_IDLE_TIMEOUT = 30_000;
-const DEFAULT_COMPLETE_ACK_TIMEOUT = 5_000;
+const DEFAULT_START_TIMEOUT = 3000;
+const DEFAULT_IDLE_TIMEOUT = 0;
 
 export interface StreamOptions {
   /** Internal queue highWaterMark for the consumer ReadableStream. Default: 32. */
   highWaterMark?: number;
   /**
-   * Max ms the producer waits for a consumer PULL (credit) before aborting the
-   * stream with an error.  Catches consumers that stop reading.
-   * Default: 30_000. Set to 0 to disable.
+   * Max ms the producer waits for the consumer to send the initial START frame
+   * before aborting with an error.  Protects against callers that create a
+   * stream but never start reading it.  Default: 30_000. Set to 0 to disable.
    */
-  readTimeout?: number;
+  startTimeout?: number;
   /**
    * Max ms the consumer waits for the next chunk from the producer before
    * cancelling the stream.  Resets on every received chunk.
    * Catches producers that stall without sending a terminal frame.
-   * Default: 30_000. Set to 0 to disable.
+   * Default: 0 (disabled). Set to a positive value to enable.
    */
   idleTimeout?: number;
-  /**
-   * Max ms to wait for the consumer's COMPLETE acknowledgment after the
-   * producer sends the terminal frame.  The interceptor is cleaned up once
-   * the timeout expires regardless.  Default: 5_000. Set to 0 to disable.
-   */
-  completeAckTimeout?: number;
 }
 
 export interface StreamSender {
@@ -136,7 +129,7 @@ export function createIncomingStream<T = unknown>(
   options?: StreamOptions,
 ): ReadableStream<T> {
   const highWaterMark = options?.highWaterMark ?? DEFAULT_WINDOW;
-  const idleTimeout = options?.idleTimeout ?? DEFAULT_IDLE_TIMEOUT;
+  const idleTimeout = options?.idleTimeout ?? DEFAULT_IDLE_TIMEOUT; // default 0 = disabled
 
   const queue = new BlockingQueue<T>();
   let cancelled = false;
@@ -261,8 +254,7 @@ export function createOutgoingStream(
   encodeChunk: (value: unknown) => Partial<Message>,
   options?: StreamOptions,
 ): StreamSender {
-  const readTimeout = options?.readTimeout ?? DEFAULT_READ_TIMEOUT;
-  const completeAckTimeout = options?.completeAckTimeout ?? DEFAULT_COMPLETE_ACK_TIMEOUT;
+  const startTimeout = options?.startTimeout ?? DEFAULT_START_TIMEOUT;
 
   const sid = transport.createId();
   let credit = 0;
@@ -300,10 +292,11 @@ export function createOutgoingStream(
 
   /**
    * Blocks until the consumer grants credit (via START or PULL).
-   * If readTimeout > 0, rejects after that many ms — catches consumers
-   * that stop reading and never send a PULL.
+   * On the first call only, if startTimeout > 0, rejects after that many ms —
+   * catches callers that create a stream but never start reading.
    * Also unblocks cleanly when the transport closes (treated as cancellation).
    */
+  let startTimerArmed = true;
   function waitForCredit(): Promise<void> {
     if (credit > 0 || cancelled) return Promise.resolve();
     return new Promise<void>((resolve, reject) => {
@@ -320,12 +313,13 @@ export function createOutgoingStream(
         resolve();
       };
 
-      if (readTimeout > 0) {
+      if (startTimerArmed && startTimeout > 0) {
+        startTimerArmed = false;
         timer = setTimeout(() => {
           waitingForCredit = undefined;
           cleanup();
-          reject(new Error(`stream read timeout: consumer did not read within ${readTimeout}ms`));
-        }, readTimeout);
+          reject(new Error(`stream start timeout: consumer did not start reading within ${startTimeout}ms`));
+        }, startTimeout);
       }
 
       // When the transport closes while we are blocked, treat it as a cancellation
@@ -388,22 +382,13 @@ export function createOutgoingStream(
 
     if (sentTerminal) {
       /* Keep the interceptor alive (to absorb in-flight PULLs) until the
-         consumer acknowledges the terminal frame, or the transport closes.
-         A completeAckTimeout caps how long we hold the interceptor open —
-         prevents leaks when the consumer crashes after receiving the terminal. */
+         consumer acknowledges the terminal frame, or the transport closes. */
       offClose = transport.onClose?.(() => resolveComplete());
       try {
-        if (completeAckTimeout > 0) {
-          await Promise.race([
-            completeAck,
-            new Promise<void>(resolve => setTimeout(resolve, completeAckTimeout)),
-          ]);
-        } else {
-          await completeAck;
-        }
+        await completeAck;
       } finally {
         offClose?.();
-        dispose(); // idempotent — ensures interceptor is freed even on timeout
+        dispose();
       }
     }
   })();
