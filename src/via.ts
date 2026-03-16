@@ -112,7 +112,7 @@ export class Via extends Rowan<Context> implements IVia {
       }))
       .use(new IncomingStreamUpgrade(this._streamOptions))
       .use(this._interceptor)
-      .use((ctx: Context, next: Next) => {
+      .use(async (ctx: Context, next: Next | undefined) => {
         /* Absorb stale in-flight stream protocol frames that arrive after their
            stream interceptor has been disposed.  Without this, DefaultContext
            creates a 404 ctx.out for any unrecognised METHOD frame, which After
@@ -123,7 +123,7 @@ export class Via extends Rowan<Context> implements IVia {
           delete (ctx as Record<string, unknown>).out; // prevent After from sending a 404
           return Promise.resolve();
         }
-        return next();
+        return next?.();
       });
 
     wire.on("message", (data: ArrayBuffer | ArrayBufferView) => {

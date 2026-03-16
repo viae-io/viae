@@ -34,7 +34,7 @@ import { Status } from "./status.js";
  */
 
 const DEFAULT_WINDOW = 32;
-const DEFAULT_START_TIMEOUT = 30_000;
+const DEFAULT_START_TIMEOUT = 3000;
 const DEFAULT_IDLE_TIMEOUT = 0;
 
 export interface StreamOptions {
@@ -333,8 +333,7 @@ export function createOutgoingStream(
   }
 
   const complete = (async () => {
-    let sentTerminal = false;
-
+  
     try {
       while (!cancelled) {
         await waitForCredit();
@@ -345,7 +344,6 @@ export function createOutgoingStream(
 
         if (done) {
           await transport.send({ id: sid, head: { status: Status.OK } as MessageHeader });
-          sentTerminal = true;
           break;
         }
 
@@ -360,7 +358,7 @@ export function createOutgoingStream(
         const message = err instanceof Error ? err.message : String(err);
         try {
           await transport.send({ id: sid, head: { status: Status.Error } as MessageHeader, data: message });
-          sentTerminal = true;
+
         } catch {
           /* error-status send failed; attempt best-effort CANCEL if transport is still open.
              If transport is closed the consumer will clean up via the close event.
