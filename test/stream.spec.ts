@@ -88,38 +88,6 @@ describe("Stream", () => {
     }
   });
 
-  it("should receive an empty stream", async () => {
-    const viae = new Viae(server);
-    const api = new Api("/");
-
-    api.get({
-      path: "/empty",
-      handler: () => new ReadableStream<number>({
-        start(controller) { controller.close(); }
-      })
-    });
-
-    viae.use(api);
-    const { via, wire } = await createTestClient(port);
-
-    try {
-      const result = await via.request<ReadableStream<number>>("GET", "/empty", undefined, { accept: "stream" });
-      assert.equal(result.ok, true);
-
-      const received: number[] = [];
-      const reader = (result.data as ReadableStream<number>).getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        received.push(value as number);
-      }
-
-      assert.deepEqual(received, []);
-    } finally {
-      wire.close();
-    }
-  });
-
   it("should propagate a producer error to the consumer", async () => {
     const viae = new Viae(server);
     const api = new Api("/");
@@ -449,6 +417,80 @@ describe("Stream", () => {
         assert.equal(result.ok, true);
         assert.deepEqual(result.data, payload);
       }
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should send a 0-element stream from client — server drains it and responds", async () => {
+    // Client sends an empty ReadableStream as the request body.
+    // Server must drain it (receiving done=true immediately) and complete normally.
+    const viae = new Viae(server);
+    const api = new Api("/");
+    let handlerCalled = false;
+
+    api.post({
+      path: "/empty-upload",
+      accept: "stream",
+      handler: async ({ data }) => {
+        handlerCalled = true;
+        const chunks: unknown[] = [];
+        const reader = (data as ReadableStream).getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+        return chunks; // returns [] — a plain (non-stream) response
+      }
+    });
+
+    viae.use(api);
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      const empty = new ReadableStream({ start(controller) { controller.close(); } });
+      const result = await via.request<unknown[]>("POST", "/empty-upload", empty);
+      assert.equal(result.ok, true);
+      assert.equal(handlerCalled, true, "handler must have been called");
+      assert.deepEqual(result.data, [], "server must have seen zero chunks");
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should echo an empty stream end-to-end without hanging", async () => {
+    // Most thorough empty-stream test: client sends an empty ReadableStream AND
+    // receives one back (echo).  Verifies both sides can send and receive a
+    // 0-element stream and that all protocol state is cleaned up cleanly.
+    const viae = new Viae(server);
+    const api = new Api("/");
+
+    api.post({
+      path: "/echo-empty",
+      accept: "stream",
+      // Return the incoming stream directly — server sends back whatever it receives
+      handler: ({ data }) => data as ReadableStream
+    });
+
+    viae.use(api);
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      const empty = new ReadableStream({ start(controller) { controller.close(); } });
+      const result = await via.request<ReadableStream>("POST", "/echo-empty", empty, { accept: "stream" });
+      assert.equal(result.ok, true);
+
+      // Drain the echoed response stream — it must close immediately with no chunks
+      const received: unknown[] = [];
+      const reader = (result.data as ReadableStream).getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received.push(value);
+      }
+
+      assert.deepEqual(received, [], "response stream must contain zero chunks");
     } finally {
       wire.close();
     }

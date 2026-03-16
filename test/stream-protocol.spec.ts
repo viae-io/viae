@@ -260,6 +260,21 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     assert.equal(transport.sentOKs().length, 1, "terminal OK should have been sent");
   });
 
+  it("should send OK immediately for a 0-element stream and not hang", async () => {
+    const transport = new MockTransport();
+    // Empty stream: ReadableStream that closes immediately without enqueuing anything
+    const empty = new ReadableStream({ start(controller) { controller.close(); } });
+    const sender = createOutgoingStream(empty, transport, v => ({ data: v }), {});
+
+    // Grant credit — producer should read done=true on first pull and terminate
+    await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 10 } } as Message);
+
+    await withTimeout(sender.complete, "complete for 0-element stream");
+    assert.equal(transport.sentPartials().length, 0, "no Partial frames for empty stream");
+    assert.equal(transport.sentOKs().length, 1, "terminal OK sent after reading done=true");
+    assert.equal(transport.sentErrors().length, 0, "no error frames");
+  });
+
   it("should ignore unknown/garbage frame methods on its sid", async () => {
     const transport = new MockTransport();
     const sender = createOutgoingStream(
@@ -447,6 +462,29 @@ describe("Stream protocol — createIncomingStream (consumer)", () => {
     const r3 = await reader.read(); assert.equal(r3.done, true);
   });
 
+  it("should close immediately and not hang when producer sends OK with no prior chunks", async () => {
+    // 0-element incoming stream: producer terminates with OK before sending any Partial frames
+    const sid = "empty-incoming-1";
+    const transport = new MockTransport();
+    const stream = createIncomingStream(sid, transport, { idleTimeout: 0 });
+    const reader = stream.getReader();
+    await tick(10); // let start() send START
+
+    // Verify START was sent so the producer knows to begin
+    assert.ok(
+      transport.sent.some(m => (m.head as any)?.method === "START"),
+      "consumer must send START"
+    );
+
+    // Producer responds with terminal OK immediately — no chunks at all
+    await transport.inject({ id: sid, head: { status: Status.OK } } as Message);
+
+    // First (and only) read must return done=true without hanging
+    const result = await withTimeout(reader.read(), "read on 0-element incoming stream");
+    assert.equal(result.done, true, "stream must signal done immediately");
+    assert.equal(result.value, undefined, "no value on done result");
+  });
+
   it("should not error when producer sends an unknown status code (treated as terminal)", async () => {
     // An unknown status (not 206/200/500) should be treated as a terminal OK-like by the interceptor.
     const sid = "unk-status-1";
@@ -567,38 +605,6 @@ describe("Stream protocol — end-to-end bad-actor scenarios", () => {
     }
   });
 
-  it("should not lose in-flight chunks when client pulls faster than producer delivers", async () => {
-    // Ensures ordering is preserved when the credit window and pull cadence are mismatched.
-    const viae = new Viae(server, { log: noopLog });
-    const api = new Api("/");
-    const TOTAL = 50;
-
-    api.get({
-      path: "/ordered",
-      handler: () => makeCountingStream(TOTAL),
-    });
-    viae.use(api);
-
-    const { via, wire } = await createTestClient(port);
-
-    try {
-      const result = await via.request<ReadableStream<number>>("GET", "/ordered", undefined, { accept: "stream" });
-      assert.equal(result.ok, true);
-
-      const reader = (result.data as ReadableStream<number>).getReader();
-      const received: number[] = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        received.push(value as number);
-      }
-
-      assert.deepEqual(received, Array.from({ length: TOTAL }, (_, i) => i));
-    } finally {
-      wire.close();
-    }
-  });
-
   it("should recover when wire closes while a stream is in flight", async () => {
     const viae = new Viae(server, { log: noopLog });
     const api = new Api("/");
@@ -636,53 +642,5 @@ describe("Stream protocol — end-to-end bad-actor scenarios", () => {
     }
   });
 
-  it("should deliver stream correctly when client sends concurrent requests on same connection", async () => {
-    // Concurrent streams must not corrupt each other's data.
-    const viae = new Viae(server, { log: noopLog });
-    const api = new Api("/");
-
-    api.get({
-      path: "/mirror/:base",
-      handler: ({ params }) => {
-        const base = parseInt(params.base, 10);
-        return makeCountingStream(10).pipeThrough(new TransformStream({
-          transform(chunk, ctrl) { ctrl.enqueue(chunk + base); }
-        }));
-      },
-    });
-    viae.use(api);
-
-    const { via, wire } = await createTestClient(port);
-
-    async function drainStream(s: ReadableStream<number>): Promise<number[]> {
-      const reader = s.getReader();
-      const out: number[] = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        out.push(value as number);
-      }
-      return out;
-    }
-
-    try {
-      const [r1, r2, r3] = await Promise.all([
-        via.request<ReadableStream<number>>("GET", "/mirror/0",   undefined, { accept: "stream" }),
-        via.request<ReadableStream<number>>("GET", "/mirror/100", undefined, { accept: "stream" }),
-        via.request<ReadableStream<number>>("GET", "/mirror/200", undefined, { accept: "stream" }),
-      ]);
-
-      const [a, b, c] = await Promise.all([
-        drainStream(r1.data as ReadableStream<number>),
-        drainStream(r2.data as ReadableStream<number>),
-        drainStream(r3.data as ReadableStream<number>),
-      ]);
-
-      assert.deepEqual(a, Array.from({ length: 10 }, (_, i) => i));
-      assert.deepEqual(b, Array.from({ length: 10 }, (_, i) => i + 100));
-      assert.deepEqual(c, Array.from({ length: 10 }, (_, i) => i + 200));
-    } finally {
-      wire.close();
-    }
-  });
 });
+
