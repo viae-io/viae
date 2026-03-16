@@ -1,6 +1,6 @@
 {
   "name": "viae",
-  "version": "3.0.0-beta.1",
+  "version": "3.0.0-beta.2",
   "private": false,
   "type": "module",
   "llm": "./LLM.md",
@@ -35,8 +35,5 @@
     "path-to-regexp": "^6",
     "pino": "^9",
     "rowan": "^2.1.0"
-  },
-  "peerDependencies": {
-    "cbor-extract": "^2.2.1"
   }
 }
