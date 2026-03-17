@@ -1,5 +1,5 @@
 import { Rowan, After, AfterIf, type Processor, Catch, type Next, type Middleware } from "rowan";
-import { EventEmitter } from "events";
+import { EventEmitter } from "eventemitter3";
 import { type Wire, WireState } from "./wire.js";
 import { type Message, type MessageHeader, type Response } from "./message.js";
 import { type Context, DefaultContext } from "./context.js";

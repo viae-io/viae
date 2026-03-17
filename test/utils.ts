@@ -1,4 +1,4 @@
-import { EventEmitter } from "events";
+import { EventEmitter } from "eventemitter3";
 import { createServer, Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import { type WireServer, WebSocketWire, Via, Viae } from "../src/index.js";

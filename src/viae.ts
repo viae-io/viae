@@ -1,5 +1,5 @@
 import { Rowan, type Processor } from "rowan";
-import { EventEmitter } from "events";
+import { EventEmitter } from "eventemitter3";
 import type { Wire, WireServer } from "./wire.js";
 import type { Context } from "./context.js";
 import { Via } from "./via.js";

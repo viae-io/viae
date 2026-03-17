@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "cbor-x": "^1.6.3",
+    "eventemitter3": "^5",
     "path-to-regexp": "^6",
     "pino": "^9",
     "rowan": "^2.1.0"
