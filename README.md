@@ -43,16 +43,15 @@ const viae = new Viae(wireServer);
 
 ```ts
 import { Viae } from "viae";
-import pino from "pino";
 
-const logger = pino();
-Viae.Log = logger; // applies to all future connections
+// bring your own logger - anything with trace/debug/info/warn/error/fatal methods
+Viae.Log = myLogger; // applies to all future connections
 ```
 
 Or pass per-instance:
 
 ```ts
-const viae = new Viae(wireServer, { log: logger });
+const viae = new Viae(wireServer, { log: myLogger });
 ```
 
 ---
