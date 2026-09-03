@@ -320,7 +320,7 @@ wire.close();
 |---|---|---|
 | `wire` | `Wire` | Required. The underlying transport. |
 | `log` | `Log` | Logger instance. Defaults to `Via.Log` (console). |
-| `timeout` | `number` | Request timeout in ms (default `10000`). |
+| `timeout` | `number` | Request timeout in ms (default `120000`). |
 | `codex` | `Codex` | Named encoder registry. Defaults to `defaultCodex` (cbor, json, binary). |
 
 ### Encoding

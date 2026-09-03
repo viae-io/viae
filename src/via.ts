@@ -88,7 +88,7 @@ export class Via extends Rowan<Context> implements IVia {
     const wire = this._wire = opts.wire;
     this._log = opts.log ?? Via.Log;
     this._uuid = opts.uuid || shortId;
-    this._timeout = opts.timeout || 10000;
+    this._timeout = opts.timeout ?? 120000;
     this._encoder = opts.codex ? new FrameEncoder(opts.codex) : new FrameEncoder();
     this._streamOptions = opts.streamOptions;
 
@@ -253,7 +253,7 @@ export class Via extends Rowan<Context> implements IVia {
       }]
     });
 
-    const clock = setTimeout(() => reject(new Error("request timeout")), opts?.timeout || this._timeout);
+    const clock = setTimeout(() => reject(new Error("request timeout")), opts?.timeout ?? this._timeout);
 
     try {
       await this.send(msg, opts);
