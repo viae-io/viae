@@ -8,13 +8,13 @@ import { Status } from "./status.js";
 import type { Log } from "./log.js";
 import { consoleLog } from "./log.js";
 import { shortId } from "./util.js";
-import { type Codex, FrameEncoder } from "./codec.js";
+import { type Codex, FrameEncoder, type FrameEncoderOptions } from "./codec.js";
 import { createOutgoingStream, createIncomingStream, type StreamTransport, type StreamOptions } from "./stream.js";
 
 function toUint8Array(data: ArrayBuffer | ArrayBufferView): Uint8Array {
   if (data instanceof Uint8Array) return data;
   if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-  return new Uint8Array(data);
+  return new Uint8Array(data as ArrayBuffer);
 }
 
 function isReadableStream(obj: unknown): obj is ReadableStream {
@@ -39,6 +39,8 @@ export interface ViaOptions {
   log?: Log;
   timeout?: number;
   codex?: Codex;
+  /** Optional frame resource limits. Omitted to preserve the historical limitless setting. */
+  frameOptions?: FrameEncoderOptions;
   /** Options forwarded to the stream layer (timeouts, highWaterMark). */
   streamOptions?: StreamOptions;
 }
@@ -70,6 +72,8 @@ export class Via extends Rowan<Context> implements IVia {
   private _uuid: () => string;
   private _log: Log;
   private _timeout: number;
+  private _closedError?: Error;
+  private _pendingRejectors = new Set<(error: Error) => void>();
   private _interceptor = new Interceptor();
   private _before: Rowan<Context> = new Rowan<Context>();
   private _encoder: FrameEncoder;
@@ -89,7 +93,7 @@ export class Via extends Rowan<Context> implements IVia {
     this._log = opts.log ?? Via.Log;
     this._uuid = opts.uuid || shortId;
     this._timeout = opts.timeout ?? 120000;
-    this._encoder = opts.codex ? new FrameEncoder(opts.codex) : new FrameEncoder();
+    this._encoder = new FrameEncoder(opts.codex ?? undefined, opts.frameOptions);
     this._streamOptions = opts.streamOptions;
 
     this
@@ -131,6 +135,8 @@ export class Via extends Rowan<Context> implements IVia {
     });
     wire.on("open", () => { this._ev.emit("open"); });
     wire.on("close", () => {
+      this._closedError = new Error("wire closed");
+      this._rejectPending(this._closedError);
       this._interceptor.dispose();
       this._ev.emit("close");
     });
@@ -140,31 +146,48 @@ export class Via extends Rowan<Context> implements IVia {
   get ready(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       if (this._wire.readyState === WireState.OPEN) return resolve();
+      if (this._wire.readyState === WireState.CLOSED) return reject(new Error("wire is closed"));
 
       const handlerOpen = () => {
-        this._wire.off("open", handlerOpen);
-        this._wire.off("error", handlerError);
+        cleanup();
         resolve();
       };
       const handlerError = (err: unknown) => {
+        cleanup();
+        reject(err);
+      };
+      const handlerClose = () => {
+        cleanup();
+        reject(this._closedError ?? new Error("wire closed"));
+      };
+      const cleanup = () => {
         this._wire.off("open", handlerOpen);
         this._wire.off("error", handlerError);
-        reject(err);
+        this._wire.off("close", handlerClose);
       };
 
       this._wire.on("open", handlerOpen);
       this._wire.on("error", handlerError);
+      this._wire.on("close", handlerClose);
     });
   }
 
   private _onMessage(data: ArrayBuffer | ArrayBufferView) {
-    const raw = toUint8Array(data);
-    const frame = this._encoder.decode(raw);
+    let frame: ReturnType<FrameEncoder["decode"]>;
+    try {
+      frame = this._encoder.decode(toUint8Array(data));
+    } catch (err) {
+      this._log.error({ err }, "invalid wire frame");
+      this._ev.emit("error", err);
+      try { this._wire.close(); } catch { /* wire may already be closed */ }
+      return;
+    }
 
     const msg: Message = {
       id: frame.id,
       head: (frame.head ?? {}) as MessageHeader,
       data: frame.data,
+      ...(frame.raw !== undefined ? { raw: frame.raw } : {}),
     };
 
     const ctx = new DefaultContext({ connection: this, in: msg, log: this._log });
@@ -180,11 +203,17 @@ export class Via extends Rowan<Context> implements IVia {
         const index = this._active.indexOf(ctx);
         if (index >= 0) this._active.splice(index, 1);
         return (ctx as DefaultContext)[Symbol.asyncDispose]();
-      });
+    });
+  }
+
+  private _rejectPending(error: Error): void {
+    for (const reject of this._pendingRejectors) reject(error);
+    this._pendingRejectors.clear();
   }
 
   send(msg: Partial<Message>, opts?: SendOptions): Promise<void> {
     if (!msg.id) msg.id = shortId();
+    if (!msg.head) msg.head = {};
 
     if (opts?.encoding) {
       msg.head = msg.head || {};
@@ -231,11 +260,17 @@ export class Via extends Rowan<Context> implements IVia {
     let reject!: (reason: unknown) => void;
     let resolve!: (value: RequestResponse<R>) => void;
     const promise = new Promise<RequestResponse<R>>((r, x) => { resolve = r; reject = x; });
+    const rejectOnClose = (error: Error) => reject(error);
+    this._pendingRejectors.add(rejectOnClose);
 
     const dispose = this._interceptor.intercept({
       id: msg.id!,
       handlers: [(ctx: Context, next?: Next) => {
         const status = ctx.in.head.status as Status;
+
+        if (status === Status.Partial) {
+          return (next || (() => Promise.resolve()))();
+        }
 
         resolve(
           Object.assign(
@@ -259,6 +294,7 @@ export class Via extends Rowan<Context> implements IVia {
       await this.send(msg, opts);
       return await promise;
     } finally {
+      this._pendingRejectors.delete(rejectOnClose);
       clearTimeout(clock);
       dispose();
     }
@@ -322,12 +358,17 @@ class Send implements Middleware<Context> {
         head: out.head as Record<string, unknown>,
         data: out.data,
       };
-      const bytes = this._encoder.encode(frame);
-      // encode() returns a subarray view into the pool, valid only until the next
-      // encode() call. The ws library shares the underlying ArrayBuffer rather than
-      // copying it, so the TCP socket can be holding a reference to pool memory that
-      // the next encode() would overwrite. Slice to take ownership before sending.
-      ctx.connection.wire.send(bytes.slice());
+      // Binary payloads are the stream fast path. Encoding them directly into
+      // an owned frame avoids the pool copy followed by a second slice copy.
+      // Keep the historical pooled path for control and object frames.
+      const bytes = out.head?.encoding === "binary"
+        ? this._encoder.encodeOwned(frame)
+        : this._encoder.encode(frame).slice();
+      try {
+        ctx.connection.wire.send(bytes);
+      } catch (err) {
+        return Promise.reject(err);
+      }
     }
     return next();
   }
@@ -344,9 +385,15 @@ class OutgoingStreamUpgrade implements Middleware<Context> {
 
     const readable = ctx.out.data as ReadableStream;
     const transport = (ctx.connection as Via)._asTransport();
+    const streamEncoding = ctx.out.head.encoding as string | undefined
+      ?? (ctx.in.head.sid !== undefined ? ctx.in.head.encoding as string | undefined : undefined)
+      ?? this._opts?.encoding;
 
     const sender = createOutgoingStream(readable, transport, (value: unknown) => {
-      return { data: value };
+      return streamEncoding === undefined ? { data: value } : {
+        data: value,
+        head: { encoding: streamEncoding },
+      };
     }, this._opts);
 
     ctx.out.head.sid = sender.sid;
@@ -370,6 +417,10 @@ class IncomingStreamUpgrade implements Middleware<Context> {
 
     const transport = (ctx.connection as Via)._asTransport();
     ctx.in.data = createIncomingStream(sid, transport, this._opts);
+    if (ctx.isReq() && this._opts?.cancelIncomingOnDispose) {
+      const stream = ctx.in.data;
+      ctx.onDispose(() => stream.cancel(new Error("request context disposed")).catch(() => {}));
+    }
 
     return next();
   }

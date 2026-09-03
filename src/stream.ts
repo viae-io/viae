@@ -5,52 +5,77 @@ import { Status } from "./status.js";
  * WHATWG-aligned backpressure streaming protocol.
  *
  * Consumer > Producer:
- *   START(desiredSize: N)  – opens the stream; sets the producer's initial credit to N
- *   PULL(desiredSize: M)   – sets the producer's credit to M; sent only when the consumer
- *                            is genuinely blocking (queue empty, no terminal seen yet)
- *   CANCEL(data?: reason)  – consumer-side abort; mirrors ReadableStream cancel(reason)
+ *   START(desiredSize: N)  - opens the stream; sets the producer's initial credit to N
+ *   PULL(desiredSize: M)   - sets the producer's credit to M
+ *   CANCEL(data?: reason)  - consumer-side abort
  *
  * Producer > Consumer:
- *   { status: 206, data }  – one chunk (Partial)
- *   { status: 200 }        – stream complete (normal terminal)
- *   { status: 500, data }  – stream error (error terminal)
- *   CANCEL(data?: reason)  – producer-side abort (e.g. source errored before terminal sent)
+ *   { status: 206, data }  - one chunk (Partial)
+ *   { status: 200 }        - stream complete
+ *   { status: 500, data }  - stream error
+ *   CANCEL(data?: reason)  - producer-side abort
  *
- * Credit model (SET, not additive):
- *   The producer maintains a `credit` counter, initially 0.
- *   On START or PULL the producer sets credit = desiredSize.
- *   The producer sends while credit > 0 (decrementing per chunk) and blocks at 0.
- *   The consumer sends PULL only at the exact moment queue.next() is about to suspend
- *   (buffer empty, queue not yet closed) — this is the only safe point where we know
- *   we need more data and haven't already seen the terminal.
- *   The consumer's ReadableStream uses a highWaterMark of 32 by default.
- *
- * Drain window:
- *   After sending the terminal frame the producer disposes its interceptor
- *   immediately.  Any in-flight stream protocol frames (START, PULL, CANCEL,
- *   COMPLETE) that arrive for an unknown sid are silently absorbed by the
- *   transport layer — they are reserved method names that can never be new
- *   requests.  No special drain timer or consumer ACK is required.
+ * Credit is a SET operation, not additive. The producer sends at most the
+ * currently granted number of chunks before waiting for another PULL.
  */
 
 const DEFAULT_WINDOW = 32;
 const DEFAULT_START_TIMEOUT = 3000;
 const DEFAULT_IDLE_TIMEOUT = 0;
+const MAX_CREDIT = Number.MAX_SAFE_INTEGER;
+
+function toCredit(value: number): number {
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return Math.min(MAX_CREDIT, Math.ceil(value));
+}
+
+function isBinaryChunk(value: unknown): value is ArrayBuffer | ArrayBufferView {
+  return ArrayBuffer.isView(value)
+    || Object.prototype.toString.call(value) === "[object ArrayBuffer]";
+}
+
+function chunkSize(value: unknown): number {
+  return isBinaryChunk(value) ? value.byteLength : 1;
+}
 
 export interface StreamOptions {
   /** Internal queue highWaterMark for the consumer ReadableStream. Default: 32. */
   highWaterMark?: number;
   /**
+   * Maximum number of chunks held outside the WHATWG stream queue while a
+   * peer is sending faster than the consumer. The historical default is
+   * unlimited; set this option to add an application-specific memory bound.
+   * Set to 0 to reject unsolicited chunks immediately.
+   */
+  maxQueuedChunks?: number;
+  /**
+   * Optional approximate byte limit for queued chunks. Non-binary chunks
+   * count as one byte. Defaults to unlimited for compatibility.
+   */
+  maxQueuedBytes?: number;
+  /**
+   * Default data encoding for stream chunks when the enclosing message does
+   * not specify one. The default remains "cbor" for compatibility.
+   */
+  encoding?: string;
+  /**
+   * Validate stream control frames strictly. The default is false so peers
+   * using the historical permissive behavior remain interoperable.
+   */
+  strictProtocol?: boolean;
+  /**
+   * Cancel an incoming request body when its request context is disposed.
+   * Defaults to false so handlers may transfer ownership of the stream.
+   */
+  cancelIncomingOnDispose?: boolean;
+  /**
    * Max ms the producer waits for the consumer's initial START (or first PULL)
-   * before aborting.  Catches callers that request a stream but never consume it.
-   * Only applied on the very first credit wait; subsequent PULL waits (normal
-   * backpressure) are not limited.  Default: 30_000. Set to 0 to disable.
+   * before aborting. Only applied on the first credit wait. Default: 3_000.
+   * Set to 0 to disable.
    */
   startTimeout?: number;
   /**
-   * Max ms the consumer waits for the next chunk from the producer before
-   * cancelling the stream.  Resets on every received chunk.
-   * Catches producers that stall without sending a terminal frame.
+   * Max ms the consumer waits for the next chunk while a read is blocked.
    * Default: 0 (disabled). Set to a positive value to enable.
    */
   idleTimeout?: number;
@@ -72,38 +97,59 @@ export interface StreamTransport {
 }
 
 /**
- * Blocking queue — suspends the caller in next() until a chunk arrives,
- * closes, or errors.  One waiter at a time (matches ReadableStream pull semantics).
+ * Blocking queue - suspends next() until a chunk arrives, closes, or errors.
+ * The queue is deliberately unbounded by default for wire compatibility;
+ * callers can opt into count and byte limits through StreamOptions.
  */
 class BlockingQueue<T> {
   private _chunks: T[] = [];
+  private _queuedBytes = 0;
   private _waiters: Array<{
-    resolve: (r: IteratorResult<T, undefined>) => void;
-    reject: (e: unknown) => void;
+    resolve: (result: IteratorResult<T, undefined>) => void;
+    reject: (error: unknown) => void;
   }> = [];
   private _closed = false;
-  private _error: unknown;
   private _hasError = false;
+  private _error: unknown;
 
-  push(chunk: T): void {
+  constructor(
+    private readonly _maxChunks: number,
+    private readonly _maxBytes: number,
+    private readonly _sizeOf: (chunk: T) => number,
+  ) {}
+
+  push(chunk: T): boolean {
+    if (this._closed) return true;
+
     if (this._waiters.length > 0) {
       this._waiters.shift()!.resolve({ value: chunk, done: false });
-    } else {
-      this._chunks.push(chunk);
+      return true;
     }
+
+    if (this._maxChunks !== Infinity && this._chunks.length >= this._maxChunks) return false;
+    const size = this._sizeOf(chunk);
+    if (this._maxBytes !== Infinity && this._queuedBytes + size > this._maxBytes) return false;
+
+    this._chunks.push(chunk);
+    this._queuedBytes += size;
+    return true;
   }
 
   close(): void {
+    if (this._closed) return;
     this._closed = true;
-    for (const w of this._waiters) w.resolve({ value: undefined, done: true });
+    for (const waiter of this._waiters) waiter.resolve({ value: undefined, done: true });
     this._waiters = [];
   }
 
-  abort(err: unknown): void {
-    this._hasError = true;
-    this._error = err;
+  abort(error: unknown): void {
+    if (this._closed) return;
     this._closed = true;
-    for (const w of this._waiters) w.reject(err);
+    this._hasError = true;
+    this._error = error;
+    this._chunks = [];
+    this._queuedBytes = 0;
+    for (const waiter of this._waiters) waiter.reject(error);
     this._waiters = [];
   }
 
@@ -111,148 +157,269 @@ class BlockingQueue<T> {
     return this._chunks.length === 0;
   }
 
-  /** True once close() or abort() has been called — no more data will arrive. */
-  get isDone(): boolean {
-    return this._closed;
-  }
-
-  /**
-   * Returns the next item.  If the queue is empty and not yet closed, suspends
-   * until a chunk, terminal, or error arrives.  `onWait` is called synchronously
-   * just before suspending — use it to request more data from the producer.
-   */
   next(onWait?: () => void): Promise<IteratorResult<T, undefined>> {
-    if (this._chunks.length > 0) return Promise.resolve({ value: this._chunks.shift()!, done: false });
     if (this._hasError) return Promise.reject(this._error);
+
+    if (this._chunks.length > 0) {
+      const value = this._chunks.shift()!;
+      this._queuedBytes -= this._sizeOf(value);
+      return Promise.resolve({ value, done: false });
+    }
+
     if (this._closed) return Promise.resolve({ value: undefined, done: true });
-    // About to block — notify caller so it can request more data.
-    onWait?.();
-    return new Promise((resolve, reject) => this._waiters.push({ resolve, reject }));
+
+    // Register before onWait so a synchronous transport cannot strand the
+    // requested chunk between the callback and waiter registration.
+    return new Promise((resolve, reject) => {
+      const waiter = { resolve, reject };
+      this._waiters.push(waiter);
+      try {
+        onWait?.();
+      } catch (error) {
+        const index = this._waiters.indexOf(waiter);
+        if (index >= 0) this._waiters.splice(index, 1);
+        reject(error);
+      }
+    });
   }
 }
 
-/**
- * Create a ReadableStream backed by a remote multiplexed stream.
- *
- * When pull() is called and the BlockingQueue is empty, a PULL frame is sent
- * with the controller's current desiredSize so the producer knows how much
- * capacity the consumer has.  pull() then blocks on queue.next() until a
- * chunk (or terminal) arrives.
- */
+function validateTimeout(value: number, name: string): void {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new RangeError(`${name} must be a non-negative finite number`);
+  }
+}
+
+function validateLimit(value: number, name: string): void {
+  if (value !== Infinity && (!Number.isSafeInteger(value) || value < 0)) {
+    throw new RangeError(`${name} must be a non-negative safe integer or Infinity`);
+  }
+}
+
+/** Create a ReadableStream backed by a remote multiplexed stream. */
 export function createIncomingStream<T = unknown>(
   sid: string,
   transport: StreamTransport,
   options?: StreamOptions,
 ): ReadableStream<T> {
   const highWaterMark = options?.highWaterMark ?? DEFAULT_WINDOW;
-  const idleTimeout = options?.idleTimeout ?? DEFAULT_IDLE_TIMEOUT; // default 0 = disabled
+  const idleTimeout = options?.idleTimeout ?? DEFAULT_IDLE_TIMEOUT;
+  const maxQueuedChunks = options?.maxQueuedChunks ?? Infinity;
+  const maxQueuedBytes = options?.maxQueuedBytes ?? Infinity;
+  const strictProtocol = options?.strictProtocol ?? false;
 
-  const queue = new BlockingQueue<T>();
+  validateTimeout(highWaterMark, "highWaterMark");
+  validateTimeout(idleTimeout, "idleTimeout");
+  validateLimit(maxQueuedChunks, "maxQueuedChunks");
+  validateLimit(maxQueuedBytes, "maxQueuedBytes");
+
+  const queue = new BlockingQueue<T>(maxQueuedChunks, maxQueuedBytes, chunkSize);
   let cancelled = false;
-
-  // ── Idle timer: fires if no chunk or terminal arrives within idleTimeout ms.
-  // Resets on every Partial received.  Catches stalled/dead producers.
+  let terminated = false;
+  let started = false;
+  let granted = 0;
+  let controller: ReadableStreamDefaultController<T> | undefined;
+  let aborted = false;
+  let terminalError: unknown;
+  let dispose: () => void = () => {};
+  let offClose: (() => void) | undefined;
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
-  function resetIdleTimer(): void {
-    if (idleTimeout <= 0) return;
-    if (idleTimer !== undefined) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-      if (cancelled) return;
-      const err = new Error(`stream idle timeout: no data from producer within ${idleTimeout}ms`);
-      // Do NOT set cancelled=true here: pull()'s catch checks !cancelled to decide
-      // whether to call controller.error(). Setting it here would suppress that call
-      // and leave reader.read() hanging forever.
+  function sendBestEffort(msg: Partial<Message>): void {
+    try {
+      Promise.resolve(transport.send(msg)).catch(() => {});
+    } catch {
+      // The transport is already unavailable.
+    }
+  }
+
+  function clearIdleTimer(): void {
+    if (idleTimer !== undefined) {
+      clearTimeout(idleTimer);
       idleTimer = undefined;
-      dispose();
-      queue.abort(err);
+    }
+  }
+
+  function disposeStream(): void {
+    clearIdleTimer();
+    offClose?.();
+    offClose = undefined;
+    dispose();
+  }
+
+  function abortStream(error: unknown): void {
+    if (terminated) return;
+    terminated = true;
+    aborted = true;
+    terminalError = error;
+    disposeStream();
+    queue.abort(error);
+    try { controller?.error(error); } catch { /* controller may already be terminal */ }
+  }
+
+  function closeStream(): void {
+    if (terminated) return;
+    terminated = true;
+    disposeStream();
+    queue.close();
+  }
+
+  function resetIdleTimer(): void {
+    if (idleTimeout <= 0 || terminated || cancelled) return;
+    clearIdleTimer();
+    idleTimer = setTimeout(() => {
+      if (terminated || cancelled) return;
+      const error = new Error(`stream idle timeout: no data from producer within ${idleTimeout}ms`);
+      abortStream(error);
       if (!transport.closed) {
-        transport.send({ id: sid, head: { method: "CANCEL" }, data: err.message }).catch(() => {});
+        sendBestEffort({ id: sid, head: { method: "CANCEL" }, data: error.message });
       }
     }, idleTimeout);
   }
 
-  function clearIdleTimer(): void {
-    if (idleTimer !== undefined) { clearTimeout(idleTimer); idleTimer = undefined; }
-  }
-
-  const dispose = transport.intercept(sid, async (msg: Message) => {
-    const status = msg.head.status;
-    if (status === Status.Partial) {
-      resetIdleTimer(); // reset idle window on every received chunk
-      queue.push(msg.data as T);
-    } else if (status === Status.Error) {
-      clearIdleTimer();
-      dispose();
-      queue.abort(msg.data ?? new Error("stream error"));
-    } else if (msg.head.method === "CANCEL") {
-      /* Producer-side abort — treat as an error on the consumer */
-      clearIdleTimer();
-      dispose();
-      queue.abort(msg.data ?? new Error("stream cancelled by producer"));
-    } else {
-      /* Status.OK or any other terminal status */
-      clearIdleTimer();
-      dispose();
-      queue.close();
+  dispose = transport.intercept(sid, async (msg: Message) => {
+    if (terminated) return;
+    const head = msg.head;
+    if (!head || typeof head !== "object") {
+      if (strictProtocol) abortStream(new Error("invalid stream frame head"));
+      return;
     }
+
+    const status = head.status;
+    if (status === Status.Partial) {
+      if (strictProtocol && head.method !== undefined) {
+        const error = new Error(`invalid stream partial method: ${String(head.method)}`);
+        abortStream(error);
+        if (!transport.closed) {
+          sendBestEffort({ id: sid, head: { method: "CANCEL" }, data: error.message });
+        }
+        return;
+      }
+      // A received chunk is progress. If it is buffered, the next pull will
+      // decide when a new idle window should begin.
+      clearIdleTimer();
+      if (granted > 0) granted--;
+      if (!queue.push(msg.data as T)) {
+        const limit = maxQueuedChunks !== Infinity && maxQueuedBytes !== Infinity
+          ? `${maxQueuedChunks} chunks/${maxQueuedBytes} bytes`
+          : maxQueuedChunks !== Infinity ? `${maxQueuedChunks} chunks` : `${maxQueuedBytes} bytes`;
+        const error = new Error(`stream buffer exceeded ${limit}`);
+        abortStream(error);
+        if (!transport.closed) {
+          sendBestEffort({ id: sid, head: { method: "CANCEL" }, data: error.message });
+        }
+      }
+      return;
+    }
+
+    if (status === Status.Error) {
+      abortStream(msg.data ?? new Error("stream error"));
+      return;
+    }
+
+    if (head.method === "CANCEL") {
+      abortStream(msg.data ?? new Error("stream cancelled by producer"));
+      return;
+    }
+
+    if (strictProtocol && (head.method !== undefined || status !== Status.OK)) {
+      const error = head.method !== undefined
+        ? new Error(`invalid stream control method: ${String(head.method)}`)
+        : new Error(`invalid stream terminal status: ${String(status)}`);
+      abortStream(error);
+      if (!transport.closed) {
+        sendBestEffort({ id: sid, head: { method: "CANCEL" }, data: error.message });
+      }
+      return;
+    }
+
+    // Preserve the historical behavior for permissive peers: any remaining
+    // status-bearing frame is a terminal frame.
+    closeStream();
   });
 
+  offClose = transport.onClose?.(() => {
+    abortStream(new Error("stream transport closed"));
+  });
+  if (transport.closed) queueMicrotask(() => abortStream(new Error("stream transport closed")));
+
   return new ReadableStream<T>({
-    async start(controller) {
+    async start(streamController) {
+      controller = streamController;
+      if (terminated || cancelled) {
+        if (aborted) {
+          try { streamController.error(terminalError); } catch { /* controller may already be terminal */ }
+        }
+        return;
+      }
+
       try {
-        await transport.send({ id: sid, head: { method: "START", desiredSize: highWaterMark } });
-        resetIdleTimer(); // start idle window once the stream is open
-      } catch (err) {
-        clearIdleTimer();
-        dispose();
-        queue.abort(err);
-        controller.error(err);
+        started = true;
+        granted = toCredit(highWaterMark);
+        await transport.send({ id: sid, head: { method: "START", desiredSize: granted } });
+      } catch (error) {
+        abortStream(error);
+        try { streamController.error(error); } catch { /* controller may already be terminal */ }
       }
     },
-    async pull(controller) {
+
+    async pull(streamController) {
       try {
         const result = await queue.next(() => {
-          /* Called only when the queue is empty AND not yet closed — we are
-             genuinely about to block.  Send PULL to request more data.
-             At this exact point it is safe: if the terminal had already been
-             received the queue would be closed and onWait would not fire. */
-          const desiredSize = controller.desiredSize;
-          if (desiredSize != null && desiredSize > 0 && !transport.closed) {
-            transport.send({ id: sid, head: { method: "PULL", desiredSize } }).catch(() => {});
+          resetIdleTimer();
+          const desiredSize = streamController.desiredSize;
+          if (!started || granted > 0 || desiredSize == null || transport.closed) return;
+
+          // CountQueuingStrategy can expose a fractional desiredSize. The wire
+          // protocol carries whole chunk credits; zero still means one pending
+          // read and therefore needs one credit.
+          const requestedCredit = desiredSize > 0 ? toCredit(desiredSize) : 1;
+          granted = requestedCredit;
+          try {
+            transport.send({ id: sid, head: { method: "PULL", desiredSize: requestedCredit } })
+              .catch(abortStream);
+          } catch (error) {
+            abortStream(error);
+            throw error;
           }
         });
+
         if (cancelled) return;
-        if (result.done) {
-          controller.close();
-        } else {
-          controller.enqueue(result.value);
+        if (result.done) streamController.close();
+        else streamController.enqueue(result.value);
+      } catch (error) {
+        if (!cancelled) {
+          abortStream(error);
+          try { streamController.error(error); } catch { /* controller may already be terminal */ }
         }
-      } catch (err) {
-        if (!cancelled) controller.error(err);
       }
     },
+
     async cancel(reason?: unknown) {
       cancelled = true;
+      terminated = true;
       clearIdleTimer();
       queue.abort(reason ?? new Error("stream cancelled"));
-      dispose();
+      disposeStream();
+
       if (!transport.closed) {
         const data = reason instanceof Error ? reason.message
           : reason != null ? String(reason) : undefined;
-        await transport.send({ id: sid, head: { method: "CANCEL" }, ...(data !== undefined ? { data } : {}) });
+        try {
+          await transport.send({
+            id: sid,
+            head: { method: "CANCEL" },
+            ...(data !== undefined ? { data } : {}),
+          });
+        } catch (error) {
+          if (!transport.closed) throw error;
+        }
       }
     },
   }, new CountQueuingStrategy({ highWaterMark }));
 }
 
-/**
- * Pump a ReadableStream over the wire as a multiplexed stream.
- *
- * Waits for START before sending any chunks.  After sending the terminal frame,
- * holds the sid interceptor open until the consumer sends COMPLETE (absorbing any
- * in-flight PULL frames so they are never misrouted as new requests).
- */
+/** Pump a ReadableStream over the wire as a multiplexed stream. */
 export function createOutgoingStream(
   readable: ReadableStream,
   transport: StreamTransport,
@@ -260,51 +427,129 @@ export function createOutgoingStream(
   options?: StreamOptions,
 ): StreamSender {
   const startTimeout = options?.startTimeout ?? DEFAULT_START_TIMEOUT;
+  validateTimeout(startTimeout, "startTimeout");
 
   const sid = transport.createId();
+  const strictProtocol = options?.strictProtocol ?? false;
+  const defaultEncoding = options?.encoding;
+  const reader = readable.getReader();
   let credit = 0;
   let waitingForCredit: (() => void) | undefined;
   let cancelled = false;
+  let protocolError: Error | undefined;
+  let sourceDone = false;
+  let receivedStart = false;
+  let dispose: () => void = () => {};
+  let offClose: (() => void) | undefined;
+  let readerCancel: Promise<void> | undefined;
+  let resolveStopped!: () => void;
+  const stopped = new Promise<void>(resolve => { resolveStopped = resolve; });
 
-  const dispose = transport.intercept(sid, (msg: Message) => {
-    const method = msg.head.method;
-    if (method === "START" || method === "PULL") {
-      credit = (msg.head.desiredSize as number) || 0;
-      if (waitingForCredit && credit > 0) {
-        const fn = waitingForCredit;
-        waitingForCredit = undefined;
-        fn();
-      }
-    } else if (method === "CANCEL") {
-      cancelled = true;
-      /* unblock any suspended waitForCredit() */
-      const fn = waitingForCredit;
-      waitingForCredit = undefined;
-      fn?.();
-      reader.cancel(msg.data).catch(() => {});
-      dispose();
+  function cancelReader(reason?: unknown): void {
+    if (readerCancel) return;
+    try {
+      readerCancel = Promise.resolve(reader.cancel(reason)).catch(() => {});
+    } catch {
+      readerCancel = Promise.resolve();
     }
-    /* Any other frame (including stray PULLs during drain window) is silently ignored. */
+  }
+
+  function cancelStream(reason?: unknown): void {
+    if (cancelled) return;
+    cancelled = true;
+    credit = 0;
+    const waiter = waitingForCredit;
+    waitingForCredit = undefined;
+    waiter?.();
+    resolveStopped();
+    cancelReader(reason);
+  }
+
+  function failProtocol(message: string): void {
+    if (protocolError || cancelled) return;
+    protocolError = new Error(message);
+    const waiter = waitingForCredit;
+    waitingForCredit = undefined;
+    waiter?.();
+    resolveStopped();
+    cancelReader(protocolError);
+  }
+
+  offClose = transport.onClose?.(() => {
+    cancelStream(new Error("stream transport closed"));
   });
 
-  const reader = readable.getReader();
+  dispose = transport.intercept(sid, (msg: Message) => {
+    const head = msg.head;
+    if (!head || typeof head !== "object") {
+      if (strictProtocol) failProtocol("invalid stream frame head");
+      return;
+    }
 
-  /**
-   * Blocks until the consumer grants credit (via START or PULL).
-   * On the first call only, if startTimeout > 0, rejects after that many ms —
-   * catches callers that create a stream but never start reading.
-   * Also unblocks cleanly when the transport closes (treated as cancellation).
-   */
+    const method = head.method;
+    if (method === "START" || method === "PULL") {
+      if (strictProtocol && method === "START" && receivedStart) {
+        failProtocol("duplicate stream START");
+        return;
+      }
+      if (strictProtocol && method === "PULL" && !receivedStart) {
+        failProtocol("stream PULL received before START");
+        return;
+      }
+      if (method === "START") receivedStart = true;
+
+      const desiredSize = head.desiredSize;
+      const validCredit = typeof desiredSize === "number"
+        && Number.isFinite(desiredSize)
+        && desiredSize >= 0
+        && desiredSize <= MAX_CREDIT
+        && (!strictProtocol || Number.isSafeInteger(desiredSize));
+
+      if (!validCredit) {
+        if (strictProtocol) {
+          failProtocol("invalid stream credit: desiredSize must be a non-negative safe integer");
+        } else {
+          // Match the historical `(desiredSize as number) || 0` fallback,
+          // without allowing malformed values to create unbounded credit.
+          credit = 0;
+        }
+        return;
+      }
+
+      credit = Math.ceil(desiredSize);
+      if (waitingForCredit && credit > 0) {
+        const waiter = waitingForCredit;
+        waitingForCredit = undefined;
+        waiter();
+      }
+      return;
+    }
+
+    if (method === "CANCEL") {
+      cancelStream(msg.data);
+      return;
+    }
+
+    if (strictProtocol && method !== undefined) {
+      failProtocol(`invalid stream control method: ${String(method)}`);
+    }
+    // Unknown methods remain ignored for compatibility with existing peers.
+  });
+
+  if (transport.closed) queueMicrotask(() => cancelStream(new Error("stream transport closed")));
+
   let startTimerArmed = true;
   function waitForCredit(): Promise<void> {
+    if (protocolError) return Promise.reject(protocolError);
     if (credit > 0 || cancelled) return Promise.resolve();
-    return new Promise<void>((resolve, reject) => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      let offClose: (() => void) | undefined;
 
+    return new Promise((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
       const cleanup = () => {
-        if (timer !== undefined) { clearTimeout(timer); timer = undefined; }
-        offClose?.(); offClose = undefined;
+        if (timer !== undefined) {
+          clearTimeout(timer);
+          timer = undefined;
+        }
       };
 
       waitingForCredit = () => {
@@ -320,59 +565,87 @@ export function createOutgoingStream(
           reject(new Error(`stream start timeout: consumer did not start reading within ${startTimeout}ms`));
         }, startTimeout);
       }
-
-      // When the transport closes while we are blocked, treat it as a cancellation
-      // so the pump loop exits cleanly via the `if (cancelled) break` check.
-      offClose = transport.onClose?.(() => {
-        waitingForCredit = undefined;
-        cleanup();
-        cancelled = true;
-        resolve();
-      });
     });
   }
 
+  async function sendFrame(msg: Partial<Message>, allowAfterStop = false): Promise<boolean> {
+    if (!allowAfterStop && (cancelled || transport.closed)) return false;
+
+    let sent: Promise<void>;
+    try {
+      sent = Promise.resolve(transport.send(msg));
+    } catch (error) {
+      throw error;
+    }
+
+    if (allowAfterStop) {
+      await sent;
+      return true;
+    }
+
+    return Promise.race([
+      sent.then(() => true),
+      stopped.then(() => false),
+    ]);
+  }
+
   const complete = (async () => {
-  
     try {
       while (!cancelled) {
         await waitForCredit();
+        if (protocolError) throw protocolError;
         if (cancelled) break;
 
-        const { done, value } = await reader.read();
-        if (cancelled) break; /* CANCEL may have arrived during the read */
+        const result = await Promise.race([
+          reader.read(),
+          stopped.then(() => ({ done: true, value: undefined } as IteratorResult<unknown>)),
+        ]);
+        if (protocolError) throw protocolError;
+        if (cancelled) break;
 
-        if (done) {
-          await transport.send({ id: sid, head: { status: Status.OK } as MessageHeader });
+        if (result.done) {
+          sourceDone = true;
+          await sendFrame({ id: sid, head: { status: Status.OK } as MessageHeader });
           break;
         }
 
         credit--;
-        const chunk = encodeChunk(value);
+        const chunk = encodeChunk(result.value);
         chunk.id = sid;
-        chunk.head = { ...chunk.head, status: Status.Partial };
-        await transport.send(chunk);
+        chunk.head = {
+          ...chunk.head,
+          ...(defaultEncoding !== undefined && chunk.head?.encoding === undefined
+            ? { encoding: defaultEncoding }
+            : {}),
+          status: Status.Partial,
+        };
+        if (!await sendFrame(chunk)) break;
       }
-    } catch (err) {
-      if (!cancelled) {
-        const message = err instanceof Error ? err.message : String(err);
+    } catch (error) {
+      if (!cancelled || protocolError) {
+        const message = error instanceof Error ? error.message : String(error);
         try {
-          await transport.send({ id: sid, head: { status: Status.Error } as MessageHeader, data: message });
-
+          const sent = await sendFrame(
+            { id: sid, head: { status: Status.Error } as MessageHeader, data: message },
+            !!protocolError,
+          );
+          if (!sent && !transport.closed) {
+            await sendFrame({ id: sid, head: { method: "CANCEL" }, data: message }, true).catch(() => {});
+          }
         } catch {
-          /* error-status send failed; attempt best-effort CANCEL if transport is still open.
-             If transport is closed the consumer will clean up via the close event.
-             Swallow any send error — this is last-resort cleanup and must not propagate. */
           if (!transport.closed) {
-            await transport.send({ id: sid, head: { method: "CANCEL" }, data: message }).catch(() => {});
+            await sendFrame({ id: sid, head: { method: "CANCEL" }, data: message }, true).catch(() => {});
           }
         }
       }
     } finally {
-      dispose(); // always clean up immediately; the transport sink absorbs any racing frames
+      resolveStopped();
+      offClose?.();
+      offClose = undefined;
+      dispose();
+      if (!sourceDone && !cancelled) cancelReader(protocolError);
     }
   })();
 
   return { sid, complete };
 }
-

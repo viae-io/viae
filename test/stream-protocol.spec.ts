@@ -176,6 +176,19 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     await withTimeout(sender.complete, "complete after cancel");
   });
 
+  it("should grant one chunk for a zero desired size read", async () => {
+    const transport = new MockTransport();
+    const stream = createIncomingStream("zero-window", transport, { highWaterMark: 0 });
+    const reader = stream.getReader();
+    await tick(10);
+
+    await transport.inject({ id: "zero-window", head: { status: Status.Partial }, data: "one" } as Message);
+    assert.equal((await reader.read()).value, "one");
+    const pulls = transport.sentWhere(m => (m.head as any)?.method === "PULL");
+    assert.ok(pulls.every(m => (m.head as any).desiredSize >= 1));
+    await reader.cancel();
+  });
+
   it("should stop cleanly when consumer sends START with desiredSize: 0", async () => {
     const transport = new MockTransport();
     const sender = createOutgoingStream(
@@ -221,12 +234,29 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     );
 
     // One credit consumed, then transport closes before any PULL arrives
-    await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 1 } } as Message);
+    await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 2 } } as Message);
     await tick(30);
 
     transport.simulateClose();
 
     await withTimeout(sender.complete, "complete after transport close");
+  });
+
+  it("should cancel a blocked source read when transport closes", async () => {
+    const transport = new MockTransport();
+    let cancelled = false;
+    const readable = new ReadableStream({
+      pull() { return new Promise<void>(() => {}); },
+      cancel() { cancelled = true; },
+    });
+    const sender = createOutgoingStream(readable, transport, v => ({ data: v }));
+
+    await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 1 } } as Message);
+    await tick(10);
+    transport.simulateClose();
+
+    await withTimeout(sender.complete, "complete after close during source read");
+    assert.equal(cancelled, true);
   });
 
   it("should resolve complete when send fails mid-stream (network error)", async () => {
@@ -446,6 +476,139 @@ describe("Stream protocol — createIncomingStream (consumer)", () => {
     assert.deepEqual(received, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
+  it("should abort when an opt-in chunk limit is exceeded", async () => {
+    const sid = "bounded-1";
+    const transport = new MockTransport();
+    const stream = createIncomingStream(sid, transport, { maxQueuedChunks: 2, highWaterMark: 0 });
+    const reader = stream.getReader();
+    await tick(10);
+
+    await transport.inject({ id: sid, head: { status: Status.Partial }, data: 1 } as Message);
+    await transport.inject({ id: sid, head: { status: Status.Partial }, data: 2 } as Message);
+    await transport.inject({ id: sid, head: { status: Status.Partial }, data: 3 } as Message);
+
+    await assert.rejects(() => reader.read(), /buffer exceeded/);
+    assert.equal(transport.sentCANCELs().length, 1);
+  });
+
+  it("should reject invalid terminal frames in strict mode", async () => {
+    const sid = "strict-status-1";
+    const transport = new MockTransport();
+    const stream = createIncomingStream(sid, transport, { strictProtocol: true });
+    const reader = stream.getReader();
+    await tick(10);
+
+    await transport.inject({ id: sid, head: { status: 202 as any } } as Message);
+    await assert.rejects(() => reader.read(), /invalid stream terminal status/);
+  });
+
+  it("should reject a control method attached to a partial in strict mode", async () => {
+    const transport = new MockTransport();
+    const stream = createIncomingStream("strict-partial", transport, { strictProtocol: true });
+    const reader = stream.getReader();
+    await tick(10);
+
+    await transport.inject({
+      id: "strict-partial",
+      head: { status: Status.Partial, method: "UNKNOWN" },
+      data: 1,
+    } as Message);
+    await assert.rejects(() => reader.read(), /invalid stream partial method/);
+  });
+
+  it("should ignore a late partial after a terminal frame", async () => {
+    const sid = "late-partial-1";
+    const transport = new MockTransport();
+    const stream = createIncomingStream(sid, transport);
+    const reader = stream.getReader();
+    await tick(10);
+
+    await transport.inject({ id: sid, head: { status: Status.OK } } as Message);
+    await transport.inject({ id: sid, head: { status: Status.Partial }, data: "late" } as Message);
+    assert.equal((await reader.read()).done, true);
+  });
+
+  it("should abort pending reads when transport closes", async () => {
+    const sid = "close-incoming-1";
+    const transport = new MockTransport();
+    const stream = createIncomingStream(sid, transport);
+    const reader = stream.getReader();
+    await tick(10);
+
+    const pending = reader.read();
+    transport.simulateClose();
+    await assert.rejects(() => withTimeout(pending, "read after transport close"), /transport closed/);
+  });
+
+  it("should error a stream when transport closes before start finishes", async () => {
+    const transport = new MockTransport();
+    const stream = createIncomingStream("early-close", transport);
+    const reader = stream.getReader();
+    transport.simulateClose();
+    await assert.rejects(() => withTimeout(reader.read(), "early close read"), /transport closed/);
+  });
+
+  it("should not let buffered data delay a producer error", async () => {
+    const sid = "error-priority-1";
+    const transport = new MockTransport();
+    const stream = createIncomingStream(sid, transport);
+    const reader = stream.getReader();
+    await tick(10);
+
+    await transport.inject({ id: sid, head: { status: Status.Partial }, data: "buffered" } as Message);
+    await transport.inject({ id: sid, head: { status: Status.Error }, data: "failed" } as Message);
+    await assert.rejects(() => reader.read(), /failed/);
+  });
+
+  it("should reject malformed credits in strict mode", async () => {
+    const transport = new MockTransport();
+    const sender = createOutgoingStream(makeInfiniteStream(), transport, v => ({ data: v }), { strictProtocol: true });
+
+    await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: Infinity } } as Message);
+    await tick(10);
+    assert.equal(transport.sentPartials().length, 0);
+    await transport.inject({ id: sender.sid, head: { method: "CANCEL" } } as Message);
+    await withTimeout(sender.complete, "complete after invalid credit");
+    assert.ok(transport.sentErrors().length >= 1);
+  });
+
+  it("should reject unknown producer control methods in strict mode", async () => {
+    const transport = new MockTransport();
+    const stream = createIncomingStream("strict-method", transport, { strictProtocol: true });
+    const reader = stream.getReader();
+    await tick(10);
+
+    await transport.inject({ id: "strict-method", head: { method: "UNKNOWN" } } as Message);
+    await assert.rejects(() => reader.read(), /invalid stream control method/);
+  });
+
+  it("should bound queued binary data by bytes when configured", async () => {
+    const transport = new MockTransport();
+    const stream = createIncomingStream("bounded-bytes", transport, {
+      highWaterMark: 0,
+      maxQueuedBytes: 4,
+    });
+    const reader = stream.getReader();
+    await tick(10);
+
+    await transport.inject({ id: "bounded-bytes", head: { status: Status.Partial }, data: new Uint8Array(4) } as Message);
+    await transport.inject({ id: "bounded-bytes", head: { status: Status.Partial }, data: new Uint8Array(1) } as Message);
+    await assert.rejects(() => reader.read(), /buffer exceeded/);
+  });
+
+  it("should preserve binary stream chunk metadata from the sender", async () => {
+    const transport = new MockTransport();
+    const sender = createOutgoingStream(makeCountingStream(1), transport, value => ({
+      data: value,
+      head: { encoding: "binary" },
+    }));
+
+    await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 2 } } as Message);
+    await tick(10);
+    await withTimeout(sender.complete, "binary sender completion");
+    assert.equal((transport.sentPartials()[0].head as any).encoding, "binary");
+  });
+
   it("should deliver queued chunks then signal done on Status.OK", async () => {
     const sid = "ok-1";
     const transport = new MockTransport();
@@ -643,4 +806,3 @@ describe("Stream protocol — end-to-end bad-actor scenarios", () => {
   });
 
 });
-

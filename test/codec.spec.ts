@@ -44,10 +44,23 @@ describe("FrameEncoder", () => {
     it("should encode and decode a frame with no head or data", () => {
       const frame: Frame = { id: "abc123" };
       const buf = Uint8Array.from(encoder.encode(frame));
+      assert.deepEqual(buf, Uint8Array.from([6, 97, 98, 99, 49, 50, 51, 0, 0]));
       const decoded = encoder.decode(buf);
       assert.equal(decoded.id, "abc123");
       assert.equal(decoded.head, undefined);
       assert.equal(decoded.data, undefined);
+    });
+
+    it("should retain the golden request frame encoding", () => {
+      const bytes = Uint8Array.from(encoder.encode({
+        id: "req-1",
+        head: { method: "GET", path: "/ping" },
+      }));
+      assert.deepEqual(bytes, Uint8Array.from([
+        5, 114, 101, 113, 45, 49, 25, 185, 0, 2, 102, 109, 101, 116, 104,
+        111, 100, 99, 71, 69, 84, 100, 112, 97, 116, 104, 101, 47, 112, 105,
+        110, 103, 0,
+      ]));
     });
 
     it("should encode and decode a frame with head only", () => {
@@ -110,6 +123,66 @@ describe("FrameEncoder", () => {
       const buf = Uint8Array.from(encoder.encode(frame));
       const decoded = encoder.decode(buf);
       assert.deepEqual(new Uint8Array(decoded.data as ArrayBuffer), payload);
+    });
+
+    it("should preserve the existing absent-data representation for empty binary data", () => {
+      const frame: Frame = {
+        id: "empty-bin",
+        head: { encoding: "binary" },
+        data: new Uint8Array(0),
+      };
+      const decoded = encoder.decode(Uint8Array.from(encoder.encode(frame)));
+      assert.equal(decoded.data, undefined);
+    });
+  });
+
+  describe("frame validation and ownership", () => {
+    const encoder = new FrameEncoder();
+
+    it("should round-trip UTF-8 ids", () => {
+      const frame: Frame = { id: "stream-😀-é", head: { status: 200 } };
+      const decoded = encoder.decode(Uint8Array.from(encoder.encode(frame)));
+      assert.equal(decoded.id, frame.id);
+    });
+
+    it("should expose the raw encoded data segment on decode", () => {
+      const bytes = Uint8Array.from(encoder.encode({ id: "raw", head: { encoding: "binary" }, data: Uint8Array.from([1, 2, 3]) }));
+      const decoded = encoder.decode(bytes);
+      assert.deepEqual(decoded.raw, Uint8Array.from([1, 2, 3]));
+    });
+
+    it("should reject truncated and trailing frames", () => {
+      const bytes = Uint8Array.from(encoder.encode({ id: "x", head: { status: 200 } }));
+      assert.throws(() => encoder.decode(bytes.slice(0, -1)), /truncated|CBOR/);
+      assert.throws(() => encoder.decode(Uint8Array.from([...bytes, 0])), /trailing/);
+    });
+
+    it("should reject unterminated length varints", () => {
+      assert.throws(() => encoder.decode(Uint8Array.from([0x80])), /truncated|too long/);
+    });
+
+    it("should enforce a configured maximum frame size", () => {
+      const limited = new FrameEncoder(defaultCodex, { maxFrameSize: 32 });
+      assert.throws(
+        () => limited.encode({ id: "large", data: new Uint8Array(64), head: { encoding: "binary" } }),
+        /maximum size/,
+      );
+      const bytes = Uint8Array.from(encoder.encode({ id: "large", data: new Uint8Array(64), head: { encoding: "binary" } }));
+      assert.throws(() => limited.decode(bytes), /maximum size/);
+    });
+
+    it("should encode oversized binary frames without overflowing the pool", () => {
+      const payload = new Uint8Array(4 * 1024 * 1024);
+      const bytes = encoder.encode({ id: "large", head: { encoding: "binary" }, data: payload });
+      const decoded = encoder.decode(bytes);
+      assert.equal((decoded.data as Uint8Array).byteLength, payload.byteLength);
+    });
+
+    it("should provide an owned encoding result", () => {
+      const first = encoder.encodeOwned({ id: "one", data: { n: 1 } });
+      const copy = Uint8Array.from(first);
+      encoder.encodeOwned({ id: "two", data: { n: 2 } });
+      assert.deepEqual(encoder.decode(copy).data, { n: 1 });
     });
   });
 

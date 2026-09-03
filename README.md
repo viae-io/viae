@@ -293,6 +293,29 @@ api.get({
 await assert.rejects(() => reader.read(), /oops/);
 ```
 
+For byte-oriented streams, opt into the pass-through binary codec. This keeps
+each chunk as raw octets instead of wrapping it in CBOR:
+
+```ts
+const result = await via.request<ReadableStream<Uint8Array>>(
+  "GET", "/blob", undefined, { accept: "stream", encoding: "binary" }
+);
+```
+
+On a response, set the encoding when replying:
+
+```ts
+api.get({
+  path: "/blob",
+  handler: ({ ctx }) => ctx.reply(byteStream, { status: 200, type: "binary" }),
+});
+```
+
+The default remains CBOR for compatibility. `StreamOptions.encoding` can also
+be used to set the default for outgoing stream chunks. `maxQueuedChunks`,
+`maxQueuedBytes`, `strictProtocol`, and `cancelIncomingOnDispose` are available
+as opt-in resource, protocol, and ownership controls.
+
 ---
 
 ## Client
@@ -321,6 +344,10 @@ wire.close();
 | `log` | `Log` | Logger instance. Defaults to `Via.Log` (console). |
 | `timeout` | `number` | Request timeout in ms (default `120000`). |
 | `codex` | `Codex` | Named encoder registry. Defaults to `defaultCodex` (cbor, json, binary). |
+| `frameOptions` | `FrameEncoderOptions` | Optional frame limits, including `maxFrameSize`; omitted for compatibility. |
+
+`Viae` accepts the same `frameOptions` and `codex` settings and forwards them
+to each connection.
 
 ### Encoding
 

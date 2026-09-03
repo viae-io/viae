@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { Viae, Api } from "../src/index.js";
+import { Viae, Api, FrameEncoder } from "../src/index.js";
 import { TestWireServer, createTestClient } from "./utils.js";
 
 describe("Stream", () => {
@@ -538,6 +538,46 @@ describe("Stream", () => {
       }
 
       assert.equal(received, CHUNKS);
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should send binary stream chunks with the binary wire encoding", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+    const captured: ReturnType<FrameEncoder["decode"]>[] = [];
+
+    api.get({
+      path: "/binary-wire",
+      handler: ({ ctx }) => {
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(Uint8Array.from([1, 2, 3]));
+            controller.close();
+          },
+        });
+        ctx.reply(stream, { status: 200, type: "binary" });
+      },
+    });
+    viae.use(api);
+    const { via, ws, wire } = await createTestClient(port);
+    const encoder = new FrameEncoder();
+    ws.on("message", data => {
+      const raw = data instanceof Buffer ? new Uint8Array(data) : new Uint8Array(data as ArrayBuffer);
+      captured.push(encoder.decode(raw));
+    });
+
+    try {
+      const result = await via.request<ReadableStream<Uint8Array>>("GET", "/binary-wire", undefined, { accept: "stream" });
+      const reader = (result.data as ReadableStream<Uint8Array>).getReader();
+      assert.deepEqual(Array.from((await reader.read()).value!), [1, 2, 3]);
+      assert.equal((await reader.read()).done, true);
+
+      const partial = captured.find(frame => frame.head?.status === 206);
+      assert.ok(partial, "expected a response partial frame");
+      assert.equal(partial.head?.encoding, "binary");
+      assert.ok(partial.data instanceof Uint8Array);
     } finally {
       wire.close();
     }
