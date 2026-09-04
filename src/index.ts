@@ -3,7 +3,7 @@ export { type Message, type MessageHeader, type Request, type Response, isReques
 export { type Wire, WireState, type WireServer, WebSocketWire } from "./wire.js";
 export { type Context, DefaultContext, type ContextTask, type RequestContext, type ResponseContext, type ReplyOptions } from "./context.js";
 export { Via, type IVia, type ViaOptions, type SendOptions, type RequestOptions, type RequestResponse } from "./via.js";
-export { Viae } from "./viae.js";
+export { Viae, type ViaeOptions } from "./viae.js";
 export { Api, type ApiRouteOptions, type ApiFn, type HandlerOptions, type ParamDef, type ParamsSchema, type InferParams } from "./api.js";
 export { Router, type RouterOptions } from "./router.js";
 export { Interceptor } from "./interceptor.js";

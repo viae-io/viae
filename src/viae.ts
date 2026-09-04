@@ -8,6 +8,17 @@ import { consoleLog } from "./log.js";
 import type { StreamOptions } from "./stream.js";
 import type { Codex, FrameEncoderOptions } from "./codec.js";
 
+/** Options applied to the Via connections created by a Viae server. */
+export interface ViaeOptions {
+  log?: Log;
+  middleware?: Processor<Context>[];
+  /** Default timeout in milliseconds for requests on each created Via. */
+  timeout?: number;
+  streamOptions?: StreamOptions;
+  frameOptions?: FrameEncoderOptions;
+  codex?: Codex;
+}
+
 /**
  * Viae - server that accepts wire connections and creates Via instances.
  * All registered middleware/routers apply to every inbound connection.
@@ -25,13 +36,7 @@ export class Viae extends Rowan<Context> {
 
   constructor(
     server: WireServer,
-    opts?: {
-      log?: Log;
-      middleware?: Processor<Context>[];
-      streamOptions?: StreamOptions;
-      frameOptions?: FrameEncoderOptions;
-      codex?: Codex;
-    },
+    opts?: ViaeOptions,
   ) {
     super(opts?.middleware);
 
@@ -41,6 +46,7 @@ export class Viae extends Rowan<Context> {
       const via = new Via({
         wire,
         log,
+        timeout: opts?.timeout,
         streamOptions: opts?.streamOptions,
         frameOptions: opts?.frameOptions,
         codex: opts?.codex,

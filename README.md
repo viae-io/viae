@@ -347,7 +347,12 @@ wire.close();
 | `frameOptions` | `FrameEncoderOptions` | Optional frame limits, including `maxFrameSize`; omitted for compatibility. |
 
 `Viae` accepts the same `frameOptions` and `codex` settings and forwards them
-to each connection.
+to each connection. Its `timeout` option sets the default request timeout for
+every `Via` connection it creates.
+
+| Option | Type | Description |
+|---|---|---|
+| `timeout` | `number` | Default request timeout in ms for each server-created `Via` (default `120000`). |
 
 ### Encoding
 

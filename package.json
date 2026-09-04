@@ -12,6 +12,7 @@
     "bench": "node --experimental-strip-types --experimental-transform-types --no-warnings bench/codec.bench.ts",
     "bench:stream": "node --import tsx/esm --no-warnings bench/stream.bench.ts",
     "build": "tsc --build tsconfig.build.json",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
   "author": "Meirion Hughes <crakinshot@yahoo.com>",

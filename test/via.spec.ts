@@ -1,13 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "eventemitter3";
-import { Via, WireState, type Wire } from "../src/index.js";
+import { Via, Viae, WireState, type Wire, type WireServer } from "../src/index.js";
 import { noopLog } from "./utils.js";
 
 class TestWire extends EventEmitter implements Wire {
   readyState: WireState;
   readonly url = "test://wire";
-  sent: ArrayBufferView[] = [];
+  sent: Array<ArrayBuffer | ArrayBufferView> = [];
   closeCalls = 0;
 
   constructor(readyState = WireState.OPEN) {
@@ -27,7 +27,21 @@ class TestWire extends EventEmitter implements Wire {
   }
 }
 
+class TestWireServer extends EventEmitter implements WireServer {
+}
+
 describe("Via connection lifecycle", () => {
+  it("should apply the server timeout to each created Via", async () => {
+    const server = new TestWireServer();
+    const viae = new Viae(server, { log: noopLog, timeout: 10 });
+    const wire = new TestWire();
+
+    server.emit("connection", wire);
+    const via = viae.connections[0];
+
+    await assert.rejects(via.request("GET", "/pending"), /request timeout/);
+  });
+
   it("should reject a pending request when the wire closes", async () => {
     const wire = new TestWire();
     const via = new Via({ wire, log: noopLog, timeout: 30_000 });
