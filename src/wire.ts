@@ -10,6 +10,12 @@ export enum WireState {
 export interface Wire {
   readonly readyState: WireState;
   readonly url: string;
+  /**
+   * Bytes queued by the underlying transport but not yet transmitted, when
+   * the transport can report it.  `Infinity` (or an absent value) means the
+   * buffer size is unknown and backpressure must not be applied.
+   */
+  readonly bufferedAmount?: number;
   send(data: ArrayBuffer | ArrayBufferView): void;
   close(): void;
   on(event: "message", cb: (data: ArrayBuffer | ArrayBufferView) => void): void;
@@ -29,6 +35,7 @@ export interface WireServer {
  */
 export class WebSocketWire extends EventEmitter implements Wire {
   private _ws?: WebSocket;
+  private _sendCallback = false;
 
   get url(): string {
     if (!this._ws) return "";
@@ -37,6 +44,10 @@ export class WebSocketWire extends EventEmitter implements Wire {
 
   get readyState(): WireState {
     return this._ws?.readyState ?? WireState.CLOSED;
+  }
+
+  get bufferedAmount(): number {
+    return this._ws ? this._ws.bufferedAmount : Infinity;
   }
 
   /** Wrap an existing WebSocket (server-side) */
@@ -52,6 +63,14 @@ export class WebSocketWire extends EventEmitter implements Wire {
       const ws = new WS(url);
       (ws as any).binaryType = "arraybuffer";
 
+      const closeQuietly = () => {
+        try {
+          if (ws.readyState !== WireState.CLOSING && ws.readyState !== WireState.CLOSED) {
+            ws.close();
+          }
+        } catch { /* the socket may already be unusable */ }
+      };
+
       const onOpen = () => {
         cleanup();
         this._bind(ws);
@@ -59,10 +78,12 @@ export class WebSocketWire extends EventEmitter implements Wire {
       };
       const onError = (err: unknown) => {
         cleanup();
+        closeQuietly();
         reject(err);
       };
       const onClose = () => {
         cleanup();
+        closeQuietly();
         reject(new Error("connection closed"));
       };
 
@@ -80,6 +101,11 @@ export class WebSocketWire extends EventEmitter implements Wire {
 
   private _bind(ws: WebSocket) {
     this._ws = ws;
+    /* The `ws` package implements an EventEmitter-style `on` and accepts a
+       send callback that reports asynchronous failures.  The global WebSocket
+       does not (empirically: `send.length` 1 vs 3, `.on` undefined), so never
+       pass a callback to it. */
+    this._sendCallback = typeof (ws as { on?: unknown }).on === "function";
     (ws as any).binaryType = "arraybuffer";
 
     ws.addEventListener("open", () => {
@@ -105,10 +131,20 @@ export class WebSocketWire extends EventEmitter implements Wire {
   }
 
   send(data: ArrayBuffer | ArrayBufferView): void {
-    if (!this._ws || this._ws.readyState !== WireState.OPEN) {
+    const ws = this._ws;
+    if (!ws || ws.readyState !== WireState.OPEN) {
       throw new Error("wire is not open");
     }
-    this._ws.send(data);
+    if (this._sendCallback) {
+      (ws.send as unknown as (
+        data: ArrayBuffer | ArrayBufferView,
+        cb: (err?: Error) => void,
+      ) => void)(data, (err) => {
+        if (err) this.emit("error", err);
+      });
+    } else {
+      ws.send(data);
+    }
   }
 
   close(): void {

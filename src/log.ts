@@ -12,7 +12,7 @@ export interface Log {
   fatal: LogFn;
 }
 
-function makeLogFn(fn: (...args: unknown[]) => void): LogFn {
+export function makeLogFn(fn: (...args: unknown[]) => void): LogFn {
   return function (objOrMsg: object | string, ...rest: unknown[]): void {
     if (typeof objOrMsg === "string") {
       fn(objOrMsg, ...rest);

@@ -9,6 +9,7 @@
   "scripts": {
     "clean": "cross-env rimraf .tmp .nyc_output coverage dist",
     "test": "node --import tsx/esm --no-warnings --test test/**/*.spec.ts",
+    "test:coverage": "c8 --reporter=text --reporter=lcov npm test",
     "bench": "node --experimental-strip-types --experimental-transform-types --no-warnings bench/codec.bench.ts",
     "bench:stream": "node --import tsx/esm --no-warnings bench/stream.bench.ts",
     "build": "tsc --build tsconfig.build.json",

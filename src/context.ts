@@ -6,6 +6,8 @@ import type { Log } from "./log.js";
 export interface ContextTask {
   readonly name: string;
   readonly complete: Promise<void>;
+  /** Cancel the underlying work (e.g. stop an outgoing stream pump). */
+  cancel?(reason?: unknown): void;
 }
 
 export interface ReplyOptions {
@@ -52,6 +54,7 @@ export interface ResponseContext extends Context {
 export class DefaultContext implements Context {
   private _disposers: (() => (Promise<void> | void))[] = [];
   private _tasks: ContextTask[] = [];
+  private _complete?: Promise<void>;
 
   id: string;
   connection: IVia;
@@ -101,7 +104,7 @@ export class DefaultContext implements Context {
   }
 
   get complete(): Promise<void> {
-    return Promise.all(this._tasks.map(x => x.complete)).then(() => void 0);
+    return this._complete ??= Promise.all(this._tasks.map(x => x.complete)).then(() => void 0);
   }
 
   onDispose(cb: () => void | Promise<void>): void {

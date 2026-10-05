@@ -99,12 +99,34 @@ function makeStallingStream(initialChunks: number): ReadableStream {
 const tick = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 function withTimeout<T>(promise: Promise<T>, label: string, ms = 1000): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, rej) =>
-      setTimeout(() => rej(new Error(`${label} did not resolve within ${ms}ms`)), ms)
-    ),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, rej) => {
+    timer = setTimeout(() => rej(new Error(`${label} did not resolve within ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
+/**
+ * Connect two MockTransports as the two ends of one stream: every frame sent
+ * on `from` is recorded and then injected into `to`'s intercept handler with
+ * its id remapped to `toSid`. An optional `log` records the interleaved
+ * two-way traffic order for window/credit assertions.
+ */
+function linkMockTransports(
+  from: MockTransport,
+  to: MockTransport,
+  toSid: string,
+  log?: Array<{ side: "consumer" | "producer"; msg: Partial<Message> }>,
+  side?: "consumer" | "producer",
+): void {
+  const baseSend = from.send.bind(from);
+  from.send = async (msg: Partial<Message>) => {
+    await baseSend(msg);
+    if (log && side) log.push({ side, msg });
+    await to.inject({ ...msg, id: toSid } as Message);
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -120,10 +142,13 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
       { startTimeout: 150 }
     );
 
-    // Consumer never sends START — startTimeout fires on the very first waitForCredit()
-    // inject COMPLETE after the error frame so the interceptor can clean up
-    setTimeout(() => transport.inject({ id: sender.sid, head: { method: "COMPLETE" } } as Message), 300);
-    await withTimeout(sender.complete, "complete after start timeout");
+    // Consumer never sends START — startTimeout rejects the pump on its very
+    // first waitForCredit(). The failure is surfaced as an error frame plus a
+    // rejected complete (no more silent resolution).
+    await assert.rejects(
+      withTimeout(sender.complete, "outgoing complete"),
+      /stream start timeout/,
+    );
 
     assert.equal(transport.sentPartials().length, 0, "should send zero chunks (never got credit)");
     assert.equal(transport.sentErrors().length, 1, "should send one error frame on timeout");
@@ -189,20 +214,23 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     await reader.cancel();
   });
 
-  it("should stop cleanly when consumer sends START with desiredSize: 0", async () => {
+  it("should time out when consumer sends START with desiredSize: 0", async () => {
     const transport = new MockTransport();
     const sender = createOutgoingStream(
       makeCountingStream(5), transport, v => ({ data: v }),
       { startTimeout: 150 }
     );
 
-    // START with zero credits — producer stalls immediately, startTimeout fires;
-    // mock transport silently drops any racing frames after dispose
+    // START with zero credits — producer stalls immediately and the start
+    // timeout eventually fails the stream.
     await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 0 } } as Message);
 
-    await withTimeout(sender.complete, "complete after zero-credit START timeout");
-    // Either a start-timeout error is sent, or still no chunks
+    await assert.rejects(
+      withTimeout(sender.complete, "outgoing complete"),
+      /stream start timeout/,
+    );
     assert.equal(transport.sentPartials().length, 0, "no chunks should be sent with zero initial credit");
+    assert.equal(transport.sentErrors().length, 1, "start timeout emits an error frame");
   });
 
   it("should stop cleanly when consumer sends CANCEL mid-stream", async () => {
@@ -259,7 +287,7 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     assert.equal(cancelled, true);
   });
 
-  it("should resolve complete when send fails mid-stream (network error)", async () => {
+  it("should reject complete when send fails mid-stream (network error)", async () => {
     const transport = new MockTransport();
     let sendCount = 0;
     const origSend = transport.send.bind(transport);
@@ -274,8 +302,13 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     );
 
     await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 10 } } as Message);
-    // complete may resolve OR reject — we just must not hang
-    await withTimeout(sender.complete.catch(() => {}), "complete after send failure");
+
+    // The failure is surfaced: a best-effort error frame goes out and complete rejects.
+    await assert.rejects(
+      withTimeout(sender.complete, "outgoing complete"),
+      /simulated network failure/,
+    );
+    assert.equal(transport.sentErrors().length, 1, "best-effort error frame sent before rejecting");
   });
 
   it("should resolve complete as soon as terminal is sent (no ACK required)", async () => {
@@ -345,6 +378,74 @@ describe("Stream protocol — createOutgoingStream (producer)", () => {
     await tick(30);
     assert.equal(transport.sentOKs().length, 1, "terminal OK sent");
     await withTimeout(sender.complete, "complete after duplicate START");
+  });
+
+  it("should reject complete when the source stream errors mid-stream", async () => {
+    const transport = new MockTransport();
+    let pulls = 0;
+    const erroring = new ReadableStream<number>({
+      pull(ctrl) {
+        pulls++;
+        if (pulls <= 2) ctrl.enqueue(pulls);
+        else ctrl.error(new Error("source exploded"));
+      },
+    });
+    const sender = createOutgoingStream(erroring, transport, v => ({ data: v }), {});
+
+    await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 10 } } as Message);
+
+    await assert.rejects(
+      withTimeout(sender.complete, "outgoing complete"),
+      /source exploded/,
+    );
+    assert.ok(transport.sentPartials().length >= 1, "chunks sent before the source error");
+    assert.equal(transport.sentErrors().length, 1, "best-effort error frame sent before rejecting");
+  });
+
+  it("should settle complete, emit one CANCEL and cancel source reads on sender.cancel", async () => {
+    const transport = new MockTransport();
+    let sourceCancelled = false;
+    const readable = new ReadableStream<number>({
+      pull(ctrl) { ctrl.enqueue(1); },
+      cancel() { sourceCancelled = true; },
+    });
+    const sender = createOutgoingStream(readable, transport, v => ({ data: v }), {});
+
+    await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 32 } } as Message);
+    await tick(20);
+
+    sender.cancel("stop");
+
+    await withTimeout(sender.complete, "outgoing complete after sender.cancel");
+    await tick(10);
+
+    assert.equal(sourceCancelled, true, "source reader must be cancelled");
+    const cancels = transport.sentCANCELs();
+    assert.equal(cancels.length, 1, "exactly one CANCEL frame");
+    assert.equal(cancels[0].data, "stop");
+    assert.equal(transport.sentErrors().length, 0, "cancellation must not emit an error frame");
+  });
+
+  it("should fail the stream when the producer makes no progress within producerIdleTimeout", async () => {
+    const transport = new MockTransport();
+    // Emits one chunk then stalls forever; credit remains, so only the
+    // producer idle timer can terminate the stream.
+    const sender = createOutgoingStream(
+      makeStallingStream(1), transport, v => ({ data: v }),
+      { producerIdleTimeout: 100, startTimeout: 0 }
+    );
+
+    await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: 5 } } as Message);
+
+    await assert.rejects(
+      withTimeout(sender.complete, "outgoing complete"),
+      /producer idle timeout/,
+    );
+    assert.equal(transport.sentErrors().length, 1, "error frame sent on producer idle timeout");
+    assert.ok(
+      String(transport.sentErrors()[0].data).includes("producer idle timeout"),
+      `error message: ${transport.sentErrors()[0].data}`,
+    );
   });
 
 });
@@ -565,10 +666,11 @@ describe("Stream protocol — createIncomingStream (consumer)", () => {
     const sender = createOutgoingStream(makeInfiniteStream(), transport, v => ({ data: v }), { strictProtocol: true });
 
     await transport.inject({ id: sender.sid, head: { method: "START", desiredSize: Infinity } } as Message);
-    await tick(10);
     assert.equal(transport.sentPartials().length, 0);
-    await transport.inject({ id: sender.sid, head: { method: "CANCEL" } } as Message);
-    await withTimeout(sender.complete, "complete after invalid credit");
+    await assert.rejects(
+      withTimeout(sender.complete, "outgoing complete"),
+      /invalid stream credit/,
+    );
     assert.ok(transport.sentErrors().length >= 1);
   });
 
@@ -664,6 +766,223 @@ describe("Stream protocol — createIncomingStream (consumer)", () => {
     // Should complete cleanly (not error)
     const r2 = await reader.read(); assert.equal(r2.done, true);
   });
+
+  it("should abort on the 1025th unsolicited chunk with the default chunk cap", async () => {
+    const sid = "default-cap";
+    const transport = new MockTransport();
+    const stream = createIncomingStream(sid, transport, { highWaterMark: 0 });
+    const reader = stream.getReader();
+    await tick(10);
+
+    // Default maxQueuedChunks is 1024: 1024 buffered chunks are fine, the
+    // 1025th must abort the stream and emit exactly one CANCEL.
+    for (let i = 0; i <= 1024; i++) {
+      await transport.inject({ id: sid, head: { status: Status.Partial }, data: i } as Message);
+    }
+
+    await assert.rejects(() => reader.read(), /buffer exceeded/);
+    assert.equal(transport.sentCANCELs().length, 1, "one CANCEL sent on buffer overflow");
+  });
+
+  it("should abort the first unsolicited chunk when maxQueuedChunks is 0", async () => {
+    const sid = "zero-cap";
+    const transport = new MockTransport();
+    const stream = createIncomingStream(sid, transport, { maxQueuedChunks: 0, highWaterMark: 0 });
+    const reader = stream.getReader();
+    await tick(10);
+
+    await transport.inject({ id: sid, head: { status: Status.Partial }, data: 1 } as Message);
+
+    await assert.rejects(() => reader.read(), /buffer exceeded/);
+    assert.equal(transport.sentCANCELs().length, 1, "one CANCEL sent on immediate overflow");
+  });
+
+  it("should reject invalid consumer options with RangeError", () => {
+    const transport = new MockTransport();
+    assert.throws(
+      () => createIncomingStream("bad-idle", transport, { idleTimeout: -1 }),
+      RangeError,
+    );
+    assert.throws(
+      () => createIncomingStream("bad-hwm", transport, { highWaterMark: NaN }),
+      RangeError,
+    );
+    assert.throws(
+      () => createIncomingStream("bad-chunks", transport, { maxQueuedChunks: 1.5 }),
+      RangeError,
+    );
+  });
+
+  it("should reject an invalid producerIdleTimeout with RangeError", () => {
+    const transport = new MockTransport();
+    assert.throws(
+      () => createOutgoingStream(makeCountingStream(1), transport, v => ({ data: v }), {
+        producerIdleTimeout: -1,
+      }),
+      RangeError,
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+describe("Stream protocol — maxCredit", () => {
+
+  it("should reject invalid maxCredit values with RangeError on both roles", () => {
+    const transport = new MockTransport();
+    for (const maxCredit of [0, -1, 1.5, NaN]) {
+      assert.throws(
+        () => createIncomingStream("bad-credit", transport, { maxCredit }),
+        RangeError,
+        `consumer maxCredit: ${maxCredit}`,
+      );
+      assert.throws(
+        () => createOutgoingStream(makeCountingStream(1), transport, v => ({ data: v }), { maxCredit }),
+        RangeError,
+        `producer maxCredit: ${maxCredit}`,
+      );
+    }
+  });
+
+  it("should treat maxCredit: Infinity (default) as unbounded", async () => {
+    // Consumer: the full highWaterMark window goes out untouched.
+    const consumerTransport = new MockTransport();
+    const stream = createIncomingStream("infinity-consumer", consumerTransport, {
+      maxCredit: Infinity,
+      idleTimeout: 0,
+    });
+    const reader = stream.getReader();
+    await tick(10);
+
+    const start = consumerTransport.sent.find(m => (m.head as any)?.method === "START");
+    assert.ok(start, "consumer sends START");
+    assert.equal((start!.head as any).desiredSize, 32, "default window is not clamped");
+    await reader.cancel();
+
+    // Producer: a grant larger than any finite cap is accepted and honored.
+    const producerTransport = new MockTransport();
+    const sender = createOutgoingStream(
+      makeCountingStream(3), producerTransport, v => ({ data: v }),
+      { maxCredit: Infinity },
+    );
+    await producerTransport.inject({
+      id: sender.sid, head: { method: "START", desiredSize: 10 },
+    } as Message);
+    await withTimeout(sender.complete, "producer complete with Infinity cap");
+
+    assert.equal(producerTransport.sentPartials().length, 3, "all chunks sent under unbounded credit");
+    assert.equal(producerTransport.sentOKs().length, 1);
+    assert.equal(producerTransport.sentErrors().length, 0);
+  });
+
+  it("should complete across multiple clamped windows and never exceed maxCredit between PULLs", async () => {
+    const consumerTransport = new MockTransport();
+    const producerTransport = new MockTransport();
+    const consumerSid = "clamped-consumer";
+    const timeline: Array<{ side: "consumer" | "producer"; msg: Partial<Message> }> = [];
+
+    const producer = createOutgoingStream(
+      makeCountingStream(7), producerTransport, v => ({ data: v }), { maxCredit: 2 },
+    );
+    linkMockTransports(consumerTransport, producerTransport, producer.sid, timeline, "consumer");
+    linkMockTransports(producerTransport, consumerTransport, consumerSid, timeline, "producer");
+
+    const stream = createIncomingStream<number>(consumerSid, consumerTransport, {
+      maxCredit: 2,
+      highWaterMark: 8,
+      idleTimeout: 0,
+    });
+    const reader = stream.getReader();
+
+    const received: number[] = [];
+    while (true) {
+      const { done, value } = await withTimeout(reader.read(), "clamped read");
+      if (done) break;
+      received.push(value as number);
+    }
+    await withTimeout(producer.complete, "clamped producer complete");
+
+    assert.deepEqual(received, [0, 1, 2, 3, 4, 5, 6], "all chunks delivered in order");
+
+    const start = consumerTransport.sent.find(m => (m.head as any)?.method === "START");
+    assert.ok(start, "consumer sends START");
+    assert.equal((start!.head as any).desiredSize, 2, "START window clamped to maxCredit");
+
+    const pulls = consumerTransport.sentWhere(m => (m.head as any)?.method === "PULL");
+    assert.ok(pulls.length >= 2, `expected multiple PULL cycles, got ${pulls.length}`);
+    assert.ok(
+      pulls.every(m => (m.head as any).desiredSize <= 2),
+      "every PULL desiredSize is clamped to maxCredit",
+    );
+
+    // Walk the interleaved traffic: every credit window (START/PULL from the
+    // consumer) may be followed by at most `maxCredit` Partial frames.
+    let partialsInWindow = 0;
+    let maxPartialsInWindow = 0;
+    let windows = 0;
+    for (const entry of timeline) {
+      const head = entry.msg.head as any;
+      if (entry.side === "consumer" && (head?.method === "START" || head?.method === "PULL")) {
+        windows++;
+        partialsInWindow = 0;
+      } else if (entry.side === "producer" && head?.status === Status.Partial) {
+        partialsInWindow++;
+        if (partialsInWindow > maxPartialsInWindow) maxPartialsInWindow = partialsInWindow;
+      }
+    }
+    assert.ok(windows >= 3, `expected multiple credit windows, got ${windows}`);
+    assert.ok(
+      maxPartialsInWindow <= 2,
+      `producer sent ${maxPartialsInWindow} chunks in a credit window (maxCredit 2)`,
+    );
+  });
+
+  it("should fail fast when a mismatched consumer grants more than maxCredit", async () => {
+    const consumerTransport = new MockTransport();
+    const producerTransport = new MockTransport();
+    const consumerSid = "mismatch-consumer";
+    let sourceCancelled = false;
+
+    const source = new ReadableStream<number>({
+      pull(ctrl) { ctrl.enqueue(1); },
+      cancel() { sourceCancelled = true; },
+    });
+    const producer = createOutgoingStream(source, producerTransport, v => ({ data: v }), {
+      maxCredit: 2,
+      startTimeout: 0,
+    });
+    linkMockTransports(consumerTransport, producerTransport, producer.sid);
+    linkMockTransports(producerTransport, consumerTransport, consumerSid);
+
+    // An unconfigured consumer grants its full 4-chunk window.
+    const stream = createIncomingStream<number>(consumerSid, consumerTransport, {
+      highWaterMark: 4,
+      idleTimeout: 0,
+    });
+    const reader = stream.getReader();
+
+    await assert.rejects(
+      withTimeout(producer.complete, "mismatched producer complete"),
+      /granted credit 4 exceeds maxCredit 2/,
+    );
+
+    assert.equal(sourceCancelled, true, "source reads must be cancelled on the protocol failure");
+    assert.equal(producerTransport.sentPartials().length, 0, "no chunks may be sent");
+    assert.equal(producerTransport.sentErrors().length, 1, "exactly one error frame");
+    assert.equal(
+      producerTransport.sentCANCELs().length, 0,
+      "fallback CANCEL is only sent when the error frame itself fails",
+    );
+
+    // The consumer learns about the failure instead of hanging for a PULL.
+    await assert.rejects(
+      withTimeout(reader.read(), "consumer read after mismatch"),
+      (err: unknown) => {
+        assert.ok(String(err).includes("exceeds maxCredit"), `unexpected: ${err}`);
+        return true;
+      },
+    );
+  });
+
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -728,10 +1047,9 @@ describe("Stream protocol — end-to-end bad-actor scenarios", () => {
   });
 
   it("should fire server startTimeout when client never reads the stream", async () => {
-    // Server has a short start timeout; client gets the stream response but never reads it
-    // (never triggers START).  Since we can't prevent the Via layer from auto-starting,
-    // we test via the mock transport unit test above instead.
-    // This e2e test verifies that when the client closes the wire, the producer unblocks.
+    // Server startTimeouts are disabled here; the observable under test is that
+    // closing the client wire unblocks the server producer and cleans up the
+    // server-side connection within a bounded time.
     const viae = new Viae(server, {
       log: noopLog,
       streamOptions: { startTimeout: 0, idleTimeout: 0 },
@@ -758,13 +1076,23 @@ describe("Stream protocol — end-to-end bad-actor scenarios", () => {
       const reader = (result.data as ReadableStream<number>).getReader();
       await reader.read();
 
-      // Close the wire — producer should unblock cleanly via onClose
-      wire.close();
-      await tick(100);
+      // The server must have registered the connection before cleanup can be observed
+      const registeredBy = Date.now() + 1000;
+      while (viae.connections.length === 0 && Date.now() < registeredBy) {
+        await tick(20);
+      }
+      assert.equal(viae.connections.length, 1, "server should have registered the connection");
 
-      // If we get here without hanging, the producer cleaned up correctly
-    } catch {
-      // Connection-close errors are acceptable
+      // Close the wire — the server must unblock the producer and clean up
+      wire.close();
+
+      const cleanedBy = Date.now() + 2000;
+      while (viae.connections.length > 0 && Date.now() < cleanedBy) {
+        await tick(20);
+      }
+      assert.equal(viae.connections.length, 0, "server connection should be cleaned up after wire close");
+    } finally {
+      wire.close();
     }
   });
 
@@ -788,20 +1116,18 @@ describe("Stream protocol — end-to-end bad-actor scenarios", () => {
       await reader.read();
       await reader.read();
 
-      // Drop the connection abruptly — the stream should not hang or throw unhandled
+      // Drop the connection abruptly — the in-flight read must settle (done or
+      // error) within a bounded time. A timeout fails the test instead of
+      // being swallowed by a catch.
       wire.close();
 
-      // Attempting to read further should either complete or error cleanly
-      let cleaned = false;
-      try {
-        await withTimeout(reader.read(), "read after wire close", 500);
-        cleaned = true;
-      } catch {
-        cleaned = true; // error is acceptable — as long as we don't hang
-      }
-      assert.equal(cleaned, true);
-    } catch {
-      // If the initial request fails due to wire close timing, that is also acceptable
+      const settled = await Promise.race([
+        reader.read().then(() => "settled", () => "settled"),
+        tick(2000).then(() => "timed out"),
+      ]);
+      assert.equal(settled, "settled", "read must settle within 2000ms after wire close");
+    } finally {
+      wire.close();
     }
   });
 

@@ -55,7 +55,7 @@ export class Router implements Middleware<Context>, RouterOptions {
     };
   }
 
-  process(ctx: Context, next: Next): Promise<void> {
+  async process(ctx: Context, next: Next): Promise<void> {
     if (!ctx.in.head.path) return next();
     const match = this._rootMatch(ctx);
     if (match === undefined) return next();
@@ -68,15 +68,14 @@ export class Router implements Middleware<Context>, RouterOptions {
 
     ctx.in.head.path = normalisePath(originalPath.substring(match.length));
 
-    return Rowan.process(this.middleware, ctx, () => {
+    try {
+      await Rowan.process(this.middleware, ctx, () => {
+        ctx.in.head.path = originalPath;
+        return next();
+      });
+    } finally {
       ctx.in.head.path = originalPath;
-      return next();
-    }).then(() => {
-      ctx.in.head.path = originalPath;
-    }).catch((err) => {
-      ctx.in.head.path = originalPath;
-      throw err;
-    });
+    }
   }
 
   use(processor: Processor<Context>, meta?: Meta) {

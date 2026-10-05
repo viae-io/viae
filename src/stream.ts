@@ -22,6 +22,9 @@ import { Status } from "./status.js";
 const DEFAULT_WINDOW = 32;
 const DEFAULT_START_TIMEOUT = 3000;
 const DEFAULT_IDLE_TIMEOUT = 0;
+const DEFAULT_PRODUCER_IDLE_TIMEOUT = 0;
+const DEFAULT_MAX_QUEUED_CHUNKS = 1024;
+const DEFAULT_MAX_QUEUED_BYTES = 64 * 1024 * 1024;
 const MAX_CREDIT = Number.MAX_SAFE_INTEGER;
 
 function toCredit(value: number): number {
@@ -34,8 +37,14 @@ function isBinaryChunk(value: unknown): value is ArrayBuffer | ArrayBufferView {
     || Object.prototype.toString.call(value) === "[object ArrayBuffer]";
 }
 
-function chunkSize(value: unknown): number {
-  return isBinaryChunk(value) ? value.byteLength : 1;
+/**
+ * Approximate wire size of a chunk. Binary chunks use their exact byte
+ * length; other values fall back to the raw encoded segment length when the
+ * transport provides it, otherwise one byte.
+ */
+function chunkSize(value: unknown, rawLength?: number): number {
+  if (isBinaryChunk(value)) return value.byteLength;
+  return rawLength ?? 1;
 }
 
 export interface StreamOptions {
@@ -43,14 +52,16 @@ export interface StreamOptions {
   highWaterMark?: number;
   /**
    * Maximum number of chunks held outside the WHATWG stream queue while a
-   * peer is sending faster than the consumer. The historical default is
-   * unlimited; set this option to add an application-specific memory bound.
-   * Set to 0 to reject unsolicited chunks immediately.
+   * peer is sending faster than the consumer. Default: 1024. Set to 0 to
+   * reject unsolicited chunks immediately, or to `Infinity` to opt out of
+   * the chunk bound.
    */
   maxQueuedChunks?: number;
   /**
-   * Optional approximate byte limit for queued chunks. Non-binary chunks
-   * count as one byte. Defaults to unlimited for compatibility.
+   * Approximate byte limit for queued chunks. Binary chunks are counted
+   * exactly; other chunks use the raw encoded segment length when available,
+   * otherwise one byte. Default: 64 MiB (64 * 1024 * 1024). Set to
+   * `Infinity` to opt out of the byte bound.
    */
   maxQueuedBytes?: number;
   /**
@@ -75,15 +86,41 @@ export interface StreamOptions {
    */
   startTimeout?: number;
   /**
+   * Max ms the producer may go without protocol progress (a successful chunk
+   * send or a received credit update) after the consumer's first credit. On
+   * expiry the producer aborts the stream and terminates it with an error
+   * frame. Default: 0 (disabled). Set to a positive value to enable.
+   */
+  producerIdleTimeout?: number;
+  /**
    * Max ms the consumer waits for the next chunk while a read is blocked.
    * Default: 0 (disabled). Set to a positive value to enable.
    */
   idleTimeout?: number;
+  /**
+   * Upper bound on stream credit — the number of chunks a producer may have
+   * in flight at once. Default: Infinity (unbounded). Must be a positive
+   * safe integer or `Infinity`.
+   *
+   * Applied to both roles so the credit accounting stays consistent:
+   * a consumer clamps the credit it requests (START/PULL desiredSize and its
+   * initial window) to `maxCredit`, while a producer treats a grant larger
+   * than `maxCredit` as a configuration mismatch and fails the stream fast
+   * (protocol error + error frame) rather than silently clamping and
+   * deadlocking against a peer that thinks it granted more. Configure the
+   * same value on both peers.
+   */
+  maxCredit?: number;
 }
 
 export interface StreamSender {
   readonly sid: string;
   readonly complete: Promise<void>;
+  /**
+   * Stop the pump and cancel source reads. Best-effort sends a CANCEL frame
+   * to the consumer when the transport is still open. Idempotent.
+   */
+  cancel(reason?: unknown): void;
 }
 
 export interface StreamTransport {
@@ -98,11 +135,19 @@ export interface StreamTransport {
 
 /**
  * Blocking queue - suspends next() until a chunk arrives, closes, or errors.
- * The queue is deliberately unbounded by default for wire compatibility;
- * callers can opt into count and byte limits through StreamOptions.
+ * Bounded by finite defaults (1024 chunks / 64 MiB); callers can opt out of
+ * either bound with `Infinity` through StreamOptions. Entries are stored with
+ * their advertised size and read through a head index (no `Array.shift` on
+ * the hot path), compacting the backing array periodically.
  */
+interface QueueEntry<T> {
+  value: T;
+  size: number;
+}
+
 class BlockingQueue<T> {
-  private _chunks: T[] = [];
+  private _entries: Array<QueueEntry<T> | undefined> = [];
+  private _head = 0;
   private _queuedBytes = 0;
   private _waiters: Array<{
     resolve: (result: IteratorResult<T, undefined>) => void;
@@ -115,10 +160,13 @@ class BlockingQueue<T> {
   constructor(
     private readonly _maxChunks: number,
     private readonly _maxBytes: number,
-    private readonly _sizeOf: (chunk: T) => number,
   ) {}
 
-  push(chunk: T): boolean {
+  private get _queuedChunks(): number {
+    return this._entries.length - this._head;
+  }
+
+  push(chunk: T, size: number): boolean {
     if (this._closed) return true;
 
     if (this._waiters.length > 0) {
@@ -126,11 +174,10 @@ class BlockingQueue<T> {
       return true;
     }
 
-    if (this._maxChunks !== Infinity && this._chunks.length >= this._maxChunks) return false;
-    const size = this._sizeOf(chunk);
+    if (this._maxChunks !== Infinity && this._queuedChunks >= this._maxChunks) return false;
     if (this._maxBytes !== Infinity && this._queuedBytes + size > this._maxBytes) return false;
 
-    this._chunks.push(chunk);
+    this._entries.push({ value: chunk, size });
     this._queuedBytes += size;
     return true;
   }
@@ -147,23 +194,31 @@ class BlockingQueue<T> {
     this._closed = true;
     this._hasError = true;
     this._error = error;
-    this._chunks = [];
+    this._entries = [];
+    this._head = 0;
     this._queuedBytes = 0;
     for (const waiter of this._waiters) waiter.reject(error);
     this._waiters = [];
   }
 
   get isEmpty(): boolean {
-    return this._chunks.length === 0;
+    return this._queuedChunks === 0;
   }
 
   next(onWait?: () => void): Promise<IteratorResult<T, undefined>> {
     if (this._hasError) return Promise.reject(this._error);
 
-    if (this._chunks.length > 0) {
-      const value = this._chunks.shift()!;
-      this._queuedBytes -= this._sizeOf(value);
-      return Promise.resolve({ value, done: false });
+    if (this._head < this._entries.length) {
+      const entry = this._entries[this._head]!;
+      this._entries[this._head] = undefined;
+      this._head++;
+      this._queuedBytes -= entry.size;
+      // Compact consumed slots before the backing array grows without bound.
+      if (this._head > 64 && this._head * 2 >= this._entries.length) {
+        this._entries = this._entries.slice(this._head);
+        this._head = 0;
+      }
+      return Promise.resolve({ value: entry.value, done: false });
     }
 
     if (this._closed) return Promise.resolve({ value: undefined, done: true });
@@ -196,6 +251,12 @@ function validateLimit(value: number, name: string): void {
   }
 }
 
+function validatePositiveLimit(value: number, name: string): void {
+  if (value !== Infinity && (!Number.isSafeInteger(value) || value < 1)) {
+    throw new RangeError(`${name} must be a positive safe integer or Infinity`);
+  }
+}
+
 /** Create a ReadableStream backed by a remote multiplexed stream. */
 export function createIncomingStream<T = unknown>(
   sid: string,
@@ -204,16 +265,18 @@ export function createIncomingStream<T = unknown>(
 ): ReadableStream<T> {
   const highWaterMark = options?.highWaterMark ?? DEFAULT_WINDOW;
   const idleTimeout = options?.idleTimeout ?? DEFAULT_IDLE_TIMEOUT;
-  const maxQueuedChunks = options?.maxQueuedChunks ?? Infinity;
-  const maxQueuedBytes = options?.maxQueuedBytes ?? Infinity;
+  const maxQueuedChunks = options?.maxQueuedChunks ?? DEFAULT_MAX_QUEUED_CHUNKS;
+  const maxQueuedBytes = options?.maxQueuedBytes ?? DEFAULT_MAX_QUEUED_BYTES;
   const strictProtocol = options?.strictProtocol ?? false;
+  const maxCredit = options?.maxCredit ?? Infinity;
 
   validateTimeout(highWaterMark, "highWaterMark");
   validateTimeout(idleTimeout, "idleTimeout");
   validateLimit(maxQueuedChunks, "maxQueuedChunks");
   validateLimit(maxQueuedBytes, "maxQueuedBytes");
+  validatePositiveLimit(maxCredit, "maxCredit");
 
-  const queue = new BlockingQueue<T>(maxQueuedChunks, maxQueuedBytes, chunkSize);
+  const queue = new BlockingQueue<T>(maxQueuedChunks, maxQueuedBytes);
   let cancelled = false;
   let terminated = false;
   let started = false;
@@ -299,7 +362,8 @@ export function createIncomingStream<T = unknown>(
       // decide when a new idle window should begin.
       clearIdleTimer();
       if (granted > 0) granted--;
-      if (!queue.push(msg.data as T)) {
+      const data = msg.data as T;
+      if (!queue.push(data, chunkSize(data, msg.raw?.byteLength))) {
         const limit = maxQueuedChunks !== Infinity && maxQueuedBytes !== Infinity
           ? `${maxQueuedChunks} chunks/${maxQueuedBytes} bytes`
           : maxQueuedChunks !== Infinity ? `${maxQueuedChunks} chunks` : `${maxQueuedBytes} bytes`;
@@ -355,7 +419,10 @@ export function createIncomingStream<T = unknown>(
 
       try {
         started = true;
-        granted = toCredit(highWaterMark);
+        // Never request more credit than the configured cap; a producer on
+        // this connection is expected to enforce the same cap, so granting
+        // more here would desynchronise the two sides' accounting.
+        granted = Math.min(toCredit(highWaterMark), maxCredit);
         await transport.send({ id: sid, head: { method: "START", desiredSize: granted } });
       } catch (error) {
         abortStream(error);
@@ -372,8 +439,9 @@ export function createIncomingStream<T = unknown>(
 
           // CountQueuingStrategy can expose a fractional desiredSize. The wire
           // protocol carries whole chunk credits; zero still means one pending
-          // read and therefore needs one credit.
-          const requestedCredit = desiredSize > 0 ? toCredit(desiredSize) : 1;
+          // read and therefore needs one credit. Never request more than the
+          // configured cap, even when the local window is larger.
+          const requestedCredit = Math.min(desiredSize > 0 ? toCredit(desiredSize) : 1, maxCredit);
           granted = requestedCredit;
           try {
             transport.send({ id: sid, head: { method: "PULL", desiredSize: requestedCredit } })
@@ -427,7 +495,11 @@ export function createOutgoingStream(
   options?: StreamOptions,
 ): StreamSender {
   const startTimeout = options?.startTimeout ?? DEFAULT_START_TIMEOUT;
+  const producerIdleTimeout = options?.producerIdleTimeout ?? DEFAULT_PRODUCER_IDLE_TIMEOUT;
+  const maxCredit = options?.maxCredit ?? Infinity;
   validateTimeout(startTimeout, "startTimeout");
+  validateTimeout(producerIdleTimeout, "producerIdleTimeout");
+  validatePositiveLimit(maxCredit, "maxCredit");
 
   const sid = transport.createId();
   const strictProtocol = options?.strictProtocol ?? false;
@@ -442,6 +514,7 @@ export function createOutgoingStream(
   let dispose: () => void = () => {};
   let offClose: (() => void) | undefined;
   let readerCancel: Promise<void> | undefined;
+  let producerIdleTimer: ReturnType<typeof setTimeout> | undefined;
   let resolveStopped!: () => void;
   const stopped = new Promise<void>(resolve => { resolveStopped = resolve; });
 
@@ -454,9 +527,27 @@ export function createOutgoingStream(
     }
   }
 
+  function clearProducerIdleTimer(): void {
+    if (producerIdleTimer !== undefined) {
+      clearTimeout(producerIdleTimer);
+      producerIdleTimer = undefined;
+    }
+  }
+
+  function resetProducerIdleTimer(): void {
+    if (producerIdleTimeout <= 0 || cancelled || protocolError) return;
+    clearProducerIdleTimer();
+    producerIdleTimer = setTimeout(() => {
+      producerIdleTimer = undefined;
+      if (cancelled || protocolError) return;
+      failProtocol(`stream producer idle timeout: no progress for ${producerIdleTimeout}ms`);
+    }, producerIdleTimeout);
+  }
+
   function cancelStream(reason?: unknown): void {
     if (cancelled) return;
     cancelled = true;
+    clearProducerIdleTimer();
     credit = 0;
     const waiter = waitingForCredit;
     waitingForCredit = undefined;
@@ -468,6 +559,7 @@ export function createOutgoingStream(
   function failProtocol(message: string): void {
     if (protocolError || cancelled) return;
     protocolError = new Error(message);
+    clearProducerIdleTimer();
     const waiter = waitingForCredit;
     waitingForCredit = undefined;
     waiter?.();
@@ -516,7 +608,17 @@ export function createOutgoingStream(
         return;
       }
 
-      credit = Math.ceil(desiredSize);
+      const granted = Math.ceil(desiredSize);
+      if (granted > maxCredit) {
+        // A grant above the local cap is a configuration mismatch: granting
+        // it would exceed this producer's bound, while clamping it silently
+        // would leave a consumer waiting for a PULL that never comes (its
+        // accounting still expects the full window). Fail fast instead.
+        failProtocol(`granted credit ${granted} exceeds maxCredit ${maxCredit}`);
+        return;
+      }
+      credit = Math.min(granted, maxCredit);
+      resetProducerIdleTimer();
       if (waitingForCredit && credit > 0) {
         const waiter = waitingForCredit;
         waitingForCredit = undefined;
@@ -535,6 +637,25 @@ export function createOutgoingStream(
     }
     // Unknown methods remain ignored for compatibility with existing peers.
   });
+
+  function cancel(reason?: unknown): void {
+    if (cancelled) return;
+    cancelStream(reason);
+    if (transport.closed) return;
+    const data = reason instanceof Error ? reason.message
+      : reason != null ? String(reason) : undefined;
+    // Fire-and-forget: the pump is already stopped, so this intentionally
+    // bypasses the cancelled-state guard inside sendFrame.
+    try {
+      Promise.resolve(transport.send({
+        id: sid,
+        head: { method: "CANCEL" },
+        ...(data !== undefined ? { data } : {}),
+      })).catch(() => {});
+    } catch {
+      // The transport is already unavailable.
+    }
+  }
 
   if (transport.closed) queueMicrotask(() => cancelStream(new Error("stream transport closed")));
 
@@ -605,7 +726,11 @@ export function createOutgoingStream(
 
         if (result.done) {
           sourceDone = true;
-          await sendFrame({ id: sid, head: { status: Status.OK } as MessageHeader });
+          if (!await sendFrame({ id: sid, head: { status: Status.OK } as MessageHeader })) {
+            // A protocol error may have fired while the terminal frame was in
+            // flight; route it through the catch so the error frame is sent.
+            if (protocolError) throw protocolError;
+          }
           break;
         }
 
@@ -619,7 +744,11 @@ export function createOutgoingStream(
             : {}),
           status: Status.Partial,
         };
-        if (!await sendFrame(chunk)) break;
+        if (!await sendFrame(chunk)) {
+          if (protocolError) throw protocolError;
+          break;
+        }
+        resetProducerIdleTimer();
       }
     } catch (error) {
       if (!cancelled || protocolError) {
@@ -637,8 +766,13 @@ export function createOutgoingStream(
             await sendFrame({ id: sid, head: { method: "CANCEL" }, data: message }, true).catch(() => {});
           }
         }
+        // Surface source, send and protocol failures through `complete`
+        // (consumed by via.ts). A consumer-initiated CANCEL or a transport
+        // close stays a clean resolve.
+        throw error;
       }
     } finally {
+      clearProducerIdleTimer();
       resolveStopped();
       offClose?.();
       offClose = undefined;
@@ -647,5 +781,5 @@ export function createOutgoingStream(
     }
   })();
 
-  return { sid, complete };
+  return { sid, complete, cancel };
 }

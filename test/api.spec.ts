@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { Api, Viae, Status, ViaeError, type Context } from "../src/index.js";
+import { Api, Viae, Status, ViaeError, decodeData, encodeData, type Context } from "../src/index.js";
 import { TestWireServer, createTestClient } from "./utils.js";
 
 interface MyContext extends Context {
@@ -304,5 +304,187 @@ describe("Api", () => {
     } finally {
       wire.close();
     }
+  });
+
+  it("should keep the status set by ctx.reply while a returned value overrides only the data", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+
+    api.get({
+      path: "/reply-status",
+      handler: ({ ctx }) => {
+        ctx.reply("A", { status: 201 });
+        return "B";
+      }
+    });
+
+    viae.use(api);
+
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      const result = await via.request<string>("GET", "/reply-status");
+      assert.equal(result.ok, true);
+      assert.equal(result.head.status, 201);
+      assert.equal(result.data, "B");
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should not pass next to the handler when next is false", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+
+    let receivedNext: unknown = "sentinel";
+
+    api.get({
+      path: "/no-next",
+      next: false,
+      handler: (opts) => {
+        receivedNext = opts.next;
+        return "done";
+      }
+    });
+
+    viae.use(api);
+
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      const result = await via.request<string>("GET", "/no-next");
+      assert.equal(receivedNext, undefined);
+      assert.equal(result.ok, true);
+      assert.equal(result.head.status, Status.OK);
+      assert.equal(result.data, "done");
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should fall through to the next matching route when a next:true handler calls next()", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+
+    let firstRan = false;
+
+    api.get({
+      path: "/chain",
+      next: true,
+      handler: async ({ next }) => {
+        firstRan = true;
+        await next?.();
+      }
+    });
+
+    api.get({
+      path: "/chain",
+      handler: () => "second"
+    });
+
+    viae.use(api);
+
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      const result = await via.request<string>("GET", "/chain");
+      assert.equal(firstRan, true);
+      assert.equal(result.ok, true);
+      assert.equal(result.head.status, Status.OK);
+      assert.equal(result.data, "second");
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should map a numeric throw to that status", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+
+    api.get({
+      path: "/throw-numeric",
+      handler: () => {
+        throw 403;
+      }
+    });
+
+    viae.use(api);
+
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      const result = await via.request("GET", "/throw-numeric");
+      assert.equal(result.ok, false);
+      assert.equal(result.head.status, Status.Forbidden);
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should reject non-finite Number params and still accept finite numeric forms", async () => {
+    const viae = new Viae(server);
+    const api = new Api("/");
+
+    api.get({
+      path: "/numbers/:id",
+      params: { id: { type: Number } },
+      handler: ({ params }) => params.id
+    });
+
+    viae.use(api);
+
+    const { via, wire } = await createTestClient(port);
+
+    try {
+      const infinite = await via.request("GET", "/numbers/Infinity");
+      assert.equal(infinite.ok, false);
+      assert.equal(infinite.head.status, Status.BadRequest);
+
+      const negativeInfinite = await via.request("GET", "/numbers/-Infinity");
+      assert.equal(negativeInfinite.ok, false);
+      assert.equal(negativeInfinite.head.status, Status.BadRequest);
+
+      const notANumber = await via.request("GET", "/numbers/NaN");
+      assert.equal(notANumber.ok, false);
+      assert.equal(notANumber.head.status, Status.BadRequest);
+
+      /* finite non-decimal forms keep the pre-existing Number() behavior: "0x10" -> 16 */
+      const hex = await via.request<number>("GET", "/numbers/0x10");
+      assert.equal(hex.ok, true);
+      assert.equal(hex.data, 16);
+    } finally {
+      wire.close();
+    }
+  });
+
+  it("should reject a decoded CBOR object whose getReader is not a function", async () => {
+    const api = new Api("/");
+    let handlerCalled = false;
+
+    api.post({
+      path: "/wants-stream",
+      accept: "stream",
+      handler: () => {
+        handlerCalled = true;
+        return "unreachable";
+      }
+    });
+
+    /* Drive the Api middleware directly: the client-side stream duck-typing in
+       via.ts treats any object with a `getReader` key as a stream and would fail
+       before the request reached this guard. */
+    const data = decodeData(encodeData({ getReader: "not-a-function" }));
+    const ctx = {
+      id: "unit-stream-guard",
+      in: { id: "unit-stream-guard", head: { method: "POST", path: "/wants-stream" }, data },
+      out: { id: "unit-stream-guard", head: {} },
+      params: {},
+    } as unknown as Context;
+
+    await api.process(ctx, async () => {});
+
+    assert.equal(handlerCalled, false);
+    assert.equal(ctx.out?.head.status, Status.BadRequest);
+    assert.equal(ctx.out?.data, "expected stream");
   });
 });

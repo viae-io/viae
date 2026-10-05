@@ -7,4 +7,5 @@ export enum Status {
   Forbidden = 403,
   NotFound = 404,
   Error = 500,
+  Busy = 503,
 }

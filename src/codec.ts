@@ -1,4 +1,23 @@
-import { encode as _encode, decode as _decode } from "cbor-x";
+import { encode as _encode, decode as _decode, setSizeLimits } from "cbor-x";
+
+// cbor-x 1.6.3 exports setSizeLimits at runtime (decode.js) but omits it from
+// its bundled typings, so declare it here to keep the build type-clean.
+declare module "cbor-x" {
+  export function setSizeLimits(limits: {
+    maxArraySize?: number;
+    maxMapSize?: number;
+    maxObjectSize?: number;
+  }): void;
+}
+
+// cbor-x size limits are process-global state, so cap them once at module
+// load.  Without limits, a tiny frame can request an enormous allocation: a
+// 5-byte data segment such as `9a 00 1e 84 80` (CBOR array-32 claiming
+// 2,000,000 elements, truncated) drives the decoder into a ~256 MB
+// allocation before any payload bytes are read.  These caps are far above
+// any legitimate viae payload and reject such amplification frames instead.
+// Note: this affects every cbor-x consumer in the process.
+setSizeLimits({ maxArraySize: 1_000_000, maxMapSize: 100_000, maxObjectSize: 100_000 });
 
 export interface Encoder {
   encode(value: unknown): Uint8Array;
@@ -8,6 +27,13 @@ export interface Encoder {
 export interface FrameEncoderOptions {
   /** Maximum encoded frame size accepted by encode() and decode(). */
   maxFrameSize?: number;
+  /**
+   * Protocol major version.  Defaults to `1`.  When positive, non-empty
+   * heads that omit a `v` field get one injected (into a copy; the caller's
+   * head is never mutated) and decoded heads carrying a `v` must match this
+   * value.  `0` disables both emission and validation.
+   */
+  protocolVersion?: number;
 }
 
 /**
@@ -40,13 +66,18 @@ const binaryEncoder: Encoder = {
   },
 };
 
+// Module-level singletons so the JSON codec does not allocate a TextEncoder /
+// TextDecoder per call.
+const jsonTextEncoder = new TextEncoder();
+const jsonTextDecoder = new TextDecoder();
+
 /** Built-in JSON encoder. */
 const jsonEncoder: Encoder = {
   encode(value: unknown): Uint8Array {
-    return new TextEncoder().encode(JSON.stringify(value));
+    return jsonTextEncoder.encode(JSON.stringify(value));
   },
   decode(data: Uint8Array): unknown {
-    return JSON.parse(new TextDecoder().decode(data));
+    return JSON.parse(jsonTextDecoder.decode(data));
   },
 };
 
@@ -145,10 +176,26 @@ function encodeStr(str: string): EncodedString {
 function readStr(buf: Uint8Array, c: { v: number }): string {
   const len = readVarint(buf, c);
   if (len > buf.length - c.v) throw new RangeError("truncated frame string");
-  const value = buf.subarray(c.v, c.v + len);
+  const start = c.v;
   c.v += len;
+
+  // ASCII fast path: ids and header keys are overwhelmingly ASCII, and a
+  // charCode loop avoids both the TextDecoder setup and its allocation.
+  let ascii = true;
+  for (let i = start; i < start + len; i++) {
+    if (buf[i] >= 0x80) {
+      ascii = false;
+      break;
+    }
+  }
+  if (ascii) {
+    let str = "";
+    for (let i = start; i < start + len; i++) str += String.fromCharCode(buf[i]);
+    return str;
+  }
+
   try {
-    return utf8Decoder.decode(value);
+    return utf8Decoder.decode(buf.subarray(start, start + len));
   } catch {
     throw new Error("frame id is not valid UTF-8");
   }
@@ -157,6 +204,20 @@ function readStr(buf: Uint8Array, c: { v: number }): string {
 function isHeader(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+/**
+ * True when `o` has at least one own enumerable key.  Cheaper than
+ * `Object.keys(o).length > 0`, which allocates a key array.
+ */
+function hasOwnKeys(o: Record<string, unknown>): boolean {
+  for (const k in o) {
+    if (Object.hasOwn(o, k)) return true;
+  }
+  return false;
+}
+
+/** Reused descriptor so decode() does not allocate one per frame. */
+const rawPropertyDescriptor: PropertyDescriptor = { enumerable: false };
 
 /**
  * Wire frame encoder/decoder.
@@ -168,17 +229,24 @@ function isHeader(value: unknown): value is Record<string, unknown> {
  * selecting the data decoder.  The data encoder is chosen from the codex via
  * `head.encoding`, defaulting to "cbor".
  *
- * Uses a per-instance pool buffer — encode() output is a subarray view valid
- * until the next encode() call on the same instance.
+ * Uses a per-instance pool buffer, allocated lazily on the first encode() —
+ * encode() output is a subarray view valid until the next encode() call on
+ * the same instance.
  */
 export class FrameEncoder {
   private static readonly DEFAULT_POOL_SIZE = 4 * 1024 * 1024;
-  /** No protocol size limit is imposed unless one is configured. */
-  static readonly DEFAULT_MAX_FRAME_SIZE = Number.MAX_SAFE_INTEGER;
+  /**
+   * Default maximum accepted frame size: 64 MiB.  This is defense in depth
+   * against oversized frames; opt out with
+   * `new FrameEncoder(codex, { maxFrameSize: Number.MAX_SAFE_INTEGER })`.
+   */
+  static readonly DEFAULT_MAX_FRAME_SIZE = 64 * 1024 * 1024;
 
-  private _pool: Uint8Array;
+  private _pool?: Uint8Array;
   readonly codex: Codex;
   readonly maxFrameSize: number;
+  /** Protocol major version emitted/validated on frame heads; `0` disables both. */
+  readonly protocolVersion: number;
   private _headEncoder: Encoder;
 
   constructor(codex: Codex = defaultCodex, options?: FrameEncoderOptions) {
@@ -186,16 +254,26 @@ export class FrameEncoder {
     if (!Number.isSafeInteger(maxFrameSize) || maxFrameSize <= 0) {
       throw new RangeError("maxFrameSize must be a positive safe integer");
     }
+    const protocolVersion = options?.protocolVersion ?? 1;
+    if (!Number.isSafeInteger(protocolVersion) || protocolVersion < 0) {
+      throw new RangeError("protocolVersion must be 0 or a positive safe integer");
+    }
 
-    this._pool = new Uint8Array(Math.min(FrameEncoder.DEFAULT_POOL_SIZE, maxFrameSize));
     this.codex = codex;
     this.maxFrameSize = maxFrameSize;
+    this.protocolVersion = protocolVersion;
     /* Head is always CBOR so both sides can read encoding before selecting data codec */
     this._headEncoder = codex.cbor ?? cborEncoder;
   }
 
   private _getEncoder(encoding?: string): Encoder {
     if (!encoding) return this.codex.cbor ?? cborEncoder;
+    // Reject prototype-chain members ("constructor", "toString", ...) so a
+    // remote-controlled head.encoding cannot select an inherited property as
+    // an encoder; only own codex entries are valid.
+    if (!Object.hasOwn(this.codex, encoding)) {
+      throw new Error(`unknown encoding: ${encoding}`);
+    }
     const enc = this.codex[encoding];
     if (!enc) throw new Error(`unknown encoding: ${encoding}`);
     return enc;
@@ -209,8 +287,10 @@ export class FrameEncoder {
    */
   encode(frame: Frame): Uint8Array {
     const encoded = this._prepare(frame);
-    const target = encoded.length <= this._pool.length
-      ? this._pool
+    const pool = this._pool
+      ?? (this._pool = new Uint8Array(Math.min(FrameEncoder.DEFAULT_POOL_SIZE, this.maxFrameSize)));
+    const target = encoded.length <= pool.length
+      ? pool
       : new Uint8Array(encoded.length);
     return this._write(encoded, target);
   }
@@ -243,6 +323,12 @@ export class FrameEncoder {
     }
     let head: Record<string, unknown> | undefined = decodedHead;
 
+    if (this.protocolVersion > 0 && head?.v !== undefined) {
+      if (typeof head.v !== "number" || head.v !== this.protocolVersion) {
+        throw new Error(`unsupported protocol version: ${String(head.v)}`);
+      }
+    }
+
     const dataLen = readVarint(buf, c);
     if (dataLen > buf.length - c.v) throw new RangeError("truncated frame data");
     const encoding = head?.encoding as string | undefined;
@@ -260,7 +346,8 @@ export class FrameEncoder {
     if (raw !== undefined) {
       // Keep the historical enumerable shape of decoded frames while making
       // the raw segment available to callers that need it.
-      Object.defineProperty(frame, "raw", { value: raw, enumerable: false });
+      rawPropertyDescriptor.value = raw;
+      Object.defineProperty(frame, "raw", rawPropertyDescriptor);
     }
     return frame;
   }
@@ -280,9 +367,14 @@ export class FrameEncoder {
     }
 
     const id = encodeStr(frame.id);
-    const head = frame.head && Object.keys(frame.head).length > 0
-      ? this._headEncoder.encode(frame.head)
-      : undefined;
+    let head: Uint8Array | undefined;
+    if (frame.head && hasOwnKeys(frame.head)) {
+      // Inject the protocol major into a copy; never mutate the caller's head.
+      const headToEncode = this.protocolVersion > 0 && frame.head.v === undefined
+        ? { ...frame.head, v: this.protocolVersion }
+        : frame.head;
+      head = this._headEncoder.encode(headToEncode);
+    }
 
     let data: Uint8Array | undefined;
     if (frame.data !== undefined) {

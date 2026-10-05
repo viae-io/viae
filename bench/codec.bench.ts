@@ -20,6 +20,10 @@
  */
 
 import { Encoder as CborEncoder } from "cbor-x";
+// Native .ts specifier: this bench runs under `node --experimental-strip-types`
+// (see package.json "bench"), which does not rewrite ".js" specifiers to ".ts".
+import { FrameEncoder, defaultCodex } from "../src/codec.ts";
+import type { Frame } from "../src/codec.ts";
 
 const cbor = new CborEncoder({ useRecords: true, structuredClone: false });
 
@@ -288,6 +292,59 @@ for (const sc of scenarios) {
     col(`${nativeEncoded.byteLength} B`, 14, true) +
     col(cborEncoded.byteLength <= nativeEncoded.byteLength ? "cbor-x ✓" : "native ✓", 9, true)
   );
+  console.log(sep);
+}
+
+// ─── FrameEncoder (shipped hot path) ────────────────────────────────────────
+// The section above measures a parallel-universe bespoke codec; this one
+// measures the FrameEncoder that actually ships on the wire.
+
+const shippedEncoder = new FrameEncoder(defaultCodex);
+
+const shippedScenarios: { name: string; frame: Frame }[] = [
+  {
+    name: "header-only request",
+    frame: { id: "a1b2c3d4", head: { method: "GET", path: "/api/v1/users/42" } },
+  },
+  {
+    name: "64 B CBOR payload",
+    frame: {
+      id: "a1b2c3d4",
+      head: { method: "POST", path: "/api/v1/users" },
+      data: { id: 42, name: "Alice", role: "admin", tags: ["alpha", "beta", "gamma"] },
+    },
+  },
+];
+
+console.log(`${"═".repeat(W)}`);
+console.log(`  FrameEncoder (shipped hot path)  —  encode / encodeOwned / decode`);
+console.log(`  ${ITERATIONS.toLocaleString()} iterations  |  Node ${process.version}`);
+console.log(`${"═".repeat(W)}\n`);
+console.log(col("Scenario", 24) + col("Op", 11) + col("ops/s", 14, true) + col("ns/op", 12, true));
+console.log(sep);
+
+for (const sc of shippedScenarios) {
+  // decode re-reads the same owned buffer; encode reuses the encoder's
+  // lazily allocated pool exactly as the wire path does.
+  const encoded = shippedEncoder.encodeOwned(sc.frame);
+
+  const results: [string, { ops: number; ns: number }][] = [
+    ["encode", bench("encode", () => { shippedEncoder.encode(sc.frame); })],
+    ["encodeOwned", bench("encodeOwned", () => { shippedEncoder.encodeOwned(sc.frame); })],
+    ["decode", bench("decode", () => { shippedEncoder.decode(encoded); })],
+  ];
+
+  let first = true;
+  for (const [op, r] of results) {
+    console.log(
+      col(first ? sc.name : "", 24) +
+      col(op, 11) +
+      col(fmt(r.ops), 14, true) +
+      col(r.ns.toFixed(1), 12, true)
+    );
+    first = false;
+  }
+  console.log(col("", 24) + col("bytes", 11) + col(`${encoded.byteLength} B`, 14, true));
   console.log(sep);
 }
 

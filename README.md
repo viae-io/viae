@@ -187,6 +187,11 @@ api.post<number>({
 });
 ```
 
+For `accept: "stream"` routes, `validate` runs lazily per chunk (through a
+`TransformStream`). A failing chunk errors the response stream mid-flight
+instead of returning `400`, because the response status has already been sent
+once the stream is established.
+
 ### `ctx.reply()`
 
 Instead of returning a value, you can call `ctx.reply()` directly to set the response data, status code, and encoding simultaneously:
@@ -222,6 +227,11 @@ api.get({
   },
 });
 ```
+
+`ViaeError` responses keep the status and message you throw, wherever the error
+originates (handler, guard, or middleware). Any other error becomes
+`500 "internal error"` for the caller — the full detail is logged locally and
+never sent to the peer.
 
 ---
 
@@ -293,6 +303,10 @@ api.get({
 await assert.rejects(() => reader.read(), /oops/);
 ```
 
+Cancellation and error reasons cross the wire as strings: an `Error` is reduced
+to its `message`, and the opposite side receives that string — never the
+original `Error` object — for both consumer cancels and producer errors.
+
 For byte-oriented streams, opt into the pass-through binary codec. This keeps
 each chunk as raw octets instead of wrapping it in CBOR:
 
@@ -312,9 +326,33 @@ api.get({
 ```
 
 The default remains CBOR for compatibility. `StreamOptions.encoding` can also
-be used to set the default for outgoing stream chunks. `maxQueuedChunks`,
-`maxQueuedBytes`, `strictProtocol`, and `cancelIncomingOnDispose` are available
-as opt-in resource, protocol, and ownership controls.
+be used to set the default for outgoing stream chunks. Inbound streams are
+bounded by default — 1024 queued chunks and 64 MiB per stream — with `Infinity`
+as an explicit opt-out. `strictProtocol` and `cancelIncomingOnDispose` remain
+opt-in protocol and ownership controls.
+
+### Stream options
+
+Pass `streamOptions` to `Viae` (applies to every server connection) or `Via`:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `highWaterMark` | `number` | `32` | Initial credit window (in chunks) for incoming streams. |
+| `maxQueuedChunks` | `number` | `1024` | Max inbound chunks buffered outside the WHATWG stream queue before the stream aborts. `Infinity` opts out. |
+| `maxQueuedBytes` | `number` | `64 MiB` | Approximate inbound byte cap. Binary chunks are counted exactly; other chunks use the encoded data-segment length. `Infinity` opts out. |
+| `encoding` | `string` | `"cbor"` | Default chunk encoding when the enclosing message does not specify one. |
+| `strictProtocol` | `boolean` | `false` | Strictly validate stream control frames; permissive fallbacks otherwise. |
+| `cancelIncomingOnDispose` | `boolean` | `false` | Cancel an incoming request body when its request context is disposed. |
+| `startTimeout` | `number` | `3000` | Max ms the producer waits for the consumer's initial credit. `0` disables. |
+| `producerIdleTimeout` | `number` | `0` | Max ms the producer may go without progress (chunk sent or credit received) before aborting the stream. `0` disables, so indefinite backpressure remains the default. |
+| `idleTimeout` | `number` | `0` | Max ms a consumer read waits for the next chunk. `0` disables. |
+| `maxCredit` | `number` | `Infinity` | Upper bound on stream credit — the chunks a producer may have in flight at once. The consumer clamps the credit it requests (`START`/`PULL`); the producer fails the stream fast with a protocol error when a peer grants more. Configure the same value on both peers. |
+
+> **Important:** `maxCredit` must be configured on **both** peers. A server-only
+> configuration fails a default client's first `START` — a 32-credit grant from
+> the default 32-chunk window — with `granted credit 32 exceeds maxCredit N`:
+> the producer cancels the source and sends an error frame. A producer-only
+> configuration fails the same way once a default consumer grants 32.
 
 ---
 
@@ -336,6 +374,13 @@ console.log(result.data); // "Hello, world"
 wire.close();
 ```
 
+When `accept` is supplied it is a validated assertion: `"stream"` rejects the request when the response is an object, and `"object"` rejects it when the response is a stream. Omit `accept` to accept either shape:
+
+```ts
+const stream = await via.request("GET", "/numbers", undefined, { accept: "stream" });
+// rejects with "expected stream response but received object" if the server replies with an object
+```
+
 ### `Via` options
 
 | Option | Type | Description |
@@ -344,15 +389,35 @@ wire.close();
 | `log` | `Log` | Logger instance. Defaults to `Via.Log` (console). |
 | `timeout` | `number` | Request timeout in ms (default `120000`). |
 | `codex` | `Codex` | Named encoder registry. Defaults to `defaultCodex` (cbor, json, binary). |
-| `frameOptions` | `FrameEncoderOptions` | Optional frame limits, including `maxFrameSize`; omitted for compatibility. |
+| `frameOptions` | `FrameEncoderOptions` | Frame limits. `maxFrameSize` defaults to 64 MiB (64 * 1024 * 1024); opt out with `Number.MAX_SAFE_INTEGER`. |
+| `streamOptions` | `StreamOptions` | Stream-layer options forwarded to each stream (queue caps, timeouts, encoding). See [Stream options](#stream-options). |
+| `heartbeat` | `{ interval?: number; timeout?: number }` | Protocol-level keepalive. Off by default (no timers). When enabled, sends reserved `PING` frames every `interval` (default `15000` ms) and requires liveness proof within `timeout` (default `5000` ms). Any well-formed inbound frame counts as proof; a miss is a connection failure — reconnects when configured, otherwise permanent close plus wire close. |
+| `reconnect` | `{ wire: () => Wire \| Promise<Wire>; minDelay?: number; maxDelay?: number; factor?: number; jitter?: number; maxAttempts?: number }` | Client-only reconnect policy. Off by default. Defaults: `minDelay` `100`, `maxDelay` `10000`, `factor` `2`, `jitter` `0.2`, `maxAttempts` `Infinity`. On unexpected loss, in-flight requests reject (never replayed), streams abort, `disconnect` fires, and a replacement wire is built from `wire()` with jittered exponential backoff. Permanent protocol failures never retry; `ready` waits through reconnects and rejects only on permanent closure. |
+| `maxInflightRequests` | `number` | Maximum concurrent non-reserved inbound requests. Over-cap frames get `503 Busy` without running any handler. Default `0` (disabled). |
+| `maxStreamsPerConnection` | `number` | Maximum concurrent multiplexed streams, in both directions. Over-cap streams are refused with `503 Busy`. Default `0` (disabled). |
+| `maxBufferedBytes` | `number` | Wire backpressure threshold. Only applies when the wire reports a finite `bufferedAmount`; outbound non-control sends wait until it drains to or below the threshold. Control `PING`/`PONG` bypass the wait. Default `0` (disabled). |
+| `protocolVersion` | `number` | Protocol major version, emitted as `v` on non-empty heads. An inbound `v` must match or the connection fails permanently; `0` disables emission and validation. Default `1`; overrides `frameOptions.protocolVersion`. |
 
-`Viae` accepts the same `frameOptions` and `codex` settings and forwards them
-to each connection. Its `timeout` option sets the default request timeout for
-every `Via` connection it creates.
+`Viae` accepts the same `frameOptions`, `codex`, and `streamOptions` settings and
+forwards them to each connection. Its `timeout` option sets the default request
+timeout for every `Via` connection it creates.
 
 | Option | Type | Description |
 |---|---|---|
 | `timeout` | `number` | Default request timeout in ms for each server-created `Via` (default `120000`). |
+| `frameOptions` | `FrameEncoderOptions` | Frame limits forwarded to each connection (`maxFrameSize` defaults to 64 MiB). |
+| `codex` | `Codex` | Named encoder registry forwarded to each connection. |
+| `streamOptions` | `StreamOptions` | Stream-layer options forwarded to each connection. See [Stream options](#stream-options). |
+| `heartbeat` | `{ interval?: number; timeout?: number }` | Heartbeat policy forwarded to each connection. Defaults `15000` / `5000` ms; see [`Via` options](#via-options). |
+| `maxConnections` | `number` | Maximum concurrent connections. `0` (default) is unlimited; excess connections are closed immediately, without creating a `Via` or emitting `connection`. |
+| `maxInflightRequests` | `number` | Forwarded to each connection (default `0`, disabled). See [`Via` options](#via-options). |
+| `maxStreamsPerConnection` | `number` | Forwarded to each connection (default `0`, disabled). See [`Via` options](#via-options). |
+| `maxBufferedBytes` | `number` | Forwarded to each connection (default `0`, disabled). See [`Via` options](#via-options). |
+| `protocolVersion` | `number` | Forwarded to each connection (default `1`). See [`Via` options](#via-options). |
+
+`heartbeat`, `maxInflightRequests`, `maxStreamsPerConnection`,
+`maxBufferedBytes`, and `protocolVersion` all apply to every connection `Viae`
+creates; `reconnect` is client-only — there is no server-side reconnect policy.
 
 ### Encoding
 
@@ -387,6 +452,19 @@ const myCodex = {
 const via = new Via({ wire, codex: myCodex });
 ```
 
+### Resource limits
+
+Secure defaults are applied on import:
+
+- Frames are limited to 64 MiB by default, inbound and outbound, via
+  `FrameEncoderOptions.maxFrameSize`. Opt out with
+  `frameOptions: { maxFrameSize: Number.MAX_SAFE_INTEGER }`.
+- The cbor-x decoder is initialised with size limits (`maxArraySize`
+  1,000,000 / `maxMapSize` 100,000 / `maxObjectSize` 100,000) when `viae` is
+  imported, rejecting decoder-amplification payloads such as truncated
+  array-32 headers. Note that cbor-x size limits are process-global: importing
+  `viae` changes decoding limits for every cbor-x consumer in the process.
+
 ### Raw send
 
 ```ts
@@ -395,9 +473,85 @@ await via.send({ id: "abc", head: { method: "PING", path: "/" } });
 
 ---
 
+## Connection lifecycle
+
+### Closing
+
+`Via.close(opts?)` closes a connection. `drain` defaults to `false`: pending
+requests are rejected immediately and the wire is closed. With `drain: true`,
+active handlers and their tasks are allowed to finish, bounded by
+`drainTimeout` (default `5000` ms); on expiry any remaining streams are
+force-aborted and the wire is closed. `close()` is idempotent — every call
+returns the first call's promise.
+
+```ts
+await via.close({ drain: true, drainTimeout: 5000 });
+console.log(via.closed); // true
+```
+
+`Via.closed` flips to `true` on permanent closure; `via.ready` resolves when
+the wire is open, waits through transient drops, and rejects only on permanent
+closure.
+
+`Viae.close(opts?)` marks the server closed — new connections are refused and
+closed immediately, without creating a `Via` or emitting `connection` — then
+drain-closes every connection current at call time and resolves once they have
+all settled. `drainTimeout` is per connection (default `5000` ms). It is
+idempotent, and `Viae.closed` becomes `true`.
+
+**`Viae` does not own the underlying `WireServer`/http server socket — callers
+must close it themselves.** Draining only ends the accepted connections.
+
+### Events
+
+| Event | Fires |
+|---|---|
+| `open` | The wire reached `OPEN` (also after a reconnect; not emitted if the wire is already `OPEN` when bound). |
+| `close` | Permanent closure only — an unexpected loss with no reconnect policy, attempts exhausted, a permanent protocol failure, or an explicit `close()`. |
+| `disconnect` | A transient drop: an unexpected connection loss while a reconnect policy is configured. Without a policy the loss is permanent and only `close` fires. |
+| `reconnected` | A replacement wire was built and reached `OPEN`. |
+| `error` | A wire error, an unhandled processing error, or the reason for an unexpected drop. |
+
+An intentional `close()` emits `close` but never `disconnect`.
+
+### Caps
+
+Optional per-connection caps reject excess work with `503 Busy`
+(`Status.Busy`):
+
+- `maxInflightRequests` — concurrent non-reserved inbound requests. Over-cap
+  requests get `503` without running any handler.
+- `maxStreamsPerConnection` — concurrent multiplexed streams, in both
+  directions. Over-cap streams are refused with `503` (a best-effort `CANCEL`
+  stops a peer that already announced the stream).
+- `maxBufferedBytes` — outbound non-control sends wait while the wire reports a
+  `bufferedAmount` above the threshold; `PING`/`PONG` bypass the wait.
+
+### Protocol version
+
+By default non-empty heads carry `v: 1`. An inbound head carrying a `v` must
+match the configured major or the connection fails permanently; heads without
+`v` are accepted for legacy peers, and empty-head frames carry no `v`. Set
+`protocolVersion: 0` to disable both emission and validation.
+
+### Wire ownership
+
+A wire may be bound to only one `Via`. Constructing a second, different `Via`
+on the same wire throws `wire is already bound to another Via`. The same `Via`
+may re-claim a replacement wire during reconnect.
+
+### Heartbeat compatibility
+
+`PING` is answered with `PONG` even by peers that have no heartbeat configured,
+so heartbeat-capable peers can probe legacy ones. Any response proves liveness,
+including a legacy peer's normal `404`: the beat is settled by the first
+well-formed frame received after it was sent.
+
+---
+
 ## Middleware
 
-Both `Viae` and `Via` extend `Rowan<Context>`, so arbitrary middleware can be inserted into the processing pipeline:
+Both `Viae` and `Via` extend `Rowan<Context>`, so arbitrary middleware can be inserted into the processing pipeline. viae depends on [`rowan`](https://www.npmjs.com/package/rowan) but does not re-export it — import `Rowan`, `Middleware`, `Processor`, or `Next` from `rowan` directly when you need those types:
 
 ```ts
 viae.use(async (ctx, next) => {
@@ -433,6 +587,7 @@ Status.Unauthorized // 401
 Status.Forbidden    // 403
 Status.NotFound     // 404
 Status.Error        // 500
+Status.Busy         // 503
 ```
 
 ---

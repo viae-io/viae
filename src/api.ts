@@ -2,6 +2,7 @@ import { type Middleware, type Next, type Processor } from "rowan";
 import type { Context } from "./context.js";
 import { ViaeError } from "./error.js";
 import { Router } from "./router.js";
+import { Status } from "./status.js";
 
 export type ParamTypeConstructor = typeof Number | typeof String | typeof Boolean;
 export type ParamDef = { type: ParamTypeConstructor };
@@ -61,7 +62,7 @@ export type ApiFn<C extends Context = Context> = <R, A extends "stream" | "objec
 function isReadableStream(obj: unknown): obj is ReadableStream {
   if (obj == null) return false;
   if (obj instanceof ReadableStream) return true;
-  if (typeof obj === "object" && "getReader" in obj) return true;
+  if (typeof obj === "object" && typeof (obj as { getReader?: unknown }).getReader === "function") return true;
   return false;
 }
 
@@ -80,7 +81,7 @@ export class Api<C extends Context = Context> implements Middleware<Context> {
 
     const methodFn = (method: string | null): ApiFn<C> => <R, A extends "stream" | "object" = "object", S extends ParamsSchema | undefined = undefined>(opts: ApiRouteOptions<R, A, C, S>) => {
       const { path, handler } = opts;
-      const isNext = opts.next !== undefined ? true : false;
+      const isNext = opts.next === true;
       const end = opts.end !== undefined ? opts.end : true;
 
       this._router.route({
@@ -103,6 +104,11 @@ export class Api<C extends Context = Context> implements Middleware<Context> {
             }
 
             try {
+              /* non-next routes default to 200; the handler may override via ctx.reply */
+              if (!isNext && ctx.out) {
+                ctx.out.head.status = Status.OK;
+              }
+
               /* params conversion */
               if (opts.params) {
                 const converted: Record<string, unknown> = { ...args.params };
@@ -111,7 +117,7 @@ export class Api<C extends Context = Context> implements Middleware<Context> {
                   if (raw === undefined) continue;
                   if (def.type === Number) {
                     const n = Number(raw);
-                    if (isNaN(n)) throw new ViaeError(400, `param '${key}' must be a number`);
+                    if (!Number.isFinite(n)) throw new ViaeError(400, `param '${key}' must be a number`);
                     converted[key] = n;
                   } else if (def.type === Boolean) {
                     converted[key] = raw === "true" || raw === "1";
@@ -157,10 +163,6 @@ export class Api<C extends Context = Context> implements Middleware<Context> {
 
               if (result !== undefined && ctx.out) {
                 ctx.out.data = result;
-              }
-
-              if (!isNext && ctx.out) {
-                ctx.out.head.status = 200;
               }
             } catch (err) {
               if (typeof err === "number" && ctx.out) {

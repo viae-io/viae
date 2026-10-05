@@ -1,8 +1,8 @@
 import { EventEmitter } from "eventemitter3";
 import { createServer, Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
-import { type WireServer, WebSocketWire, Via, Viae } from "../src/index.js";
-import type { Log } from "../src/index.js";
+import { type WireServer, WebSocketWire, Via, Viae, WireState } from "../src/index.js";
+import type { Log, ViaOptions, Wire } from "../src/index.js";
 import type { AddressInfo } from "net";
 
 const noop = () => {};
@@ -53,13 +53,52 @@ export class TestWireServer extends EventEmitter implements WireServer {
   }
 }
 
+/** Client-side `Via` options (the wire is supplied by the helper). */
+export type TestClientOptions = Omit<ViaOptions, "wire">;
+
 /**
  * Create a connected client via for testing.
+ *
+ * `opts` is optional and backward compatible: the wire and default noop log
+ * are supplied here, everything else is forwarded to the `Via` constructor.
  */
-export async function createTestClient(port: number, host = "localhost") {
+export async function createTestClient(
+  port: number,
+  host = "localhost",
+  opts: TestClientOptions = {},
+) {
   const ws = new WebSocket(`ws://${host}:${port}`);
   const wire = WebSocketWire.wrap(ws as unknown as globalThis.WebSocket);
-  const via = new Via({ wire, log: noopLog });
+  const via = new Via({ ...opts, wire, log: opts.log ?? noopLog });
   await via.ready;
   return { via, ws, wire };
+}
+
+/**
+ * Close a wire and wait until its `"close"` event fires. Bounded so a stuck
+ * socket fails the test explicitly instead of hanging it; a wire that is
+ * already closed resolves immediately.
+ */
+export function closeAndWait(wire: Wire, timeoutMs = 2000): Promise<void> {
+  if (wire.readyState === WireState.CLOSED) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onClose = () => {
+      clearTimeout(timer);
+      wire.off("close", onClose);
+      resolve();
+    };
+    timer = setTimeout(() => {
+      wire.off("close", onClose);
+      reject(new Error(`wire did not emit close within ${timeoutMs}ms`));
+    }, timeoutMs);
+    wire.on("close", onClose);
+    try {
+      wire.close();
+    } catch (err) {
+      clearTimeout(timer);
+      wire.off("close", onClose);
+      reject(err);
+    }
+  });
 }

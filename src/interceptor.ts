@@ -20,15 +20,17 @@ export class Interceptor implements Middleware<Context> {
   }): () => void {
     if (!opts.id) throw new Error("id is required");
     if (!opts.handlers.length) throw new Error("handlers required");
-
-    const dispose = () => {
-      this._entries.delete(opts.id);
-    };
+    if (this._entries.has(opts.id)) throw new Error(`id already in use: ${opts.id}`);
 
     const middleware = opts.handlers.map(h => Rowan.convertToMiddleware(h));
 
-    this._entries.set(opts.id, { dispose, middleware });
-    return dispose;
+    const entry = { middleware } as InterceptEntry;
+    entry.dispose = () => {
+      if (this._entries.get(opts.id) === entry) this._entries.delete(opts.id);
+    };
+
+    this._entries.set(opts.id, entry);
+    return entry.dispose;
   }
 
   /** 
