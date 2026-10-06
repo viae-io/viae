@@ -40,7 +40,7 @@ async function waitFor(predicate: () => boolean, label: string, ms = 2000): Prom
 
 /** Wrap a raw client socket so its close state is observable as a `Wire`. */
 function wrapClientSocket(url: string): Wire {
-  return WebSocketWire.wrap(new WebSocket(url) as unknown as globalThis.WebSocket);
+  return WebSocketWire.wrap(new WebSocket(url));
 }
 
 describe("Viae lifecycle", () => {

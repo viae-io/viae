@@ -17,7 +17,7 @@ import { Api, Viae, WebSocketWire } from "viae";
 const wss = new WebSocketServer({ port: 8080 });
 const wireServer = {
   on: (_e: "connection", cb: (wire: Wire) => void) =>
-    wss.on("connection", (ws) => cb(WebSocketWire.wrap(ws as any))),
+    wss.on("connection", (ws) => cb(WebSocketWire.wrap(ws))),
 };
 const viae = new Viae(wireServer);
 
@@ -33,7 +33,7 @@ import WebSocket from "ws";
 import { Via, WebSocketWire } from "viae";
 
 const ws = new WebSocket("ws://localhost:8080");
-const via = new Via({ wire: WebSocketWire.wrap(ws as any) });
+const via = new Via({ wire: WebSocketWire.wrap(ws) });
 await via.ready;
 const res = await via.request<string>("GET", "/hello/world"); // res.data === "Hello, world"
 ```
@@ -43,6 +43,8 @@ const res = await via.request<string>("GET", "/hello/world"); // res.data === "H
 - `via.request(method, path, data?, opts?)` -> `{ ok, head, data }`; opts: `timeout`, `id`, `accept` (`"stream" | "object"`), `encoding`, `head`.
 - `via.send(msg, opts?)` fire-and-forget; `via.close({ drain?, drainTimeout? })`; `via.ready`; `via.closed`.
 - Client wires: `WebSocketWire.wrap(ws)` or `new WebSocketWire().connect(url)`.
+- Connection identity: adapter sets `wire.state` before handoff -> `via.state` / `ctx.connection.state`; `wire.upgrade` via `WebSocketWire.wrap(ws, req)`; reject with `wire.close(code, reason)` (e.g. `1008`, `4401`).
+- Typed claims: `IVia<S>` / `Via<S>` / `ViaOptions<S>`; `new Via({ wire, state: claims })` infers `S`; server-side, `interface AppContext extends Context { connection: IVia<Claims> }` + `new Api<AppContext>` types `ctx.connection.state`. `WebSocketLike` is the structural socket type accepted by `WebSocketWire.wrap(ws, upgrade?)` - both the `ws` package and global `WebSocket` satisfy it, no casts needed.
 - Events: `via.on("open" | "close" | "disconnect" | "reconnected" | "error", cb)`.
 - `Api`: `get / post / put / delete / all / subscribe`; guards via `api.use(path, fn)`.
 - Route opts: `path`, `handler({ data, head, raw, path, params, ctx })`, `params`, `validate`, `accept`, `end`, `next`.
@@ -58,6 +60,10 @@ const res = await via.request<string>("GET", "/hello/world"); // res.data === "H
 - Reserved methods - `PING PONG START PULL CANCEL COMPLETE` - are control frames; never valid request methods.
 - Head is always CBOR; non-empty heads carry `v: 1`. A peer sending an unsupported `v` fails permanently; `protocolVersion: 0` disables.
 - One `Via` per wire; binding a second throws. Reconnect (`reconnect: { wire: () => Wire }`, client-only, opt-in) rebuilds and re-claims.
+- `via.state` is a construction-time snapshot: `ViaOptions.state` (even `undefined`) overrides `wire.state`; later `wire.state` mutations and reconnect rebinds do not refresh it.
+- Beta break: `IVia.state` is required (was `state?: unknown`) - structural `IVia` mocks must add a `state` member. `request<T>(..., { accept: "stream" })` types `data` as `ReadableStream<T>`; legacy `request<ReadableStream<T>>(..., { accept: "stream" })` still works, omitted `accept` stays permissive, and `IVia.request` remains non-overloaded.
+- Auth is adapter-owned - no cookies/JWT/session helpers; never smuggle identity via `head`. Set `wire.state` at the upgrade and read `ctx.connection.state` in guards.
+- Revocation/expiry is user-land: recheck claims per request, drop with `via.close()` / `wire.close(1008|4401, reason)`, or sweep `viae.connections`. A client reconnect re-authenticates server-side; client `via.state` does not refresh on rebind.
 - `accept`, when supplied, is an assertion, not a conversion: a mismatch rejects the request. Omit it to accept either shape.
 - Streams: credit is SET (not additive). Configure `streamOptions.maxCredit` on BOTH peers or the stream fails fast with `granted credit N exceeds maxCredit M`.
 - Stream queues are bounded by default: 1024 chunks / 64 MiB per stream (`Infinity` opts out). Streams abort on any connection drop; no resume.

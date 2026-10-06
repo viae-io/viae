@@ -133,9 +133,15 @@ interface ReadyWaiter {
   reject: (error: Error) => void;
 }
 
-export interface IVia {
+export interface IVia<S = unknown> {
   readonly wire: Wire;
   readonly closed: boolean;
+  /**
+   * Per-connection state/claims snapshot, typed by the constructing `Via`
+   * (`ViaOptions.state` infers `S`). Required: structural `IVia` mocks must
+   * supply a `state` member.
+   */
+  readonly state: S;
   send(msg: Partial<Message>, opts?: SendOptions): Promise<void>;
   request<R>(method: string, path: string, data?: unknown, opts?: RequestOptions): Promise<RequestResponse<R>>;
   intercept(id: string, handlers: Processor<Context>[]): () => void;
@@ -153,8 +159,14 @@ export interface CloseOptions {
   drainTimeout?: number;
 }
 
-export interface ViaOptions {
+export interface ViaOptions<S = unknown> {
   wire: Wire;
+  /**
+   * Typed per-connection state/claims snapshot. When present (including an
+   * explicit `undefined`) it overrides `wire.state`. Read once at construction;
+   * later `wire.state` mutations are ignored by this Via.
+   */
+  state?: S;
   uuid?: () => string;
   log?: Log;
   timeout?: number;
@@ -214,10 +226,21 @@ export interface RequestResponse<T = unknown> extends Response<T> {
 }
 
 /**
+ * Response data type for `request<R>(..., { accept: "stream" })`.
+ *
+ * `R` may be a chunk type (wrapped into `ReadableStream<R>`) or an existing
+ * `ReadableStream` type (passed through unchanged), so both the new-style
+ * `request<number>(..., { accept: "stream" })` and every legacy
+ * `request<ReadableStream<number>>(..., { accept: "stream" })` call site keep
+ * their meaning.
+ */
+type StreamData<R> = R extends ReadableStream<any> ? R : ReadableStream<R>;
+
+/**
  * Via - wraps a wire connection and processes inbound/outbound messages.
  * Opinionated: CBOR serialisation, credit-based stream backpressure.
  */
-export class Via extends Rowan<Context> implements IVia {
+export class Via<S = unknown> extends Rowan<Context> implements IVia<S> {
   private _ev = new EventEmitter();
   private _active: Context[] = [];
   private _wire: Wire;
@@ -278,6 +301,14 @@ export class Via extends Rowan<Context> implements IVia {
 
   readonly out: Rowan<Context> = new Rowan<Context>();
 
+  /**
+   * Per-connection state/claims snapshot, resolved once at construction (from
+   * `ViaOptions.state` when present, else `wire.state`). Later `wire.state`
+   * mutations and reconnect rebinds never change it. `S` is inferred from
+   * `ViaOptions.state` (defaults to `unknown`).
+   */
+  readonly state: S;
+
   get wire() { return this._wire; }
   get active() { return this._active; }
   get closed() { return this._closed; }
@@ -285,9 +316,12 @@ export class Via extends Rowan<Context> implements IVia {
 
   static Log: Log = consoleLog;
 
-  constructor(opts: ViaOptions) {
+  constructor(opts: ViaOptions<S>) {
     super();
     const wire = this._wire = opts.wire;
+    // `opts.state` is `S | undefined` under strictNullChecks; the presence
+    // check keeps the runtime snapshot semantics and the cast asserts `S`.
+    this.state = (Object.hasOwn(opts, "state") ? opts.state : wire.state) as S;
     this._log = opts.log ?? Via.Log;
     this._uuid = opts.uuid || shortId;
     this._timeout = opts.timeout ?? 120000;
@@ -979,6 +1013,39 @@ export class Via extends Rowan<Context> implements IVia {
     return sent;
   }
 
+  /**
+   * Send a request and resolve its response.
+   *
+   * Typing is driven by `accept` when it is statically known:
+   * - `{ accept: "stream" }` types `data` as `StreamData<R>` — `R` may be the
+   *   chunk type (new style: `request<number>` → `ReadableStream<number>`) or
+   *   an existing stream type (legacy: `request<ReadableStream<number>>`).
+   * - `{ accept: "object" }` (or omitted) types `data` as `R`.
+   * - A plain `RequestOptions` variable falls through to the permissive
+   *   overload and types `data` as `R`.
+   *
+   * Omitting `accept` is permissive at runtime (either shape is accepted), so
+   * `data` is typed as `R`; the specific overloads are precise only when
+   * `accept` is statically known. No runtime behavior changes.
+   */
+  request<R>(
+    method: string,
+    path: string,
+    data: unknown,
+    opts: RequestOptions & { accept: "stream" },
+  ): Promise<RequestResponse<StreamData<R>>>;
+  request<R>(
+    method: string,
+    path: string,
+    data?: unknown,
+    opts?: RequestOptions & { accept?: "object" },
+  ): Promise<RequestResponse<R>>;
+  request<R>(
+    method: string,
+    path: string,
+    data?: unknown,
+    opts?: RequestOptions,
+  ): Promise<RequestResponse<R>>;
   async request<R>(
     method: string,
     path: string,

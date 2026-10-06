@@ -16,8 +16,21 @@ export interface Wire {
    * buffer size is unknown and backpressure must not be applied.
    */
   readonly bufferedAmount?: number;
+  /**
+   * Adapter-provided per-connection state/claims (e.g. identity established at
+   * the HTTP upgrade). Opaque to viae: never read or mutated internally. Set it
+   * before handoff; later mutations are ignored by Via's construction-time
+   * snapshot.
+   */
+  state?: unknown;
+  /**
+   * Adapter-provided upgrade metadata (e.g. the `ws` request). Opaque to viae.
+   * Only server-side wires created via `WebSocketWire.wrap(ws, upgrade)` carry
+   * it; client `connect()` wires never do.
+   */
+  readonly upgrade?: unknown;
   send(data: ArrayBuffer | ArrayBufferView): void;
-  close(): void;
+  close(code?: number, reason?: string): void;
   on(event: "message", cb: (data: ArrayBuffer | ArrayBufferView) => void): void;
   on(event: "open", cb: () => void): void;
   on(event: "close", cb: () => void): void;
@@ -30,16 +43,38 @@ export interface WireServer {
 }
 
 /**
+ * Minimal structural WebSocket surface accepted by `WebSocketWire.wrap`.
+ *
+ * Both the `ws` package's `WebSocket` and the global (DOM) `WebSocket`
+ * satisfy it, so server adapters can wrap sockets without `as any` casts.
+ * The `(...args: any[]) => void` listener signature is required for
+ * DOM-style handler assignability.
+ */
+export interface WebSocketLike {
+  readyState: number;
+  bufferedAmount: number;
+  send(data: ArrayBuffer | ArrayBufferView): void;
+  close(code?: number, reason?: string): void;
+  addEventListener(type: string, listener: (...args: any[]) => void): void;
+  removeEventListener(type: string, listener: (...args: any[]) => void): void;
+}
+
+/**
  * WebSocket Wire - wraps a WebSocket instance as a Wire.
  * Works with both browser WebSocket and `ws` library.
  */
 export class WebSocketWire extends EventEmitter implements Wire {
-  private _ws?: WebSocket;
+  private _ws?: WebSocketLike;
+  private _upgrade?: unknown;
   private _sendCallback = false;
 
   get url(): string {
     if (!this._ws) return "";
     return (this._ws as any).url ?? (this._ws as any)._socket?.remoteAddress ?? "";
+  }
+
+  get upgrade(): unknown {
+    return this._upgrade;
   }
 
   get readyState(): WireState {
@@ -51,8 +86,9 @@ export class WebSocketWire extends EventEmitter implements Wire {
   }
 
   /** Wrap an existing WebSocket (server-side) */
-  static wrap(ws: WebSocket): WebSocketWire {
+  static wrap(ws: WebSocketLike, upgrade?: unknown): WebSocketWire {
     const wire = new WebSocketWire();
+    wire._upgrade = upgrade;
     wire._bind(ws);
     return wire;
   }
@@ -99,7 +135,7 @@ export class WebSocketWire extends EventEmitter implements Wire {
     });
   }
 
-  private _bind(ws: WebSocket) {
+  private _bind(ws: WebSocketLike) {
     this._ws = ws;
     /* The `ws` package implements an EventEmitter-style `on` and accepts a
        send callback that reports asynchronous failures.  The global WebSocket
@@ -111,8 +147,9 @@ export class WebSocketWire extends EventEmitter implements Wire {
     ws.addEventListener("open", () => {
       this.emit("open");
     });
-    ws.addEventListener("message", (ev: MessageEvent | { data: unknown }) => {
-      const data = (ev as MessageEvent).data ?? (ev as any).data;
+    ws.addEventListener("message", (...args: any[]) => {
+      const ev = args[0] as MessageEvent | { data?: unknown };
+      const data = (ev as MessageEvent).data ?? ev.data;
       this.emit("message", data);
     });
     ws.addEventListener("close", () => {
@@ -147,9 +184,12 @@ export class WebSocketWire extends EventEmitter implements Wire {
     }
   }
 
-  close(): void {
+  close(code?: number, reason?: string): void {
     if (this._ws && this._ws.readyState !== WireState.CLOSING) {
-      this._ws.close();
+      if (code !== undefined && reason !== undefined) this._ws.close(code, reason);
+      else if (code !== undefined) this._ws.close(code);
+      else if (reason !== undefined) this._ws.close(undefined, reason);
+      else this._ws.close();
     }
   }
 }

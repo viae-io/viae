@@ -1017,7 +1017,7 @@ describe("Stream protocol — end-to-end bad-actor scenarios", () => {
     // Client configured with a short idle timeout
     const ws = new WebSocket(`ws://localhost:${port}`);
     const { WebSocketWire } = await import("../src/index.js");
-    const wire = WebSocketWire.wrap(ws as unknown as globalThis.WebSocket);
+    const wire = WebSocketWire.wrap(ws);
     const via = new Via({ wire, log: noopLog, streamOptions: { idleTimeout: 200 } });
     await via.ready;
 
@@ -1064,7 +1064,7 @@ describe("Stream protocol — end-to-end bad-actor scenarios", () => {
 
     const ws = new WebSocket(`ws://localhost:${port}`);
     const { WebSocketWire } = await import("../src/index.js");
-    const wire = WebSocketWire.wrap(ws as unknown as globalThis.WebSocket);
+    const wire = WebSocketWire.wrap(ws);
     const via = new Via({ wire, log: noopLog, streamOptions: { highWaterMark: 2, idleTimeout: 0 } });
     await via.ready;
 

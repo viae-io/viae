@@ -1,6 +1,6 @@
 export { Status } from "./status.js";
 export { type Message, type MessageHeader, type Request, type Response, isRequest, isResponse } from "./message.js";
-export { type Wire, WireState, type WireServer, WebSocketWire } from "./wire.js";
+export { type Wire, WireState, type WireServer, WebSocketWire, type WebSocketLike } from "./wire.js";
 export { type Context, DefaultContext, type ContextTask, type RequestContext, type ResponseContext, type ReplyOptions } from "./context.js";
 export { Via, type IVia, type ViaOptions, type SendOptions, type RequestOptions, type RequestResponse } from "./via.js";
 export { Viae, type ViaeOptions } from "./viae.js";

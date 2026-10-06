@@ -33,7 +33,7 @@ const wss = new WebSocketServer({ port: 8080 });
 // Adapt the ws server so Viae can accept connections
 const wireServer = {
   on(event: "connection", cb: (wire: Wire) => void) {
-    wss.on("connection", (ws) => cb(WebSocketWire.wrap(ws as any)));
+    wss.on("connection", (ws) => cb(WebSocketWire.wrap(ws)));
   }
 };
 
@@ -55,7 +55,7 @@ import WebSocket from "ws";
 import { Via, WebSocketWire } from "viae";
 
 const ws   = new WebSocket("ws://localhost:8080");
-const wire = WebSocketWire.wrap(ws as any);
+const wire = WebSocketWire.wrap(ws);
 const via  = new Via({ wire });
 
 await via.ready;
@@ -92,13 +92,14 @@ Supply a custom context interface as a type argument to get full type-safety for
 ```ts
 interface AppContext extends Context {
   userId: string;
+  connection: IVia<{ sub: string }>;
 }
 
 const api = new Api<AppContext>("/");
 
 // guard — runs for every request under this router
 api.use("*", async (ctx, next) => {
-  ctx.userId = ctx.in.head.token as string; // ctx is typed as AppContext
+  ctx.userId = ctx.connection.state.sub; // typed claims, no cast
   return next();
 });
 
@@ -114,7 +115,7 @@ api.get({
 
 ```ts
 api.use("*", async (ctx, next) => {
-  if (!ctx.in.head.token) throw new ViaeError(Status.Unauthorized, "missing token");
+  if (!ctx.connection.state) throw new ViaeError(Status.Unauthorized, "unauthenticated");
   return next();
 });
 
@@ -233,8 +234,8 @@ import { ViaeError, Status } from "viae";
 
 api.get({
   path: "/secret",
-  handler: ({ head }) => {
-    if (!head.token) throw new ViaeError(Status.Unauthorized, "missing token");
+  handler: ({ ctx }) => {
+    if (!ctx.connection.state) throw new ViaeError(Status.Unauthorized, "unauthenticated");
     return "classified";
   },
 });
@@ -268,29 +269,36 @@ api.get({
 
 ### Client — consuming a stream
 
-Request with `accept: "stream"` to receive a `ReadableStream`:
+Request with `accept: "stream"` to receive a `ReadableStream`. The type
+argument is the **chunk** type:
 
 ```ts
-const result = await via.request<ReadableStream<number>>(
+const result = await via.request<number>(
   "GET", "/numbers", undefined, { accept: "stream" }
 );
 
-const reader = (result.data as ReadableStream<number>).getReader();
+const reader = result.data!.getReader(); // ReadableStream<number>
 
 while (true) {
   const { done, value } = await reader.read();
   if (done) break;
-  console.log(value);
+  console.log(value); // number
 }
 ```
 
 Or pipe through the WHATWG Streams API:
 
 ```ts
-await (result.data as ReadableStream<number>).pipeTo(
+await result.data!.pipeTo(
   new WritableStream({ write: (chunk) => console.log(chunk) })
 );
 ```
+
+Legacy call sites that pass the stream type itself keep their exact meaning:
+`via.request<ReadableStream<number>>("GET", "/numbers", undefined, { accept: "stream" })`
+still types `data` as `ReadableStream<number>`, and a variable typed as plain
+`RequestOptions` still compiles. `IVia.request` itself stays non-overloaded:
+interface-typed consumers keep the `request<R>` signature.
 
 When `accept` is supplied it is a validated assertion: `"stream"` rejects the request when the response is an object, and `"object"` rejects it when the response is a stream. Omit `accept` to accept either shape:
 
@@ -298,6 +306,10 @@ When `accept` is supplied it is a validated assertion: `"stream"` rejects the re
 const stream = await via.request("GET", "/numbers", undefined, { accept: "stream" });
 // rejects with "expected stream response but received object" if the server replies with an object
 ```
+
+Because omitted `accept` stays permissive at runtime (either shape is
+accepted), `data` is typed as the bare type argument in that case — pass
+`accept` when you need the precise shape.
 
 ### Cancellation and error propagation
 
@@ -330,7 +342,7 @@ For byte-oriented streams, opt into the pass-through binary codec. This keeps
 each chunk as raw octets instead of wrapping it in CBOR:
 
 ```ts
-const result = await via.request<ReadableStream<Uint8Array>>(
+const result = await via.request<Uint8Array>(
   "GET", "/blob", undefined, { accept: "stream", encoding: "binary" }
 );
 ```
@@ -391,7 +403,7 @@ viae.use(async (ctx, next) => {
 
 ```ts
 viae.before(async (ctx, next) => {
-  if (!ctx.in.head.token) {
+  if (!ctx.connection.state) {
     ctx.out!.head.status = Status.Unauthorized;
     return;
   }
@@ -451,6 +463,7 @@ await via.send({ id: "abc", head: { method: "CUSTOM", path: "/" } });
 | Option | Type | Description |
 |---|---|---|
 | `wire` | `Wire` | Required. The underlying transport. |
+| `state` | `S` (inferred) | Typed per-connection state/claims snapshot. When present — including an explicit `undefined` — it overrides `wire.state`. Resolved once at construction; later `wire.state` mutations are ignored. Infers `S` on `new Via(...)`; defaults to `unknown`. |
 | `uuid` | `() => string` | Id generator for requests, responses, and streams. Defaults to `shortId`. |
 | `log` | `Log` | Logger instance. Defaults to `Via.Log` (console). |
 | `timeout` | `number` | Request timeout in ms (default `120000`). |
@@ -594,6 +607,145 @@ match the configured major or the connection fails permanently; heads without
 A wire may be bound to only one `Via`. Constructing a second, different `Via`
 on the same wire throws `wire is already bound to another Via`. The same `Via`
 may re-claim a replacement wire during reconnect.
+
+### Connection state & auth
+
+WebSocket handshakes are HTTP requests, so authentication is owned by the
+`WireServer` adapter, not by viae. The model has two cooperating layers:
+
+1. **Admission (upgrade-time).** The adapter authenticates the handshake and,
+   on success, attaches the resulting identity to `wire.state` before handing
+   the wire to viae. On failure the wire is closed and never handed off.
+2. **Authorization (per request).** Guards read the snapshot from
+   `ctx.connection.state` (`Via.state`) and check it against the request.
+
+```ts
+import { WebSocketServer } from "ws";
+import { Api, Status, Viae, ViaeError, WebSocketWire, type Wire } from "viae";
+
+const wss = new WebSocketServer({ port: 8080 });
+
+const wireServer = {
+  on(event: "connection", cb: (wire: Wire) => void) {
+    wss.on("connection", (ws, req) => {
+      const claims = authenticate(req); // your auth logic (cookies, header, ticket, ...)
+      const wire = WebSocketWire.wrap(ws, req);
+      if (!claims) {
+        wire.close(1008, "unauthorized"); // reject: never hand off
+        return;
+      }
+      wire.state = claims; // accepted: claims ride along with the connection
+      cb(wire);
+    });
+  },
+};
+
+const api = new Api("/");
+api.use("*", async (ctx, next) => {
+  const claims = ctx.connection.state as { sub: string } | undefined;
+  if (!claims) throw new ViaeError(Status.Unauthorized, "unauthenticated");
+  return next();
+});
+api.get({ path: "/whoami", handler: ({ ctx }) => ctx.connection.state });
+
+const viae = new Viae(wireServer);
+viae.use(api);
+```
+
+`wire.state` is opaque to viae and may be any value. Set it **before** handoff:
+`Via` snapshots state once at construction, resolving it by presence — a
+`ViaOptions.state` (even an explicit `undefined`) overrides `wire.state`.
+Later mutations of `wire.state` are ignored by an existing `via`, including
+across reconnect rebinds, so make `state` a stable object and mutate it in
+place if you need to update claims. `Viae` itself has no `state` option: the
+adapter is the single admission point.
+
+#### Typed claims
+
+`wire.state` stays `unknown` (viae never reads it), but the `Via` layer is
+generic over the claims shape: `Via<S>`, `ViaOptions<S>`, and `IVia<S>`. Narrow
+`connection` in a context interface and hand that interface to `Api`:
+
+```ts
+interface Claims {
+  sub: string;
+  scopes: string[];
+}
+
+interface AppContext extends Context {
+  connection: IVia<Claims>;
+}
+
+const api = new Api<AppContext>("/");
+api.use("*", async (ctx, next) => {
+  ctx.connection.state.sub;     // string
+  // ctx.connection.state.nope; // type error: unknown claim key
+  return next();
+});
+```
+
+`IVia<S>` declares `state` as **required** (a breaking change in this beta):
+structural `IVia` mocks must add a `state` member. On the client side,
+`ViaOptions.state` infers `S` directly from the option:
+
+```ts
+const via = new Via({ wire, state: { sub: "alice", scopes: ["read"] } });
+via.state.sub; // string
+```
+
+`ViaOptions.state` still overrides `wire.state` by presence (an explicit
+`undefined` wins), and the snapshot is still resolved once at construction.
+
+| `Wire` member | Description |
+|---|---|
+| `state` | Adapter-set per-connection state/claims, opaque to viae. Set before handoff. |
+| `upgrade` | Readonly upgrade metadata passed to `WebSocketWire.wrap(ws, upgrade)`, e.g. the `ws` request. `undefined` on client `connect()` wires. |
+| `close(code?, reason?)` | Forwards to the transport per argument. The first call wins; later calls while `CLOSING` are no-ops. |
+
+**Rejecting a connection.** Close the wire with `wire.close(code, reason)` —
+`1008` (policy violation) or an application code in `4000-4999` (e.g. `4401`)
+is recommended for server-side rejections. RFC 6455 close bodies require a
+status code, so transports (including `ws`) drop a reason sent without a code;
+always pass both. viae never validates or rewrites codes.
+
+**Upgrade metadata.** `WebSocketWire.wrap(ws, req)` stores its second argument
+on the readonly `wire.upgrade`, so adapters can pass the `ws` upgrade request
+(headers, URL, socket) through without closing over it. viae never reads it.
+
+**Revocation and expiry are user-land.** WebSocket connections are stateful, so
+viae ships no revocation machinery: `via.state` is a snapshot and cannot by
+itself notice a revoked session. Recommended patterns:
+
+- **Re-validate claims per request.** Guards check the claims against the
+  authoritative session store (or an expiry timestamp inside the claims) on
+  every request — the only way a long-lived connection observes a revocation.
+  You can also schedule `wire.close(1008, "expired")` at the claim's expiry.
+- **Drop a connection.** `via.close()` for a drained close, or
+  `ctx.connection.wire.close(1008, "revoked")` / `wire.close(4401, "revoked")`
+  for an immediate one.
+- **Sweep.** Iterate `viae.connections` (or listen to `Viae.on("connection")`),
+  inspect `via.state`, and close the sessions that are revoked — useful for a
+  server-wide "log out everywhere" action.
+- **Reconnect re-authenticates server-side, not client-side.** A client
+  `reconnect` performs a fresh handshake, so the server runs its adapter gate
+  again and the new server-side `Via` snapshots fresh `wire.state`. The
+  client's own `Via.state` is developer-supplied and does **not** refresh on
+  rebind: refresh it by mutating the shared state object or constructing a new
+  `Via`; reconnecting alone does not refresh `via.state`.
+
+**Security notes.**
+
+- Allowlist the handshake `Origin` in the adapter: WebSocket handshakes are not
+  subject to CORS, so any web page can attempt a cross-origin connection.
+- Cookies are sent on WebSocket handshakes, but `SameSite` does not reliably
+  protect them across schemes/ports; prefer explicit credentials.
+- Tokens in query strings leak to access logs, proxies, and browser history.
+- Node clients can send an `Authorization` header; browsers cannot set custom
+  headers on `WebSocket`, so browser auth usually rides on cookies or an
+  out-of-band token.
+- `head` is message metadata, not connection identity: do not smuggle tokens
+  through `ctx.in.head`. Put the upgrade identity in `wire.state` and read it
+  from `ctx.connection.state`.
 
 ---
 

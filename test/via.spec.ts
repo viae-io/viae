@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "eventemitter3";
 import {
+  Api,
   FrameEncoder,
   Status,
   Via,
@@ -10,6 +11,8 @@ import {
   WebSocketWire,
   WireState,
   type Context,
+  type IVia,
+  type RequestOptions,
   type ViaOptions,
   type Wire,
   type WireServer,
@@ -21,6 +24,8 @@ class TestWire extends EventEmitter implements Wire {
   readonly url = "test://wire";
   sent: Array<ArrayBuffer | ArrayBufferView> = [];
   closeCalls = 0;
+  /** Adapter-provided claims; optional per the Wire interface. */
+  state?: unknown;
   /** Controllable queued bytes for backpressure tests; undefined = unknown. */
   bufferedAmountValue: number | undefined = undefined;
 
@@ -1109,3 +1114,222 @@ describe("WebSocketWire", () => {
     assert.notEqual(wire.readyState, WireState.OPEN);
   });
 });
+
+describe("Via state (D1)", () => {
+  it("should expose the direct state option by identity", () => {
+    const wire = new TestWire();
+    const claims = { user: "ada" };
+    const via = new Via({ wire, log: noopLog, state: claims });
+    assert.equal(via.state, claims);
+  });
+
+  it("should fall back to the wire state when no option is supplied", () => {
+    const wire = new TestWire();
+    const claims = { user: "ada" };
+    wire.state = claims;
+    const via = new Via({ wire, log: noopLog });
+    assert.equal(via.state, claims);
+  });
+
+  it("should let an explicit state: undefined override a set wire.state", () => {
+    const wire = new TestWire();
+    wire.state = { user: "ada" };
+    const via = new Via({ wire, log: noopLog, state: undefined });
+    assert.equal(via.state, undefined);
+  });
+
+  it("should default to undefined when neither source sets state", () => {
+    const wire = new TestWire();
+    const via = new Via({ wire, log: noopLog });
+    assert.equal(via.state, undefined);
+  });
+
+  it("should expose the identical snapshot to handlers via ctx.connection", async () => {
+    const wire = new TestWire();
+    const claims = { user: "ada", scopes: ["read"] };
+    const via = new Via({ wire, log: noopLog, state: claims });
+
+    let seen: unknown;
+    let seenVia: unknown;
+    via.use(async (ctx: Context) => {
+      seen = ctx.connection.state;
+      seenVia = ctx.connection;
+      ctx.out!.head.status = Status.OK;
+      ctx.out!.data = "ok";
+    });
+
+    wire.emit("message", encode({ id: "state1", head: { method: "GET", path: "/whoami" } }));
+    await tick();
+
+    assert.equal(seen, claims);
+    assert.equal(seen, via.state);
+    assert.equal(seenVia, via);
+    assert.equal(decodeSent(wire).head?.status, Status.OK);
+  });
+
+  it("should ignore post-construction wire.state mutations", () => {
+    const wire = new TestWire();
+    const first = { user: "ada" };
+    wire.state = first;
+    const via = new Via({ wire, log: noopLog });
+    assert.equal(via.state, first);
+
+    wire.state = { user: "mallory" };
+    assert.equal(via.state, first);
+  });
+
+  it("should keep the construction-time snapshot across a reconnect rebind", async () => {
+    const wires: TestWire[] = [];
+    const makeWire = () => {
+      const wire = new TestWire();
+      wires.push(wire);
+      return wire;
+    };
+    const claims = { user: "ada" };
+    const via = new Via({
+      wire: makeWire(),
+      log: noopLog,
+      timeout: 30_000,
+      state: claims,
+      reconnect: { wire: makeWire, minDelay: 2, maxDelay: 4, jitter: 0 },
+    });
+
+    let reconnected = 0;
+    via.on("reconnected", () => { reconnected++; });
+
+    wires[0].close();
+    await via.ready;
+
+    assert.equal(reconnected, 1);
+    assert.notEqual(via.wire, wires[0]);
+    assert.equal(via.state, claims);
+
+    await via.close();
+  });
+});
+
+describe("Via request overloads (T2)", () => {
+  it("should serve a chunk-typed stream request in the new style at runtime", async () => {
+    const wire = new TestWire();
+    const via = new Via({ wire, log: noopLog, timeout: 30_000 });
+    const pending = via.request<number>("GET", "/numbers", undefined, { id: "nt1", accept: "stream" });
+
+    wire.emit("message", encode({ id: "nt1", head: { status: Status.OK, sid: "sn1" } }));
+
+    const response = await pending;
+    assert.equal(response.ok, true);
+    assert.ok(response.data instanceof ReadableStream, "accept: 'stream' should resolve to a stream");
+
+    await response[Symbol.asyncDispose]();
+    const cancelFrame = sentFrames(wire).find(frame => frame.head?.method === "CANCEL" && frame.id === "sn1");
+    assert.ok(cancelFrame, "disposing an unconsumed response stream should cancel it");
+  });
+});
+
+/* ── Type probes (compile-time only) ─────────────────────────────────────────
+   These blocks are never executed (tsx runs the file, but `if (false)` is
+   skipped); `tsc` still checks them under the repo's strict settings, and an
+   unused `@ts-expect-error` directive is a hard error, so a typing regression
+   fails the build instead of silently passing. */
+
+if (false) {
+  // T1: `S` is inferred from `ViaOptions.state`.
+  const wire = new TestWire();
+  const via = new Via({ wire, log: noopLog, state: { userId: "x" } });
+  const userId: string = via.state.userId;
+  void userId;
+
+  // T1: unknown claim keys are rejected.
+  // @ts-expect-error `missing` is not part of the inferred state
+  void via.state.missing;
+
+  // T1: a structural IVia mock without `state` is rejected.
+  const withoutState: Omit<IVia, "state"> = {
+    wire,
+    closed: false,
+    send: async () => {},
+    request: via.request,
+    intercept: via.intercept,
+    createId: () => "id",
+    log: noopLog,
+    close: async () => {},
+    on: () => {},
+    off: () => {},
+  };
+  // @ts-expect-error `state` is required on IVia
+  const mock: IVia = withoutState;
+  void mock;
+
+  // `IVia.request` stays non-overloaded: interface-typed consumers keep
+  // today's `request<R>` typing, so `data` is the bare type argument.
+  const asIvia: IVia = via;
+  const viaData: number = (await asIvia.request<number>("GET", "/numbers", undefined, { accept: "stream" })).data!;
+  void viaData;
+}
+
+if (false) {
+  // T1: the AppContext pattern narrows `ctx.connection` to `IVia<Claims>`.
+  interface Claims {
+    userId: string;
+  }
+  interface AppContext extends Context {
+    connection: IVia<Claims>;
+  }
+
+  const api = new Api<AppContext>("/");
+  api.use("*", async (ctx, next) => {
+    const narrowed: string = ctx.connection.state.userId;
+    void narrowed;
+    // @ts-expect-error unknown claim keys are rejected on the narrowed connection
+    void ctx.connection.state.missing;
+    return next();
+  });
+  void api;
+}
+
+if (false) {
+  // T2: legacy stream call sites keep their meaning.
+  const wire = new TestWire();
+  const via = new Via({ wire, log: noopLog, timeout: 30_000 });
+  const legacy = await via.request<ReadableStream<number>>("GET", "/numbers", undefined, { accept: "stream" });
+  const legacyStream: ReadableStream<number> = legacy.data!;
+  void legacyStream;
+  const legacyCast = legacy.data as ReadableStream<number>;
+  void legacyCast;
+
+  // T2: new style — the type argument is the chunk type.
+  const chunks = await via.request<number>("GET", "/numbers", undefined, { accept: "stream" });
+  const numberStream: ReadableStream<number> = chunks.data!;
+  void numberStream;
+
+  // T2: no type argument → `ReadableStream<unknown>`.
+  const bare = await via.request("GET", "/numbers", undefined, { accept: "stream" });
+  const unknownStream: ReadableStream<unknown> = bare.data!;
+  void unknownStream;
+
+  // T2: omitted `accept` stays permissive and types `data` as the bare argument.
+  const object = await via.request<number>("GET", "/numbers");
+  const value: number = object.data!;
+  void value;
+
+  // T2: a plain RequestOptions variable compiles via the permissive fallback.
+  const opts: RequestOptions = { accept: "stream" };
+  const fallback = await via.request<number>("GET", "/numbers", undefined, opts);
+  const fallbackValue: number = fallback.data!;
+  void fallbackValue;
+
+  // Negative guards: the positive probes above only mean something if the
+  // inferred types did not silently degrade to `any`.
+  // @ts-expect-error a stream response is not the chunk type
+  const notChunk: number = chunks.data!;
+  void notChunk;
+  // @ts-expect-error legacy typing does not double-wrap the stream
+  const legacyNotChunk: number = legacy.data!;
+  void legacyNotChunk;
+  // @ts-expect-error `ReadableStream<unknown>` is not a number
+  const notNumber: number = bare.data!;
+  void notNumber;
+  // @ts-expect-error omitted `accept` types `data` as the bare type argument
+  const notStream: ReadableStream<number> = object.data!;
+  void notStream;
+}

@@ -27,7 +27,7 @@ export class TestWireServer extends EventEmitter implements WireServer {
     this._wss = new WebSocketServer({ server: this._server });
 
     this._wss.on("connection", (ws: WebSocket) => {
-      const wire = WebSocketWire.wrap(ws as unknown as globalThis.WebSocket);
+      const wire = WebSocketWire.wrap(ws);
       this.emit("connection", wire);
     });
   }
@@ -68,7 +68,7 @@ export async function createTestClient(
   opts: TestClientOptions = {},
 ) {
   const ws = new WebSocket(`ws://${host}:${port}`);
-  const wire = WebSocketWire.wrap(ws as unknown as globalThis.WebSocket);
+  const wire = WebSocketWire.wrap(ws);
   const via = new Via({ ...opts, wire, log: opts.log ?? noopLog });
   await via.ready;
   return { via, ws, wire };
